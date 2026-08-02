@@ -1,0 +1,19 @@
+{
+  "version": 1,
+  "include": ["/*"],
+  "exclude": [
+    "/legal/*",
+    "/legal/privacy-policy.html",
+    "/legal/terms-of-service.html",
+    "/legal/risk-disclosure.html",
+    "/legal/security-policy.html",
+    "/legal/community-guidelines.html",
+    "/legal/responsible-disclosure.html",
+    "/manifest.json",
+    "/sw.js",
+    "/finpi-logo.svg",
+    "/validation-key.txt",
+    "/_redirects",
+    "/functions/*"
+  ]
+}
