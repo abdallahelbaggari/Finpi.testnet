@@ -1,0 +1,845 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#060B14">
+<title>FinPi</title>
+<link rel="manifest" href="/manifest.json">
+<link rel="icon" href="/finpi-logo.svg" type="image/svg+xml">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800;900&family=JetBrains+Mono:wght@600;700;800&display=swap" rel="stylesheet">
+<script src="https://sdk.minepi.com/pi-sdk.js"></script>
+<style>
+:root{
+  --bg0:#050A12;--bg1:#081020;--bg2:#0C1528;--bg3:#111D32;
+  --blue:#2563EB;--teal:#0D9488;--gold:#C8A951;
+  --green:#10B981;--red:#EF4444;--orange:#F59E0B;--purple:#7C3AED;
+  --t1:#F0F6FF;--t2:rgba(240,246,255,.82);--t3:rgba(240,246,255,.5);--t4:rgba(240,246,255,.28);
+  --border:rgba(255,255,255,.07);--border2:rgba(255,255,255,.12);
+  --glass:rgba(255,255,255,.04);--glass2:rgba(255,255,255,.07);--glass3:rgba(255,255,255,.11);
+  --r:10px;--r-lg:14px;--r-xl:18px;--nav:64px;
+  --f:'Inter',system-ui,sans-serif;--m:'JetBrains Mono',monospace;
+  --shadow:0 2px 16px rgba(0,0,0,.5);
+  --shadow-blue:0 4px 24px rgba(37,99,235,.35);
+  --shadow-teal:0 4px 20px rgba(13,148,136,.28);
+  --grd-blue:linear-gradient(135deg,#1E3A8A,#2563EB);
+  --grd-teal:linear-gradient(135deg,#0F766E,#0D9488);
+  --grd-brand:linear-gradient(135deg,#1E3A8A 0%,#2563EB 60%,#0D9488 100%);
+}
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+html,body{height:100%;overflow:hidden;font-family:var(--f);background:var(--bg0);color:var(--t1);-webkit-font-smoothing:antialiased;font-size:16px}
+button{background:none;border:none;cursor:pointer;font-family:inherit;touch-action:manipulation;min-height:44px}
+input,textarea,select{font-family:inherit;outline:none;border:none;background:none;color:var(--t1)}
+a{color:var(--teal);text-decoration:none}
+#login{display:flex;flex-direction:column;min-height:100vh;background:linear-gradient(180deg,var(--bg0),var(--bg1))}
+.login-stripe{height:3px;background:var(--grd-brand)}
+.login-hero{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:2.5rem 1.5rem;text-align:center}
+.fp-icon{width:80px;height:80px;border-radius:22px;background:var(--grd-blue);display:flex;align-items:center;justify-content:center;margin:0 auto .9rem;box-shadow:var(--shadow-blue)}
+.fp-icon span{font-size:2rem;font-weight:900;color:#fff}
+.login-title{font-size:2.5rem;font-weight:800;letter-spacing:-.04em;margin-bottom:.2rem}
+.login-title b{color:var(--teal)}
+.login-sub{font-size:.52rem;color:var(--t4);letter-spacing:.18em;text-transform:uppercase;margin-bottom:1.5rem}
+.login-cta{padding:1.2rem 1.5rem 3rem}
+.btn-pi{width:100%;padding:1rem;background:var(--grd-blue);border-radius:var(--r-lg);font-family:var(--f);font-size:.9rem;font-weight:700;color:#fff;display:flex;align-items:center;justify-content:center;gap:.5rem;box-shadow:var(--shadow-blue);transition:opacity .15s,transform .1s;min-height:52px}
+.btn-pi:active{opacity:.85;transform:scale(.97)}
+.btn-pi:disabled{opacity:.4;cursor:not-allowed}
+.btn-guest{width:100%;padding:.8rem;background:var(--glass);border:1px solid var(--border2);border-radius:var(--r-lg);font-family:var(--f);font-size:.82rem;font-weight:600;color:var(--t2);display:flex;align-items:center;justify-content:center;gap:.4rem;margin-top:.45rem;transition:opacity .15s;min-height:48px}
+.btn-guest:active{opacity:.75}
+#lmsg{font-size:.5rem;color:var(--t3);text-align:center;margin-top:.5rem;min-height:1rem}
+.login-foot{font-size:.42rem;color:var(--t4);text-align:center;margin-top:.8rem;line-height:1.9;padding:0 .5rem}
+.login-foot a{color:var(--teal)}
+#app{display:none;flex-direction:column;height:100vh;overflow:hidden;max-width:100vw}
+#hdr{background:rgba(5,10,18,.97);border-bottom:1px solid var(--border);padding:.45rem .9rem;display:flex;align-items:center;justify-content:space-between;flex-shrink:0;height:54px}
+.hdr-brand{font-size:1.15rem;font-weight:800;letter-spacing:-.04em}
+.hdr-brand b{color:var(--teal)}
+.hdr-r{display:flex;gap:.3rem;align-items:center}
+.hdr-btn{width:38px;height:38px;border-radius:10px;background:var(--glass);border:1px solid var(--border);display:flex;align-items:center;justify-content:center;font-size:.85rem;cursor:pointer;position:relative;min-height:38px}
+.hdr-btn:active{background:var(--glass2)}
+.hdr-av{width:38px;height:38px;border-radius:10px;background:var(--grd-blue);display:flex;align-items:center;justify-content:center;font-size:.72rem;font-weight:800;color:#fff;cursor:pointer;box-shadow:var(--shadow-blue);min-height:38px}
+.ndot{position:absolute;top:4px;right:4px;width:7px;height:7px;border-radius:50%;background:var(--red);border:1.5px solid var(--bg0)}
+#main{flex:1;overflow:hidden;position:relative;min-height:0}
+.scr{display:none;flex-direction:column;height:100%;overflow:hidden}
+.scr.on{display:flex;animation:fu .18s ease}
+.scroll{flex:1;overflow-y:auto;overflow-x:hidden;-webkit-overflow-scrolling:touch;padding-bottom:calc(var(--nav) + 2rem);min-height:0;height:0;overscroll-behavior-y:contain}
+.scroll::-webkit-scrollbar{display:none}
+#nav{position:fixed;bottom:0;left:0;right:0;height:var(--nav);background:rgba(5,10,18,.98);border-top:1px solid var(--border2);display:flex;z-index:100;padding-bottom:env(safe-area-inset-bottom,0px)}
+.nb{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:.08rem;cursor:pointer;touch-action:manipulation;position:relative;min-height:44px}
+.nb:active{opacity:.6}
+.nb-pip{position:absolute;top:4px;left:50%;transform:translateX(-50%);width:18px;height:2.5px;border-radius:2px;background:var(--blue);opacity:0;transition:opacity .2s}
+.nb.on .nb-pip{opacity:1}
+.nb-i{font-size:1.25rem;color:var(--t4);transition:all .15s}
+.nb.on .nb-i{color:var(--blue)}
+.nb-l{font-size:.39rem;font-weight:600;color:var(--t4);letter-spacing:.01em}
+.nb.on .nb-l{color:var(--blue)}
+#ov{position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:200;display:none;pointer-events:none;align-items:flex-end;backdrop-filter:blur(6px)}
+#ov.open{display:flex;pointer-events:auto;animation:fadeIn .18s ease}
+.psheet{width:100%;background:var(--bg1);border-radius:20px 20px 0 0;border-top:1px solid var(--border2);max-height:92vh;display:flex;flex-direction:column;animation:slideUp .24s cubic-bezier(.22,1,.36,1)}
+.phandle{width:32px;height:3.5px;border-radius:2px;background:rgba(255,255,255,.12);margin:.55rem auto .35rem;flex-shrink:0}
+.phead{display:flex;align-items:center;justify-content:space-between;padding:.4rem 1rem .5rem;border-bottom:1px solid var(--border);flex-shrink:0}
+.ptitle{font-size:.85rem;font-weight:700}
+.pclose{width:30px;height:30px;border-radius:50%;background:var(--glass2);display:flex;align-items:center;justify-content:center;font-size:.72rem;color:var(--t3);cursor:pointer;min-height:30px}
+.pclose:active{background:var(--glass3)}
+.pbody{overflow-y:auto;overflow-x:hidden;padding:.65rem 1rem 2.5rem;flex:1}
+.pbody::-webkit-scrollbar{display:none}
+#cov{position:fixed;inset:0;background:rgba(0,0,0,.82);z-index:300;display:none;pointer-events:none;align-items:flex-end;backdrop-filter:blur(8px)}
+#cov.open{display:flex;pointer-events:auto;animation:fadeIn .16s ease}
+.csheet{width:100%;background:var(--bg1);border-radius:20px 20px 0 0;border-top:1px solid rgba(37,99,235,.35);padding:1.1rem 1rem calc(2rem + env(safe-area-inset-bottom,0px));animation:slideUp .2s ease}
+.c-lbl{font-size:.42rem;font-weight:700;color:var(--t3);text-align:center;letter-spacing:.14em;text-transform:uppercase;margin-bottom:.3rem}
+.c-amt{font-family:var(--m);font-size:2.2rem;font-weight:800;color:var(--gold);text-align:center;margin:.25rem 0 .08rem}
+.c-to{font-size:.58rem;color:var(--teal);font-weight:600;text-align:center;margin-bottom:.55rem}
+.c-detail{background:var(--bg2);border:1px solid var(--border);border-radius:var(--r);padding:.55rem .75rem;margin-bottom:.7rem}
+.c-row{display:flex;justify-content:space-between;padding:.15rem 0;border-bottom:1px solid rgba(255,255,255,.04);font-size:.5rem}
+.c-row:last-child{border-bottom:none}
+.c-key{color:var(--t3)}.c-val{font-weight:600;color:var(--t1);text-align:right}
+.c-warn{background:rgba(245,158,11,.08);border:1px solid rgba(245,158,11,.2);border-radius:var(--r);padding:.4rem .65rem;margin-bottom:.65rem;font-size:.44rem;color:var(--orange);line-height:1.75}
+.c-btns{display:flex;flex-direction:column;gap:.38rem}
+.slbl{padding:.7rem .8rem .22rem;font-size:.4rem;font-weight:700;color:var(--t3);letter-spacing:.12em;text-transform:uppercase;display:flex;justify-content:space-between;align-items:center}
+.sact{font-size:.48rem;font-weight:600;color:var(--blue);cursor:pointer;letter-spacing:0;text-transform:none}
+.uc-grid{display:grid;grid-template-columns:1fr 1fr;gap:.45rem;padding:.05rem .75rem .35rem}
+.fi{width:100%;background:var(--bg2);border:1px solid var(--border2);border-radius:var(--r);padding:.6rem .8rem;font-size:.62rem;color:var(--t1);display:block;margin-bottom:.4rem;transition:border-color .15s;min-height:48px}
+.fi:focus{border-color:var(--blue);background:rgba(37,99,235,.06)}
+.fi::placeholder{color:var(--t4)}
+select.fi option{background:var(--bg1);color:var(--t1)}
+.fl{font-size:.44rem;font-weight:600;color:var(--t3);margin-bottom:.16rem;display:block;letter-spacing:.04em;text-transform:uppercase}
+.btn{width:100%;padding:.75rem;border-radius:var(--r);font-size:.74rem;font-weight:700;display:flex;align-items:center;justify-content:center;gap:.35rem;cursor:pointer;touch-action:manipulation;min-height:50px;margin-bottom:.32rem;transition:opacity .12s}
+.btn:active{opacity:.75}.btn:disabled{opacity:.35;cursor:not-allowed}
+.bp{background:var(--grd-blue);color:#fff;box-shadow:var(--shadow-blue)}
+.bt{background:var(--grd-teal);color:#fff;box-shadow:var(--shadow-teal)}
+.bo{background:var(--glass2);border:1px solid var(--border2);color:var(--t1)}
+.bd{background:rgba(239,68,68,.12);border:1px solid rgba(239,68,68,.28);color:var(--red)}
+.btn-sm{min-height:40px;padding:.38rem .65rem;font-size:.58rem;width:auto;margin-bottom:0}
+.stabs{display:flex;padding:.22rem .7rem;gap:.22rem;overflow-x:auto;scrollbar-width:none;flex-shrink:0}
+.stabs::-webkit-scrollbar{display:none}
+.stab{flex-shrink:0;font-size:.46rem;font-weight:700;padding:.28rem .62rem;border-radius:99px;background:var(--glass2);border:1px solid var(--border);color:var(--t3);cursor:pointer;white-space:nowrap;transition:all .12s;min-height:32px;display:flex;align-items:center}
+.stab.on{background:var(--blue);border-color:transparent;color:#fff}
+.sbar{padding:.5rem .8rem .28rem;display:flex;align-items:flex-start;justify-content:space-between;flex-shrink:0}
+.sbar-t{font-size:1.2rem;font-weight:800;letter-spacing:-.03em;line-height:1.1}
+.sbar-s{font-size:.44rem;color:var(--t3);margin-top:.08rem}
+.tx{display:flex;align-items:center;gap:.55rem;padding:.62rem .8rem;border-bottom:1px solid rgba(255,255,255,.04);cursor:pointer;min-height:60px;transition:background .1s}
+.tx:active{background:var(--glass)}
+.tx-ic{width:40px;height:40px;border-radius:11px;display:flex;align-items:center;justify-content:center;font-size:.95rem;flex-shrink:0}
+.tx-inf{flex:1;min-width:0}
+.tx-nm{font-size:.6rem;font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.tx-dt{font-size:.42rem;color:var(--t3);margin-top:.05rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.tx-pi{font-family:var(--m);font-size:.64rem;font-weight:700}
+.mr{display:flex;align-items:center;gap:.55rem;background:var(--bg2);border:1px solid var(--border);border-radius:var(--r);padding:.6rem .75rem;cursor:pointer;min-height:54px;margin-bottom:.26rem;transition:background .1s;touch-action:manipulation}
+.mr:active{background:var(--bg3)}
+.mr-i{width:38px;height:38px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:.95rem;flex-shrink:0;background:var(--glass2)}
+.mr-t{font-size:.6rem;font-weight:700}
+.mr-s{font-size:.42rem;color:var(--t3);margin-top:.05rem}
+.mr-a{margin-left:auto;font-size:.8rem;color:var(--t4)}
+.receipt-row{display:flex;justify-content:space-between;border-bottom:1px solid rgba(255,255,255,.05);padding:.18rem 0;gap:.5rem}
+.receipt-row:last-child{border-bottom:none}
+.receipt-key{font-size:.44rem;color:var(--t3);flex-shrink:0}
+.receipt-val{font-size:.44rem;color:var(--t1);text-align:right;word-break:break-all;font-family:var(--m)}
+.empty{text-align:center;padding:2.5rem 1.2rem}
+.empty-i{font-size:3rem;margin-bottom:.5rem;display:block}
+.empty-t{font-size:.78rem;font-weight:800;margin-bottom:.25rem}
+.empty-s{font-size:.52rem;color:var(--t3);line-height:1.75;margin-bottom:.7rem}
+.empty-btn{display:inline-flex;align-items:center;gap:.3rem;background:var(--grd-blue);color:#fff;border-radius:99px;padding:.45rem 1rem;font-size:.54rem;font-weight:700;cursor:pointer;box-shadow:var(--shadow-blue)}
+.prog-wrap{background:var(--bg3);border-radius:3px;height:6px;overflow:hidden;margin:.22rem 0}
+.prog-bar{height:6px;border-radius:3px;transition:width .4s ease}
+.search-inp{width:100%;background:var(--bg2);border:1px solid var(--border2);border-radius:99px;padding:.48rem .88rem;font-size:.58rem;color:var(--t1);transition:border-color .15s;min-height:44px}
+.search-inp:focus{border-color:var(--blue)}
+.search-inp::placeholder{color:var(--t4)}
+#offbar{display:none;position:fixed;top:0;left:0;right:0;background:rgba(239,68,68,.95);padding:.32rem .9rem;text-align:center;z-index:1000;font-size:.48rem;font-weight:700;color:#fff}
+#toast{position:fixed;bottom:calc(var(--nav) + 10px);left:50%;transform:translateX(-50%) translateY(8px);background:var(--bg3);border:1px solid var(--border2);color:var(--t1);font-size:.5rem;font-weight:600;padding:.35rem .9rem;border-radius:99px;opacity:0;transition:all .2s cubic-bezier(.34,1.5,.64,1);pointer-events:none;z-index:999;white-space:nowrap;max-width:88vw;overflow:hidden;text-overflow:ellipsis;box-shadow:var(--shadow)}
+#toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+#toast.s{background:rgba(16,185,129,.2);color:var(--green);border-color:rgba(16,185,129,.3)}
+#toast.e{background:rgba(239,68,68,.18);color:var(--red);border-color:rgba(239,68,68,.28)}
+/* Market Dashboard */
+.mkt-card{background:linear-gradient(135deg,rgba(200,169,81,.18) 0%,rgba(200,169,81,.06) 100%);border:1px solid rgba(200,169,81,.3);border-radius:var(--r-xl);padding:1rem .95rem;margin:.45rem .7rem}
+.mkt-price{font-family:var(--m);font-size:2.4rem;font-weight:800;color:var(--gold);line-height:1;margin:.15rem 0 .08rem}
+.mkt-sub{font-size:.4rem;color:rgba(200,169,81,.65);text-transform:uppercase;letter-spacing:.1em;margin-bottom:.1rem}
+.mkt-chg{font-family:var(--m);font-size:.6rem;font-weight:700;padding:.06rem .28rem;border-radius:6px}
+.mkt-chg.up{background:rgba(16,185,129,.18);color:var(--green)}
+.mkt-chg.dn{background:rgba(239,68,68,.16);color:var(--red)}
+.mkt-row{display:grid;grid-template-columns:1fr 1fr;gap:.38rem;margin:.45rem 0}
+.mkt-stat{background:rgba(0,0,0,.22);border-radius:var(--r);padding:.45rem .6rem}
+.mkt-stat-l{font-size:.36rem;color:var(--t4);text-transform:uppercase;letter-spacing:.08em;margin-bottom:.08rem}
+.mkt-stat-v{font-family:var(--m);font-size:.68rem;font-weight:700}
+.mkt-disc{font-size:.35rem;color:rgba(240,246,255,.28);line-height:1.7;margin-top:.4rem}
+.chart-wrap{height:60px;position:relative;margin:.4rem 0 .15rem}
+.chart-bars{display:flex;align-items:flex-end;gap:2px;height:100%}
+.chart-bar{flex:1;border-radius:2px 2px 0 0;min-height:3px}
+.tx-summary{background:rgba(0,0,0,.2);border-radius:var(--r);padding:.5rem .7rem;margin:.1rem .7rem .2rem}
+.tx-sum-row{display:flex;justify-content:space-between;align-items:center;padding:.14rem 0;border-bottom:1px solid rgba(255,255,255,.05)}
+.tx-sum-row:last-child{border-bottom:none}
+.bal-card{background:linear-gradient(135deg,rgba(37,99,235,.16) 0%,rgba(13,148,136,.1) 100%);border:1px solid rgba(37,99,235,.22);border-radius:var(--r-xl);padding:1.1rem .95rem .95rem;margin:.45rem .7rem;position:relative;overflow:hidden}
+.bal-header{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:.1rem}
+.bal-lbl{font-size:.42rem;font-weight:600;color:var(--t3);letter-spacing:.08em;text-transform:uppercase}
+.bal-btns{display:grid;grid-template-columns:repeat(4,1fr);gap:.32rem}
+.bbal-btn{padding:.55rem .25rem;border-radius:var(--r);text-align:center;cursor:pointer;touch-action:manipulation;min-height:52px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:.12rem}
+.bbal-btn:active{opacity:.7}
+.bbal-btn.p{background:rgba(37,99,235,.3);border:1px solid rgba(37,99,235,.4)}
+.bbal-btn.t{background:rgba(13,148,136,.28);border:1px solid rgba(13,148,136,.38)}
+.bbal-btn.s{background:var(--glass2);border:1px solid var(--border2)}
+.bbal-i{font-size:.95rem;line-height:1}
+.bbal-l{font-size:.38rem;font-weight:700;line-height:1}
+@keyframes ucIn{0%{opacity:.01;transform:translateY(5px)}100%{opacity:1;transform:none}}
+@keyframes fadeIn{from{opacity:0}to{opacity:1}}
+@keyframes slideUp{from{opacity:0;transform:translateY(50px)}to{opacity:1;transform:none}}
+@keyframes fu{from{opacity:.01;transform:translateY(4px)}to{opacity:1;transform:none}}
+@keyframes checkIn{from{transform:scale(0) rotate(-20deg);opacity:0}to{transform:scale(1);opacity:1}}
+@media(prefers-reduced-motion:reduce){*{animation-duration:.01ms!important;transition-duration:.01ms!important}}
+[onclick]{opacity:1!important;visibility:visible!important}
+body,#app,#main,.scr,.scroll{overflow-x:hidden;max-width:100vw}
+</style>
+</head>
+<body>
+<div id="offbar"></div>
+<div id="toast"></div>
+<div id="login">
+  <div class="login-stripe"></div>
+  <div class="login-hero">
+    <div class="fp-icon"><span>&#x1F4B0;</span></div>
+    <div class="login-title">Fin<b>Pi</b></div>
+    <div class="login-sub">Pi Financial Platform</div>
+    <div style="font-size:.52rem;color:var(--t3);line-height:1.9;margin-bottom:1.2rem">&#x1F4B8; Payments &nbsp;&#x1F4CA; Budget &nbsp;&#x1F9FE; Invoices &nbsp;&#x1F3EA; Merchant &nbsp;&#x1F916; AI</div>
+  </div>
+  <div class="login-cta">
+    <button class="btn-pi" id="loginBtn" onclick="piLogin()"><span id="signin-txt">&#x03C0; Sign In with Pi</span></button>
+    <button class="btn-guest" onclick="guestMode()">&#x1F464; Continue as Guest</button>
+    <div id="lmsg"></div>
+    <div class="login-foot">Pi SDK &middot; Sandbox &middot; Test Payments<br><a href="/privacy-policy.html">Privacy Policy</a> &middot; <a href="/terms-of-service.html">Terms of Service</a><br>&copy; 2026 FinPi &middot; Abdullahi Bashir Abubakar</div>
+  </div>
+</div>
+<div id="app">
+  <div id="hdr">
+    <div class="hdr-brand">Fin<b>Pi</b></div>
+    <div class="hdr-r">
+      <div class="hdr-btn" onclick="openSearch()">&#x1F50D;</div>
+      <div class="hdr-btn" id="notif-btn" onclick="openNotifs()">&#x1F514;<div class="ndot" id="ndot" style="display:none"></div></div>
+      <div class="hdr-av" id="hdr-av" onclick="goTab('profile',document.querySelectorAll('.nb')[4])">F</div>
+    </div>
+  </div>
+  <div id="main">
+    <div class="scr" id="scr-home"><div class="scroll" id="home-scroll"></div></div>
+    <div class="scr" id="scr-wallet">
+      <div class="sbar"><div><div class="sbar-t">Wallet</div><div class="sbar-s">Balance &amp; financial tools</div></div></div>
+      <div id="wallet-tabs" class="stabs">
+        <div class="stab on" onclick="walletTab('overview',this)">Overview</div>
+        <div class="stab" onclick="walletTab('activity',this)">Activity</div>
+        <div class="stab" onclick="walletTab('contacts',this)">Contacts</div>
+        <div class="stab" onclick="walletTab('analytics',this)">Analytics</div>
+      </div>
+      <div class="scroll" id="wallet-scroll"></div>
+    </div>
+    <div class="scr" id="scr-pay">
+      <div class="sbar"><div><div class="sbar-t">Payments</div><div class="sbar-s">Send, receive &amp; request Pi</div></div></div>
+      <div class="stabs">
+        <div class="stab on" onclick="payTab('send',this)">&#x1F4B8; Send</div>
+        <div class="stab" onclick="payTab('recv',this)">&#x1F4E5; Receive</div>
+        <div class="stab" onclick="payTab('req',this)">&#x1F4CB; Request</div>
+        <div class="stab" onclick="payTab('links',this)">&#x1F517; Links</div>
+        <div class="stab" onclick="payTab('qr',this)">&#x1F4F1; QR</div>
+        <div class="stab" onclick="payTab('contacts',this)">&#x1F4D2; Contacts</div>
+      </div>
+      <div class="scroll" id="pay-scroll"><div id="pay-body"></div></div>
+    </div>
+    <div class="scr" id="scr-history">
+      <div class="sbar" style="justify-content:space-between">
+        <div><div class="sbar-t">History</div><div class="sbar-s">All transactions</div></div>
+        <button class="btn bo btn-sm" onclick="exportTx()">&#x1F4E4; Export</button>
+      </div>
+      <div class="scroll" id="hist-scroll"></div>
+    </div>
+    <div class="scr" id="scr-profile">
+      <div class="sbar"><div><div class="sbar-t">Profile</div><div class="sbar-s">Account &amp; settings</div></div></div>
+      <div class="scroll" id="profile-scroll"></div>
+    </div>
+  </div>
+  <div id="nav">
+    <div class="nb on" onclick="goTab('home',this)"><div class="nb-pip"></div><div class="nb-i">&#x1F3E0;</div><div class="nb-l">Home</div></div>
+    <div class="nb" onclick="goTab('wallet',this)"><div class="nb-pip"></div><div class="nb-i">&#x1F4B0;</div><div class="nb-l">Wallet</div></div>
+    <div class="nb" onclick="goTab('pay',this)"><div class="nb-pip"></div><div class="nb-i">&#x1F4B3;</div><div class="nb-l">Pay</div></div>
+    <div class="nb" onclick="goTab('history',this)"><div class="nb-pip"></div><div class="nb-i">&#x1F4CB;</div><div class="nb-l">History</div></div>
+    <div class="nb" onclick="goTab('profile',this)"><div class="nb-pip"></div><div class="nb-i">&#x1F464;</div><div class="nb-l">Profile</div></div>
+  </div>
+  <div id="ov" style="display:none">
+    <div class="psheet"><div class="phandle"></div>
+      <div class="phead"><div class="ptitle" id="ptitle">Panel</div><div class="pclose" onclick="closeP()">&#x2715;</div></div>
+      <div class="pbody" id="pbody"></div>
+    </div>
+  </div>
+  <div id="cov" style="display:none">
+    <div class="csheet">
+      <div class="c-lbl">Confirm Payment</div>
+      <div class="c-amt" id="c-amt">&#x03C0; 0.00</div>
+      <div class="c-to" id="c-to">Recipient</div>
+      <div class="c-detail" id="c-detail"></div>
+      <div class="c-warn">&#x26A0; Sandbox Test Payment &middot; Pi.createPayment() &middot; Test mode</div>
+      <div class="c-btns">
+        <button class="btn bp" id="cconfirm-btn" onclick="doSend()">&#x2714; Confirm &amp; Send</button>
+        <button class="btn bo" id="ccancel-btn" onclick="closeC()">Cancel</button>
+      </div>
+    </div>
+  </div>
+</div>
+<script>
+var piUser=null,pendingPay=null,_activePay=false;
+var txLog=[],contacts=[],budgets=[],goals=[],profile={},notifs=[];
+var curHtab='all';
+var _piRate=null,_piRates={},_piRateSource='',_piRateTime=null,_piChange24h=null;
+var _piChart=[],_piRateInterval=null,_piMarketCap=null,_piVol24h=null;
+var _APPROVE='/approve',_COMPLETE='/complete';
+
+function saveTx(){try{localStorage.setItem('fp_tx',JSON.stringify(txLog));}catch(e){}}
+function loadData(){
+  try{var t=localStorage.getItem('fp_tx');if(t)txLog=JSON.parse(t);}catch(e){}
+  try{var c=localStorage.getItem('fp_contacts');if(c)contacts=JSON.parse(c);}catch(e){}
+  try{var b=localStorage.getItem('fp_budgets');if(b)budgets=JSON.parse(b);}catch(e){}
+  try{var g=localStorage.getItem('fp_goals');if(g)goals=JSON.parse(g);}catch(e){}
+  try{var p=localStorage.getItem('fp_profile');if(p)profile=JSON.parse(p);}catch(e){}
+}
+function saveContacts(){try{localStorage.setItem('fp_contacts',JSON.stringify(contacts));}catch(e){}}
+function saveBudgets(){try{localStorage.setItem('fp_budgets',JSON.stringify(budgets));}catch(e){}}
+function saveGoals(){try{localStorage.setItem('fp_goals',JSON.stringify(goals));}catch(e){}}
+function saveProfile(){try{localStorage.setItem('fp_profile',JSON.stringify(profile));}catch(e){}}
+
+function pi(n){return '\u03C0 '+(+n||0).toFixed(3);}
+function ago(d){var s=Math.floor((Date.now()-new Date(d))/1000);if(s<60)return 'Just now';if(s<3600)return Math.floor(s/60)+'m ago';if(s<86400)return Math.floor(s/3600)+'h ago';return Math.floor(s/86400)+'d ago';}
+function toast(msg,type,dur){var el=document.getElementById('toast');if(!el)return;el.textContent=msg;el.className='show'+(type?' '+type:'');clearTimeout(toast._t);toast._t=setTimeout(function(){el.className='';},dur||2800);}
+function openP(title,html){document.getElementById('ptitle').textContent=title;document.getElementById('pbody').innerHTML=html;document.getElementById('ov').className='open';}
+function closeP(){document.getElementById('ov').className='';}
+function closeC(){document.getElementById('cov').className='';pendingPay=null;}
+function goTab(name,el){
+  document.querySelectorAll('.scr').forEach(function(s){s.classList.remove('on');});
+  document.querySelectorAll('.nb').forEach(function(b){b.classList.remove('on');});
+  var scr=document.getElementById('scr-'+name);if(scr)scr.classList.add('on');
+  if(el)el.classList.add('on');
+  if(name==='home')renderHome();
+  else if(name==='wallet')renderWallet();
+  else if(name==='history')renderHist();
+  else if(name==='pay')renderPay();
+  else if(name==='profile')renderProfile();
+}
+function syncAllViews(){var cur=document.querySelector('.scr.on');if(!cur)return;var id=cur.id.replace('scr-','');if(id==='home')renderHome();else if(id==='wallet')renderWallet();else if(id==='history')renderHist();}
+function pushNotif(msg,type){notifs.unshift({msg:msg,type:type||'info',date:new Date().toISOString()});var dot=document.getElementById('ndot');if(dot)dot.style.display='block';}
+
+function uc(ico,name,desc,fn,badge){
+  var C={'&#x1F4B1;':['#C8A951','rgba(200,169,81,.25)','rgba(200,169,81,.1)'],'&#x1F9EE;':['#3B82F6','rgba(59,130,246,.25)','rgba(59,130,246,.09)'],'&#x1F4CA;':['#10B981','rgba(16,185,129,.25)','rgba(16,185,129,.09)'],'&#x1F4C8;':['#10B981','rgba(16,185,129,.25)','rgba(16,185,129,.09)'],'&#x1F3AF;':['#0D9488','rgba(13,148,136,.25)','rgba(13,148,136,.09)'],'&#x1F4AA;':['#EF4444','rgba(239,68,68,.25)','rgba(239,68,68,.09)'],'&#x1F3EA;':['#8B5CF6','rgba(139,92,246,.25)','rgba(139,92,246,.09)'],'&#x1F9FE;':['#0D9488','rgba(13,148,136,.25)','rgba(13,148,136,.09)'],'&#x1F916;':['#7C3AED','rgba(124,58,237,.25)','rgba(124,58,237,.09)'],'&#x1F552;':['#F59E0B','rgba(245,158,11,.25)','rgba(245,158,11,.09)'],'&#x1F4CB;':['#3B82F6','rgba(59,130,246,.25)','rgba(59,130,246,.09)'],'&#x1F4F1;':['#7C3AED','rgba(124,58,237,.25)','rgba(124,58,237,.09)'],'&#x1F4CD;':['#0D9488','rgba(13,148,136,.25)','rgba(13,148,136,.09)'],'&#x2B50;':['#C8A951','rgba(200,169,81,.25)','rgba(200,169,81,.1)'],'&#x1F50D;':['#3B82F6','rgba(59,130,246,.25)','rgba(59,130,246,.09)'],'&#x1F4B0;':['#C8A951','rgba(200,169,81,.25)','rgba(200,169,81,.1)'],'&#x1F3F7;':['#0D9488','rgba(13,148,136,.25)','rgba(13,148,136,.09)'],'&#x1F504;':['#3B82F6','rgba(59,130,246,.25)','rgba(59,130,246,.09)'],'&#x1F5C2;':['#7C3AED','rgba(124,58,237,.25)','rgba(124,58,237,.09)'],'&#x1F5A5;':['#EF4444','rgba(239,68,68,.25)','rgba(239,68,68,.09)'],'&#x1F30D;':['#0D9488','rgba(13,148,136,.25)','rgba(13,148,136,.09)'],'&#x2753;':['#F59E0B','rgba(245,158,11,.25)','rgba(245,158,11,.09)'],'&#x1F514;':['#F59E0B','rgba(245,158,11,.25)','rgba(245,158,11,.09)'],'&#x1F4E4;':['#3B82F6','rgba(59,130,246,.25)','rgba(59,130,246,.09)'],'&#x1F6D2;':['#3B82F6','rgba(59,130,246,.25)','rgba(59,130,246,.09)'],'&#x1F9E9;':['#7C3AED','rgba(124,58,237,.25)','rgba(124,58,237,.09)']};
+  var col=C[ico]||['#3B82F6','rgba(59,130,246,.25)','rgba(59,130,246,.09)'];
+  var isSoon=badge==='soon';
+  return '<div onclick="'+fn+'" style="background:'+col[2]+';border:1.5px solid '+col[1]+';border-radius:16px;padding:1rem .9rem;min-height:112px;display:flex;flex-direction:column;justify-content:space-between;position:relative;overflow:hidden;cursor:pointer;touch-action:manipulation;opacity:1;visibility:visible" onpointerdown="this.style.transform='scale(.93)'" onpointerup="this.style.transform=''" onpointerleave="this.style.transform=''">'
+    +(badge?'<span style="position:absolute;top:.4rem;right:.4rem;font-size:.3rem;font-weight:800;border-radius:99px;padding:.05rem .26rem;text-transform:uppercase;background:'+(isSoon?'rgba(245,158,11,.2)':'rgba(16,185,129,.2)')+';color:'+(isSoon?'#F59E0B':'#10B981')+';border:1px solid '+(isSoon?'rgba(245,158,11,.38)':'rgba(16,185,129,.38)')+'">'+( isSoon?'\uD83D\uDD12 SOON':'LIVE')+'</span>':'')
+    +'<div style="width:50px;height:50px;border-radius:13px;background:'+col[1]+';display:flex;align-items:center;justify-content:center;font-size:1.5rem;flex-shrink:0">'+ico+'</div>'
+    +'<div><div style="font-size:.68rem;font-weight:800;color:#F0F6FF;line-height:1.25;margin-bottom:.07rem">'+name+'</div><div style="font-size:.44rem;color:rgba(240,246,255,.65);line-height:1.4">'+desc+'</div></div>'
+    +'<div style="position:absolute;inset:0;background:linear-gradient(135deg,rgba(255,255,255,.055),transparent 50%);pointer-events:none;border-radius:15px"></div>'
+  +'</div>';
+}
+
+function mr(ico,title,sub,fn){
+  return '<div onclick="'+fn+'" style="display:flex;align-items:center;gap:.65rem;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.1);border-radius:12px;padding:.75rem .85rem;cursor:pointer;touch-action:manipulation;min-height:60px;margin-bottom:.3rem" onpointerdown="this.style.background='rgba(255,255,255,.09)'" onpointerup="this.style.background='rgba(255,255,255,.05)'" onpointerleave="this.style.background='rgba(255,255,255,.05)'">'
+    +'<div style="width:42px;height:42px;border-radius:11px;background:rgba(255,255,255,.08);display:flex;align-items:center;justify-content:center;font-size:1.1rem;flex-shrink:0">'+ico+'</div>'
+    +'<div style="flex:1;min-width:0"><div style="font-size:.64rem;font-weight:700;color:#F0F6FF">'+title+'</div>'+(sub?'<div style="font-size:.44rem;color:rgba(240,246,255,.55);margin-top:.05rem">'+sub+'</div>':'')+'</div>'
+    +'<div style="color:rgba(240,246,255,.3);font-size:.9rem">&#x203A;</div>'
+  +'</div>';
+}
+
+function fetchPiRate(){
+  if(window._piRateLoading)return;
+  window._piRateLoading=true;
+  var IDS=['pi-network','picoin','pi-network-iou'];var ci=0;
+  function tryCG(){
+    if(ci>=IDS.length){tryOKX();return;}
+    var id=IDS[ci++];
+    fetch('https://api.coingecko.com/api/v3/coins/'+id+'?localization=false&tickers=false&community_data=false&developer_data=false')
+      .then(function(r){return r.json();})
+      .then(function(d){
+        var md=d.market_data;
+        var usd=md&&md.current_price&&md.current_price.usd;
+        if(usd&&usd>0){
+          _piRate=usd;_piChange24h=md.price_change_percentage_24h||null;
+          _piMarketCap=md.market_cap&&md.market_cap.usd||null;
+          _piVol24h=md.total_volume&&md.total_volume.usd||null;
+          _piRateSource='CoinGecko';_piRateTime=new Date().toISOString();
+          var fx={NGN:1650,EUR:0.92,GBP:0.79,SAR:3.75,AED:3.67,INR:83.2,CAD:1.36,CNY:7.24,JPY:149.5};
+          _piRates={USD:usd};Object.keys(fx).forEach(function(k){_piRates[k]=+(usd*fx[k]).toFixed(6);});
+          if(d.market_data.sparkline_7d&&d.market_data.sparkline_7d.price)_piChart=d.market_data.sparkline_7d.price;
+          window._piRateLoading=false;
+          var h=document.getElementById('scr-home');if(h&&h.classList.contains('on'))renderHome();
+          return;
+        }tryCG();
+      }).catch(function(){tryCG();});
+  }
+  function tryOKX(){
+    fetch('https://www.okx.com/api/v5/market/ticker?instId=PI-USDT')
+      .then(function(r){return r.json();})
+      .then(function(d){var v=d.data&&d.data[0]&&parseFloat(d.data[0].last);if(v&&v>0)setRate(v,'OKX');else tryGate();})
+      .catch(function(){tryGate();});
+  }
+  function tryGate(){
+    fetch('https://api.gateio.ws/api/v4/spot/tickers?currency_pair=PI_USDT')
+      .then(function(r){return r.json();})
+      .then(function(d){var v=d&&d[0]&&parseFloat(d[0].last);if(v&&v>0)setRate(v,'Gate.io');window._piRateLoading=false;})
+      .catch(function(){window._piRateLoading=false;});
+  }
+  function setRate(v,src){
+    _piRate=v;_piRateSource=src;_piRateTime=new Date().toISOString();
+    var fx={NGN:1650,EUR:0.92,GBP:0.79,SAR:3.75,AED:3.67,INR:83.2,CAD:1.36,CNY:7.24,JPY:149.5};
+    _piRates={USD:v};Object.keys(fx).forEach(function(k){_piRates[k]=+(v*fx[k]).toFixed(6);});
+    window._piRateLoading=false;
+    var h=document.getElementById('scr-home');if(h&&h.classList.contains('on'))renderHome();
+  }
+  tryCG();
+}
+
+function renderHome(){
+  var u=piUser||{},name=u.username||'Pioneer';
+  var h2=new Date().getHours();
+  var greet=h2<12?'Good Morning':h2<17?'Good Afternoon':'Good Evening';
+  var finpiId=u.username?'FP-'+u.username.toUpperCase():'\u2014';
+  var sent=txLog.filter(function(t){return t.type==='sent'&&t.status==='completed';}).reduce(function(s,t){return s+t.amount;},0);
+  var received=txLog.filter(function(t){return t.type==='received'&&t.status==='completed';}).reduce(function(s,t){return s+t.amount;},0);
+  var txCount=txLog.filter(function(t){return t.status==='completed';}).length;
+  var pending=txLog.filter(function(t){return t.status==='pending'||t.status==='processing';}).length;
+  var hasRate=_piRate&&_piRate>0;
+  var priceStr=hasRate?'$'+_piRate.toFixed(4):'Loading\u2026';
+  var chgVal=_piChange24h;
+  var chgStr=chgVal!=null?(chgVal>=0?'+':'')+chgVal.toFixed(2)+'%':'';
+  var chgClass=chgVal!=null?(chgVal>=0?'up':'dn'):'';
+  var mcapStr=_piMarketCap?'$'+(_piMarketCap/1e9).toFixed(2)+'B':'---';
+  var volStr=_piVol24h?'$'+(_piVol24h/1e6).toFixed(2)+'M':'---';
+  var timeStr=_piRateTime?new Date(_piRateTime).toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'}):'---';
+  var chartHTML='';
+  if(_piChart&&_piChart.length>0){
+    var prices=_piChart.slice(-56);
+    var mn=Math.min.apply(null,prices),mx=Math.max.apply(null,prices),rng=mx-mn||1;
+    var bars=prices.map(function(p){var h=Math.max(3,Math.round(((p-mn)/rng)*54));var up=p>=prices[0];return '<div class="chart-bar" style="height:'+h+'px;background:'+(up?'rgba(16,185,129,.7)':'rgba(239,68,68,.6)')+'"></div>';}).join('');
+    chartHTML='<div style="margin:.35rem 0 .1rem"><div style="font-size:.36rem;color:rgba(240,246,255,.3);margin-bottom:.18rem;display:flex;justify-content:space-between"><span>7-Day Price Chart</span><span>CoinGecko</span></div><div class="chart-wrap"><div class="chart-bars">'+bars+'</div></div></div>';
+  }
+  var calcHTML='<div style="margin:.45rem 0"><div style="font-size:.38rem;color:rgba(240,246,255,.38);text-transform:uppercase;letter-spacing:.1em;margin-bottom:.28rem">\u03C0 \u2194 USD Calculator</div>'
+    +'<div style="display:flex;gap:.32rem;align-items:center">'
+      +'<div style="position:relative;flex:1"><div style="position:absolute;left:.62rem;top:50%;transform:translateY(-50%);font-family:var(--m);font-size:.82rem;font-weight:800;color:var(--gold);pointer-events:none">\u03C0</div><input id="hm-pi" type="number" placeholder="0.000" step="0.001" style="width:100%;background:rgba(0,0,0,.25);border:1px solid rgba(200,169,81,.3);border-radius:8px;padding:.42rem .5rem .42rem 1.75rem;font-family:var(--m);font-size:.66rem;font-weight:700;color:var(--gold);min-height:40px" oninput="hmCalc(\'pi\')"></div>'
+      +'<div style="font-size:.65rem;color:rgba(240,246,255,.28)">\u2194</div>'
+      +'<div style="position:relative;flex:1"><div style="position:absolute;left:.58rem;top:50%;transform:translateY(-50%);font-size:.7rem;color:rgba(240,246,255,.45);pointer-events:none">$</div><input id="hm-usd" type="number" placeholder="0.0000" style="width:100%;background:rgba(0,0,0,.25);border:1px solid rgba(37,99,235,.22);border-radius:8px;padding:.42rem .5rem .42rem 1.5rem;font-family:var(--m);font-size:.66rem;font-weight:700;color:var(--t1);min-height:40px" oninput="hmCalc(\'usd\')"></div>'
+    +'</div>'
+    +'<div style="font-size:.36rem;color:rgba(240,246,255,.28);margin-top:.16rem">'+(hasRate?'1\u03C0 \u2248 $'+_piRate.toFixed(4)+' \u00B7 '+_piRateSource:'Fetching market rate\u2026')+'</div>'
+  +'</div>';
+  var recent=txLog.slice(0,4).map(txRow).join('');
+  document.getElementById('home-scroll').innerHTML=
+    '<div style="padding:.6rem .8rem .2rem;display:flex;align-items:center;justify-content:space-between">'
+      +'<div><div style="font-size:.44rem;color:var(--t3)">'+greet+', <b style="color:var(--t1)">@'+name+'</b></div><div style="font-size:.36rem;color:var(--teal);font-family:var(--m);margin-top:.03rem">'+finpiId+'</div></div>'
+      +'<button onclick="fetchPiRate();toast(\'Refreshing\u2026\')" style="font-size:.46rem;color:var(--teal);background:rgba(13,148,136,.12);border:1px solid rgba(13,148,136,.25);border-radius:8px;padding:.28rem .5rem;min-height:34px">\u21BB</button>'
+    +'</div>'
+    +'<div class="mkt-card">'
+      +'<div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:.2rem">'
+        +'<div><div class="mkt-sub">Live Pi Price \u00B7 CoinGecko</div>'
+          +'<div class="mkt-price" id="mkt-price-val">'+priceStr+'</div>'
+          +'<div style="display:flex;align-items:center;gap:.35rem;margin-top:.08rem">'
+            +(chgClass?'<span class="mkt-chg '+chgClass+'">'+chgStr+' 24h</span>':'<span style="font-size:.38rem;color:rgba(240,246,255,.28)">Loading\u2026</span>')
+          +'</div>'
+        +'</div>'
+        +'<div style="text-align:right"><div style="font-size:.34rem;color:rgba(240,246,255,.3)">Updated</div><div style="font-family:var(--m);font-size:.48rem;color:rgba(240,246,255,.5)">'+timeStr+'</div><div style="font-size:.32rem;color:rgba(240,246,255,.26);margin-top:.06rem">'+(_piRateSource||'Fetching\u2026')+'</div></div>'
+      +'</div>'
+      +'<div class="mkt-row"><div class="mkt-stat"><div class="mkt-stat-l">Market Cap</div><div class="mkt-stat-v">'+mcapStr+'</div></div><div class="mkt-stat"><div class="mkt-stat-l">24h Volume</div><div class="mkt-stat-v">'+volStr+'</div></div></div>'
+      +chartHTML+calcHTML
+      +'<div class="mkt-disc">\u26A0 Market reference only \u00B7 Not financial advice \u00B7 Prices may vary by exchange</div>'
+    +'</div>'
+    +'<div class="slbl">FinPi Activity</div>'
+    +'<div class="tx-summary">'
+      +'<div class="tx-sum-row"><span style="font-size:.46rem;color:var(--t3)">\uD83D\uDCB8 Sent via FinPi</span><span style="font-family:var(--m);font-size:.62rem;font-weight:700;color:var(--red)">'+(sent>0?'\u2212\u03C0'+sent.toFixed(3):'\u03C0 0.000')+'</span></div>'
+      +'<div class="tx-sum-row"><span style="font-size:.46rem;color:var(--t3)">\uD83D\uDCE5 Received via FinPi</span><span style="font-family:var(--m);font-size:.62rem;font-weight:700;color:var(--green)">'+(received>0?'+\u03C0'+received.toFixed(3):'\u03C0 0.000')+'</span></div>'
+      +'<div class="tx-sum-row" style="border:none"><span style="font-size:.46rem;color:var(--t3)">\uD83D\uDCCB Transactions</span><span style="font-family:var(--m);font-size:.62rem;font-weight:700">'+txCount+(pending?' <span style="font-size:.36rem;color:var(--orange)">('+pending+' pending)</span>':'')+'</span></div>'
+    +'</div>'
+    +'<div style="background:rgba(37,99,235,.09);border:1px solid rgba(37,99,235,.16);border-radius:8px;padding:.36rem .65rem;margin:.05rem .7rem .25rem;font-size:.4rem;color:rgba(93,150,246,.75)">\uD83D\uDCF1 Full wallet balance \u00B7 Open Pi Browser Wallet</div>'
+    +'<div class="slbl">Quick Actions</div>'
+    +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:.42rem;padding:.05rem .75rem .3rem">'
+      +'<div onclick="goTab(\'pay\',document.querySelectorAll(\'.nb\')[2])" style="background:rgba(37,99,235,.14);border:1.5px solid rgba(37,99,235,.32);border-radius:14px;padding:.72rem;min-height:68px;display:flex;align-items:center;gap:.5rem;cursor:pointer;touch-action:manipulation" onpointerdown="this.style.opacity=\'.7\'" onpointerup="this.style.opacity=\'1\'" onpointerleave="this.style.opacity=\'1\'"><div style="width:40px;height:40px;border-radius:11px;background:rgba(37,99,235,.28);display:flex;align-items:center;justify-content:center;font-size:1.15rem">\uD83D\uDCB8</div><div><div style="font-size:.6rem;font-weight:800;color:#F0F6FF">Send Pi</div><div style="font-size:.4rem;color:rgba(240,246,255,.5)">Real Mainnet</div></div></div>'
+      +'<div onclick="openRecvQR()" style="background:rgba(13,148,136,.13);border:1.5px solid rgba(13,148,136,.3);border-radius:14px;padding:.72rem;min-height:68px;display:flex;align-items:center;gap:.5rem;cursor:pointer;touch-action:manipulation" onpointerdown="this.style.opacity=\'.7\'" onpointerup="this.style.opacity=\'1\'" onpointerleave="this.style.opacity=\'1\'"><div style="width:40px;height:40px;border-radius:11px;background:rgba(13,148,136,.25);display:flex;align-items:center;justify-content:center;font-size:1.15rem">\uD83D\uDCE5</div><div><div style="font-size:.6rem;font-weight:800;color:#F0F6FF">Receive Pi</div><div style="font-size:.4rem;color:rgba(240,246,255,.5)">QR &amp; share</div></div></div>'
+      +'<div onclick="openPayReq()" style="background:rgba(200,169,81,.11);border:1.5px solid rgba(200,169,81,.28);border-radius:14px;padding:.72rem;min-height:68px;display:flex;align-items:center;gap:.5rem;cursor:pointer;touch-action:manipulation" onpointerdown="this.style.opacity=\'.7\'" onpointerup="this.style.opacity=\'1\'" onpointerleave="this.style.opacity=\'1\'"><div style="width:40px;height:40px;border-radius:11px;background:rgba(200,169,81,.2);display:flex;align-items:center;justify-content:center;font-size:1.15rem">\uD83D\uDCCB</div><div><div style="font-size:.6rem;font-weight:800;color:#F0F6FF">Request Pi</div><div style="font-size:.4rem;color:rgba(240,246,255,.5)">Create request</div></div></div>'
+      +'<div onclick="openQR()" style="background:rgba(124,58,237,.12);border:1.5px solid rgba(124,58,237,.28);border-radius:14px;padding:.72rem;min-height:68px;display:flex;align-items:center;gap:.5rem;cursor:pointer;touch-action:manipulation" onpointerdown="this.style.opacity=\'.7\'" onpointerup="this.style.opacity=\'1\'" onpointerleave="this.style.opacity=\'1\'"><div style="width:40px;height:40px;border-radius:11px;background:rgba(124,58,237,.22);display:flex;align-items:center;justify-content:center;font-size:1.15rem">\uD83D\uDCF1</div><div><div style="font-size:.6rem;font-weight:800;color:#F0F6FF">Scan QR</div><div style="font-size:.4rem;color:rgba(240,246,255,.5)">Pay by QR</div></div></div>'
+    +'</div>'
+    +'<div class="slbl">Financial Tools</div><div class="uc-grid">'
+      +uc('&#x1F4B1;','Pi Rate','Full rate center','openRateCenter()','live')
+      +uc('&#x1F9EE;','Calculator','Convert & split','openCalc()','live')
+      +uc('&#x1F4CA;','Budget','Spending tracker','openBudget()','live')
+      +uc('&#x1F3AF;','Goals','Savings goals','openGoals()','live')
+      +uc('&#x1F4C8;','Analytics','Trends & insights','openAnalytics()','live')
+      +uc('&#x1F4AA;','Health Score','Financial score','openHealth()','live')
+    +'</div>'
+    +'<div class="slbl">Business</div><div class="uc-grid">'
+      +uc('&#x1F3EA;','Merchant','Store & products','openMerchant()','live')
+      +uc('&#x1F9FE;','Invoices','Professional billing','openInvoice()','live')
+      +uc('&#x1F916;','AI Assistant','Financial AI','openAI()','live')
+      +uc('&#x1F552;','Timeline','Activity log','openTimeline()','live')
+    +'</div>'
+    +'<div class="slbl">Coming Soon</div><div class="uc-grid">'
+      +uc('&#x1F4B0;','Split Bills','Split payments','toast(\'Coming soon\')','soon')
+      +uc('&#x1F3F7;','Savings Vault','Lock & save','toast(\'Coming soon\')','soon')
+      +uc('&#x1F504;','Recurring','Auto-payments','toast(\'Coming soon\')','soon')
+      +uc('&#x1F5C2;','Statements','Monthly PDF','toast(\'Coming soon\')','soon')
+      +uc('&#x1F5A5;','POS System','Point of sale','toast(\'Coming soon\')','soon')
+      +uc('&#x1F9E9;','Dev Platform','APIs & webhooks','toast(\'Coming soon\')','soon')
+    +'</div>'
+    +'<div class="slbl">Recent Activity<span class="sact" onclick="goTab(\'history\',document.querySelectorAll(\'.nb\')[3])">See all</span></div>'
+    +(recent||'<div class="empty"><div class="empty-i">\uD83D\uDCB0</div><div class="empty-t">No transactions yet</div><div class="empty-s">Send or receive Pi through FinPi to get started</div><div class="empty-btn" onclick="goTab(\'pay\',document.querySelectorAll(\'.nb\')[2])">\uD83D\uDCB8 Send Pi</div></div>');
+}
+
+function hmCalc(dir){
+  if(!_piRate||_piRate<=0)return;
+  var pi_el=document.getElementById('hm-pi'),usd_el=document.getElementById('hm-usd');
+  if(!pi_el||!usd_el)return;
+  if(dir==='pi'){var v=parseFloat(pi_el.value);usd_el.value=isNaN(v)?'':(v*_piRate).toFixed(4);}
+  else{var v2=parseFloat(usd_el.value);pi_el.value=isNaN(v2)?'':(v2/_piRate).toFixed(4);}
+}
+
+function walletTab(tab,el){
+  document.querySelectorAll('#wallet-tabs .stab').forEach(function(b){b.classList.remove('on');});
+  if(el)el.classList.add('on');
+  var u=piUser||{},name=u.username||'Pioneer',connected=!!piUser&&name!=='Guest',isGuest=u.username==='Guest';
+  var finpiId=u.username?'FP-'+u.username.toUpperCase():'\u2014';
+  var stColor=connected?'var(--green)':'var(--orange)';
+  var ws=document.getElementById('wallet-scroll');if(!ws)return;
+  var s2=txLog.filter(function(t){return t.type==='sent'&&t.status==='completed';}).reduce(function(s,t){return s+t.amount;},0);
+  var r2=txLog.filter(function(t){return t.type==='received'&&t.status==='completed';}).reduce(function(s,t){return s+t.amount;},0);
+  var tc2=txLog.filter(function(t){return t.status==='completed';}).length;
+  if(tab==='overview'){
+    ws.innerHTML='<div class="bal-card">'
+      +'<div class="bal-header"><div><div class="bal-lbl">FinPi Activity</div></div><div style="font-size:.38rem;color:var(--teal);font-family:var(--m)">'+finpiId+'</div></div>'
+      +'<div style="background:rgba(0,0,0,.22);border-radius:var(--r);padding:.45rem .65rem;margin:.35rem 0">'
+        +'<div style="display:flex;justify-content:space-between;padding:.12rem 0;border-bottom:1px solid rgba(255,255,255,.05)"><span style="font-size:.44rem;color:rgba(240,246,255,.45)">Sent via FinPi</span><span style="font-family:var(--m);font-size:.62rem;font-weight:700;color:var(--red)">'+(s2>0?'\u2212\u03C0'+s2.toFixed(3):'\u03C0 0.000')+'</span></div>'
+        +'<div style="display:flex;justify-content:space-between;padding:.12rem 0;border-bottom:1px solid rgba(255,255,255,.05)"><span style="font-size:.44rem;color:rgba(240,246,255,.45)">Received via FinPi</span><span style="font-family:var(--m);font-size:.62rem;font-weight:700;color:var(--green)">'+(r2>0?'+\u03C0'+r2.toFixed(3):'\u03C0 0.000')+'</span></div>'
+        +'<div style="display:flex;justify-content:space-between;padding:.12rem 0"><span style="font-size:.44rem;color:rgba(240,246,255,.45)">Transactions</span><span style="font-family:var(--m);font-size:.62rem;font-weight:700">'+tc2+'</span></div>'
+      +'</div>'
+      +'<div style="font-size:.4rem;color:rgba(93,150,246,.8);background:rgba(37,99,235,.1);border:1px solid rgba(37,99,235,.18);border-radius:6px;padding:.32rem .55rem;margin-bottom:.45rem">\uD83D\uDCF1 Full wallet balance \u00B7 Open Pi Browser Wallet</div>'
+      +'<div style="background:rgba(0,0,0,.15);border-radius:var(--r);padding:.45rem .65rem;margin-bottom:.5rem">'
+        +'<div class="receipt-row"><span class="receipt-key">Username</span><span class="receipt-val" style="color:var(--teal)">@'+name+'</span></div>'
+        +'<div class="receipt-row"><span class="receipt-key">FinPi ID</span><span class="receipt-val">'+finpiId+'</span></div>'
+        +'<div class="receipt-row"><span class="receipt-key">Status</span><span class="receipt-val" style="color:'+stColor+'">\u25CF '+(connected?'Connected':isGuest?'Guest':'Disconnected')+'</span></div>'
+        +'<div class="receipt-row" style="border:none"><span class="receipt-key">Network</span><span class="receipt-val">Pi Mainnet</span></div>'
+      +'</div>'
+      +'<div class="bal-btns">'
+        +'<div class="bbal-btn p" onclick="goTab(\'pay\',document.querySelectorAll(\'.nb\')[2])"><div class="bbal-i">\uD83D\uDCB8</div><div class="bbal-l">Send</div></div>'
+        +'<div class="bbal-btn t" onclick="openRecvQR()"><div class="bbal-i">\uD83D\uDCE5</div><div class="bbal-l">Receive</div></div>'
+        +'<div class="bbal-btn s" onclick="openPayReq()"><div class="bbal-i">\uD83D\uDCCB</div><div class="bbal-l">Request</div></div>'
+        +'<div class="bbal-btn s" onclick="openQR()"><div class="bbal-i">\uD83D\uDCF1</div><div class="bbal-l">QR</div></div>'
+      +'</div>'
+    +'</div>'
+    +'<div class="slbl">Wallet Tools</div><div class="uc-grid">'
+      +uc('&#x1F4CB;','Activity','Transaction history',"walletTab('activity',document.querySelectorAll('#wallet-tabs .stab')[1])",'live')
+      +uc('&#x1F4F1;','QR Center','Generate & scan','openQR()','live')
+      +uc('&#x1F4CD;','Address Book','Saved contacts','openAllContacts()','live')
+      +uc('&#x2B50;','Favourites','Starred contacts','openFavs()','live')
+      +uc('&#x1F4B1;','Pi Rate','Live Pi price','openRateCenter()','live')
+      +uc('&#x1F4CA;','Analytics','Spending insights','openAnalytics()','live')
+    +'</div>';
+  }else if(tab==='activity'){
+    ws.innerHTML=txLog.length?txLog.map(txRow).join(''):'<div class="empty"><div class="empty-i">\uD83D\uDCCB</div><div class="empty-t">No transactions yet</div><div class="empty-s">Your Pi transactions will appear here</div><div class="empty-btn" onclick="goTab(\'pay\',document.querySelectorAll(\'.nb\')[2])">\uD83D\uDCB8 Send Pi</div></div>';
+  }else if(tab==='contacts'){
+    ws.innerHTML='<div style="padding:.35rem .75rem .1rem;display:flex;gap:.35rem"><button class="btn bp btn-sm" onclick="openAddContact()" style="flex:1;min-height:44px">+ Add Contact</button><button class="btn bo btn-sm" onclick="openSearch()" style="flex:1;min-height:44px">&#x1F50D; Search</button></div>'
+      +(contacts.length?contacts.map(function(ct,i){return '<div class="tx"><div class="tx-ic" style="font-size:1.2rem">\uD83D\uDC64</div><div class="tx-inf"><div class="tx-nm">@'+ct.un+'</div><div class="tx-dt">'+(ct.lbl||'No label')+'</div></div><div style="display:flex;gap:.28rem"><span class="stab on" onclick="quickPay(\''+ct.un+'\')" style="margin:0;cursor:pointer;min-height:36px;font-size:.44rem;display:flex;align-items:center">Pay</span><span class="stab" onclick="deleteContact('+i+')" style="margin:0;cursor:pointer;min-height:36px;font-size:.44rem;color:var(--red);display:flex;align-items:center">&#x2715;</span></div></div>';}).join(''):'<div class="empty"><div class="empty-i">\uD83D\uDCD2</div><div class="empty-t">No contacts</div><div class="empty-s">Add Pi usernames to your address book</div></div>');
+  }else if(tab==='analytics'){openAnalytics();}
+}
+function renderWallet(){var ft=document.querySelector('#wallet-tabs .stab');document.querySelectorAll('#wallet-tabs .stab').forEach(function(b){b.classList.remove('on');});if(ft)ft.classList.add('on');walletTab('overview',ft);}
+
+function txRow(tx){
+  var isSent=tx.type==='sent';
+  var sc=tx.status==='completed'?'var(--green)':tx.status==='failed'?'var(--red)':tx.status==='cancelled'?'rgba(240,246,255,.3)':'var(--orange)';
+  var si=tx.status==='completed'?(isSent?'\uD83D\uDCB8':'\uD83D\uDCE5'):tx.status==='failed'?'\u274C':tx.status==='cancelled'?'\u26AA':'\u23F3';
+  var icoBg=tx.status==='completed'?(isSent?'rgba(239,68,68,.18)':'rgba(16,185,129,.18)'):tx.status==='failed'?'rgba(239,68,68,.14)':'rgba(245,158,11,.14)';
+  var who=isSent?((tx.meta&&tx.meta.recipientName?tx.meta.recipientName+' \u00B7 ':'')+('@'+((tx.meta&&tx.meta.to)||'\u2014'))):(tx.meta&&tx.meta.from?'@'+tx.meta.from:'Received');
+  return '<div class="tx" onclick="openReceipt(\''+tx.id+'\')">'
+    +'<div class="tx-ic" style="background:'+icoBg+';font-size:1.05rem">'+si+'</div>'
+    +'<div class="tx-inf"><div class="tx-nm">'+who+'</div><div class="tx-dt">'+(tx.memo?tx.memo+' \u00B7 ':'')+ago(tx.date)+'</div></div>'
+    +'<div style="text-align:right;flex-shrink:0"><div class="tx-pi" style="color:'+(isSent?'var(--red)':'var(--green)')+'">'+(isSent?'\u2212':'+')+pi(tx.amount)+'</div><div style="font-size:.36rem;color:'+sc+';margin-top:.04rem">'+tx.status+'</div></div>'
+  +'</div>';
+}
+
+function renderHist(){
+  var tab=curHtab||'all';
+  var list=txLog.filter(function(t){if(tab==='sent')return t.type==='sent';if(tab==='received')return t.type==='received';if(tab==='pending')return t.status==='pending'||t.status==='processing';if(tab==='failed')return t.status==='failed'||t.status==='cancelled';return true;});
+  var el=document.getElementById('hist-scroll');if(!el)return;
+  var labels={all:'All',sent:'Sent',received:'Received',pending:'Pending',failed:'Failed'};
+  el.innerHTML='<div style="display:flex;gap:.3rem;padding:.3rem .75rem .4rem;overflow-x:auto;scrollbar-width:none">'
+    +['all','sent','received','pending','failed'].map(function(t){return '<div class="stab'+(tab===t?' on':'')+'" onclick="htab(\''+t+'\')" style="flex-shrink:0;min-height:34px">'+labels[t]+'</div>';}).join('')
+  +'</div>'
+  +'<div style="display:flex;gap:.3rem;padding:0 .75rem .4rem"><input class="search-inp" placeholder="Search..." oninput="searchTx(this.value)" style="flex:1"><button class="btn bo btn-sm" style="flex-shrink:0;min-height:40px" onclick="exportTx()">\uD83D\uDCE4</button></div>'
+  +(list.length?list.map(txRow).join(''):'<div class="empty"><div class="empty-i">'+(tab==='pending'?'\u23F3':tab==='failed'?'\u274C':'\uD83D\uDCCB')+'</div><div class="empty-t">No '+( tab==='all'?'':tab+' ')+'transactions</div></div>');
+}
+function htab(t){curHtab=t;renderHist();}
+function searchTx(q){if(!q){renderHist();return;}q=q.toLowerCase();var el=document.getElementById('hist-scroll');if(!el)return;var r=txLog.filter(function(t){return JSON.stringify(t).toLowerCase().includes(q);});var hdr=el.innerHTML.substring(0,el.innerHTML.indexOf('<div class="tx'));el.innerHTML=hdr+(r.length?r.slice(0,10).map(txRow).join(''):'<div class="empty"><div class="empty-t">No results</div></div>');}
+
+function renderPay(){payTab('send',document.querySelector('#scr-pay .stab'));}
+function payTab(tab,el){
+  document.querySelectorAll('#scr-pay .stab').forEach(function(b){b.classList.remove('on');});
+  if(el)el.classList.add('on');
+  var pb=document.getElementById('pay-body');if(!pb)return;
+  if(tab==='send'){
+    pb.innerHTML='<div style="padding:.5rem .75rem">'
+      +'<label class="fl">Recipient Wallet Address or Username</label><input class="fi" id="send-to" placeholder="@username or wallet address" autocomplete="off">'
+      +'<label class="fl">Recipient Full Name (optional)</label><input class="fi" id="send-name" placeholder="e.g. Abdullahi Bashir" autocomplete="off">'
+      +'<label class="fl">Amount (\u03C0)</label>'
+      +'<div style="position:relative"><div style="position:absolute;left:.8rem;top:50%;transform:translateY(-50%);font-family:var(--m);font-weight:800;color:var(--gold)">\u03C0</div><input class="fi" id="send-amt" type="number" placeholder="0.001" step="0.001" min="0.001" style="padding-left:2rem" oninput="updateSendUSD()"></div>'
+      +'<div id="send-usd" style="font-size:.42rem;color:rgba(200,169,81,.65);font-family:var(--m);margin:-.2rem 0 .35rem;padding-left:.1rem"></div>'
+      +'<label class="fl">Memo (optional)</label><input class="fi" id="send-memo" placeholder="e.g. Payment for services" maxlength="100">'
+      +'<div style="font-size:.42rem;color:var(--orange);margin-bottom:.55rem">\u26A0 Sandbox Test Payment \u00B7 Pi.createPayment() \u00B7 Test mode</div>'
+      +'<button class="btn bp" onclick="initSend()">\u03C0 Review &amp; Send</button>'
+      +'<div style="font-size:.4rem;color:var(--t3);margin-top:.3rem;text-align:center">Enter a valid Pi amount</div>'
+    +'</div>';
+    if(_piRate&&_piRate>0)updateSendUSD();
+  }else if(tab==='recv'){openRecvQR();}
+  else if(tab==='req'){openPayReq();}
+  else if(tab==='qr'){openQR();}
+  else if(tab==='links'){openPayLinks();}
+  else if(tab==='contacts'){openAllContacts();}
+}
+function updateSendUSD(){var v=parseFloat((document.getElementById('send-amt')||{}).value)||0;var el=document.getElementById('send-usd');if(el&&_piRate&&_piRate>0)el.textContent='\u2248 $'+(v*_piRate).toFixed(4)+' USD';}
+
+function initSend(){
+  var to=((document.getElementById('send-to')||{}).value||'').replace(/^@/,'').trim();
+  var amt=parseFloat((document.getElementById('send-amt')||{}).value)||0;
+  var memo=(document.getElementById('send-memo')||{}).value||'';
+  var name=(document.getElementById('send-name')||{}).value||'';
+  if(!to){toast('Enter recipient username or address','e');return;}
+  if(!amt||amt<0.001){toast('Enter a valid Pi amount (min 0.001)','e');return;}
+  pendingPay={to:to,amt:amt,memo:memo,name:name};
+  document.getElementById('c-amt').textContent='\u03C0 '+amt.toFixed(3);
+  document.getElementById('c-to').textContent='To: @'+to+(name?' ('+name+')':'');
+  var det=document.getElementById('c-detail');
+  if(det)det.innerHTML='<div class="c-row"><span class="c-key">Amount</span><span class="c-val" style="font-family:var(--m);color:var(--gold)">\u03C0 '+amt.toFixed(3)+'</span></div>'
+    +(_piRate&&_piRate>0?'<div class="c-row"><span class="c-key">Approx. USD</span><span class="c-val">$'+(amt*_piRate).toFixed(4)+'</span></div>':'')
+    +'<div class="c-row"><span class="c-key">Recipient</span><span class="c-val">@'+to+'</span></div>'
+    +(memo?'<div class="c-row"><span class="c-key">Memo</span><span class="c-val">'+memo+'</span></div>':'')
+    +'<div class="c-row" style="border:none"><span class="c-key">Network</span><span class="c-val">Pi Mainnet</span></div>';
+  document.getElementById('cov').className='open';
+}
+
+function doSend(){
+  if(_activePay){toast('Payment already in progress','e');return;}
+  if(!pendingPay){toast('No payment pending','e');return;}
+  var p=pendingPay;
+  if(typeof Pi==='undefined'){toast('Open in Pi Browser to send real Pi','e');closeC();return;}
+  if(!piUser||!piUser.username){toast('Sign in with Pi first','e');closeC();return;}
+  _activePay=true;pendingPay=null;
+  var btn=document.getElementById('cconfirm-btn'),cancelBtn=document.getElementById('ccancel-btn');
+  function resetBtn(label){_activePay=false;if(btn){btn.disabled=false;btn.textContent=label||'\u2714 Confirm & Send';}if(cancelBtn)cancelBtn.disabled=false;}
+  function setBtnLabel(label){if(btn){btn.disabled=true;btn.textContent=label;}if(cancelBtn)cancelBtn.disabled=true;}
+  var txRef='FP-'+Date.now().toString(36).toUpperCase();
+  var txEntry={id:Date.now(),finpi_ref:txRef,type:'sent',amount:Number(p.amt),memo:p.memo||'',status:'pending',date:new Date().toISOString(),meta:{to:p.to,recipientName:p.name||'',from:piUser.username||'',paymentId:null,txid:null}};
+  txLog.unshift(txEntry);saveTx();
+  var _timeout=setTimeout(function(){if(_activePay){txEntry.status='failed';txEntry.meta.error='Timeout';saveTx();closeC();resetBtn();syncAllViews();showPayFail('Payment timed out. Please try again.',p);}},90000);
+  function clearTimeout_(){if(_timeout){clearTimeout(_timeout);_timeout=null;}}
+  try{if(typeof Pi!=='undefined')Pi.init({version:'2.0',sandbox:true});}catch(e){}
+  try{
+    Pi.createPayment({amount:p.amt,memo:p.memo||'FinPi Transfer',metadata:{to:p.to,app:'FinPi',ref:txRef,from:piUser.username||''}},{
+      onReadyForServerApproval:function(paymentId){
+        clearTimeout_();console.log('[FinPi] onReadyForServerApproval',paymentId);
+        setBtnLabel('\u23F3 Approving\u2026');txEntry.meta.paymentId=paymentId;txEntry.status='processing';saveTx();
+        fetch(_APPROVE,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({paymentId:paymentId})})
+          .then(function(r){return r.json();}).then(function(d){console.log('[FinPi] /approve:',JSON.stringify(d));})
+          .catch(function(e){console.warn('[FinPi] /approve:',e?e.message:e);});
+      },
+      onReadyForServerCompletion:function(paymentId,txid){
+        clearTimeout_();console.log('[FinPi] onReadyForServerCompletion',paymentId,txid);
+        setBtnLabel('\u23F3 Completing\u2026');txEntry.meta.paymentId=paymentId;txEntry.meta.txid=txid;
+        fetch(_COMPLETE,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({paymentId:paymentId,txid:txid})})
+          .then(function(r){return r.json();})
+          .then(function(d){console.log('[FinPi] /complete:',JSON.stringify(d));txEntry.status='completed';txEntry.completed_at=new Date().toISOString();saveTx();closeC();resetBtn();syncAllViews();pushNotif('\uD83D\uDCB8 Sent '+pi(p.amt)+' to @'+p.to,'payment');showSuccess(p.amt,p.to,p.memo,txEntry);})
+          .catch(function(e){console.error('[FinPi] /complete error:',e?e.message:e);txEntry.status='completed';txEntry.completed_at=new Date().toISOString();txEntry.meta.serverNote='On-chain complete, server confirmation failed';saveTx();closeC();resetBtn();syncAllViews();showSuccess(p.amt,p.to,p.memo,txEntry);});
+      },
+      onCancel:function(paymentId){clearTimeout_();txEntry.status='cancelled';saveTx();closeC();resetBtn();syncAllViews();toast('Payment cancelled');},
+      onError:function(err,payment){clearTimeout_();console.error('[FinPi] onError',err,payment);txEntry.status='failed';txEntry.meta.error=err?String(err):'Unknown';saveTx();closeC();resetBtn();syncAllViews();showPayFail(err?String(err):'Payment failed. Please try again.',p);}
+    });
+    setBtnLabel('\u23F3 Sending\u2026');console.log('[FinPi] Pi.createPayment() called');
+  }catch(e){console.error('[FinPi] Pi.createPayment() threw:',e?e.message:e);clearTimeout_();txEntry.status='failed';txEntry.meta.error=e?e.message:'Error';saveTx();closeC();resetBtn();syncAllViews();showPayFail(e?e.message:'Could not start payment.',p);}
+}
+
+function onIncompletePayment(payment){
+  if(!payment||!payment.identifier)return;
+  var paymentId=payment.identifier,txid=payment.transaction&&payment.transaction.txid;
+  var endpoint=txid?_COMPLETE:_APPROVE,body=txid?{paymentId:paymentId,txid:txid}:{paymentId:paymentId};
+  fetch(endpoint,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)}).then(function(r){return r.json();}).then(function(d){console.log('[FinPi] Recovery:',JSON.stringify(d));}).catch(function(e){console.warn('[FinPi] Recovery error:',e?e.message:e);});
+}
+
+function showPayFail(reason,p){openP('Payment Failed','<div style="text-align:center;padding:1rem 0"><div style="font-size:2.5rem;margin-bottom:.5rem">\u26A0\uFE0F</div><div style="font-size:.8rem;font-weight:800;color:var(--red);margin-bottom:.3rem">Payment Failed</div><div style="font-size:.5rem;color:var(--t3);margin-bottom:.8rem">Your payment could not be completed.</div></div><div style="background:var(--bg2);border:1px solid rgba(239,68,68,.2);border-radius:var(--r);padding:.55rem .75rem;margin-bottom:.65rem"><div class="receipt-row"><span class="receipt-key">Reason</span><span class="receipt-val" style="color:var(--red)">'+reason+'</span></div><div class="receipt-row"><span class="receipt-key">Amount</span><span class="receipt-val">\u03C0 '+(p&&p.amt?parseFloat(p.amt).toFixed(2):'0.00')+'</span></div><div class="receipt-row" style="border:none"><span class="receipt-key">Recipient</span><span class="receipt-val">@'+(p&&p.to||'\u2014')+'</span></div></div><button class="btn bp" onclick="closeP();goTab(\'pay\',document.querySelectorAll(\'.nb\')[2])">\u21BA Try Again</button><button class="btn bo" onclick="closeP()">Cancel</button>');}
+
+function showSuccess(amt,to,memo,tx){openP('Payment Successful','<div style="text-align:center;padding:1rem 0 .5rem"><div style="font-size:3rem;margin-bottom:.3rem;animation:checkIn .4s ease">\u2705</div><div style="font-family:var(--m);font-size:1.8rem;font-weight:800;color:var(--green)">\u03C0 '+parseFloat(amt).toFixed(3)+'</div><div style="font-size:.5rem;color:var(--teal);margin-top:.15rem">Sent to @'+to+'</div></div><div style="background:var(--bg2);border:1px solid rgba(16,185,129,.2);border-radius:var(--r);padding:.55rem .75rem;margin:.5rem 0 .65rem"><div class="receipt-row"><span class="receipt-key">Amount</span><span class="receipt-val" style="color:var(--green)">\u03C0 '+parseFloat(amt).toFixed(3)+'</span></div><div class="receipt-row"><span class="receipt-key">Recipient</span><span class="receipt-val" style="color:var(--teal)">@'+to+'</span></div>'+(memo?'<div class="receipt-row"><span class="receipt-key">Memo</span><span class="receipt-val">'+memo+'</span></div>':'')+(tx&&tx.finpi_ref?'<div class="receipt-row"><span class="receipt-key">FinPi Ref</span><span class="receipt-val">'+tx.finpi_ref+'</span></div>':'')+(tx&&tx.meta&&tx.meta.txid?'<div class="receipt-row"><span class="receipt-key">Tx ID</span><span class="receipt-val">'+tx.meta.txid.substring(0,16)+'...</span></div>':'')+'<div class="receipt-row" style="border:none"><span class="receipt-key">Network</span><span class="receipt-val">Pi Mainnet</span></div></div><button class="btn bp" onclick="closeP()">Done</button>');}
+
+function openRateCenter(){
+  var hasRate=_piRate&&_piRate>0;
+  var priceStr=hasRate?'$'+_piRate.toFixed(4):'Unavailable';
+  var chgVal=_piChange24h,chgStr=chgVal!=null?(chgVal>=0?'+':'')+chgVal.toFixed(2)+'%':'';
+  var chgClass=chgVal!=null?(chgVal>=0?'up':'dn'):'';
+  var mcapStr=_piMarketCap?'$'+(_piMarketCap/1e9).toFixed(2)+'B':'---';
+  var volStr=_piVol24h?'$'+(_piVol24h/1e6).toFixed(2)+'M':'---';
+  var timeStr=_piRateTime?new Date(_piRateTime).toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'}):'---';
+  var currencies=['USD','NGN','EUR','GBP','SAR','AED','INR','CAD','CNY','JPY'];
+  var symbols={USD:'$',NGN:'\u20A6',EUR:'\u20AC',GBP:'\u00A3',SAR:'\uFDFC',AED:'\u062F.\u0625',INR:'\u20B9',CAD:'CA$',CNY:'\u00A5',JPY:'\u00A5'};
+  openP('Pi Rate Center',
+    '<div style="background:'+(hasRate?'rgba(16,185,129,.1)':'rgba(245,158,11,.1)')+';border:1px solid '+(hasRate?'rgba(16,185,129,.3)':'rgba(245,158,11,.3)')+';border-radius:var(--r);padding:.4rem .75rem;margin-bottom:.45rem;display:flex;justify-content:space-between;align-items:center">'
+      +'<span style="font-size:.46rem;font-weight:700;color:'+(hasRate?'var(--green)':'var(--orange)')+'">'+( hasRate?'\u25CF Live':'⚠ Unavailable')+'</span>'
+      +'<span style="font-size:.38rem;color:var(--t3)">'+(_piRateSource||'')+' '+(hasRate?'\u00B7 '+timeStr:'')+'</span>'
+      +'<button onclick="fetchPiRate();setTimeout(openRateCenter,1400)" style="font-size:.4rem;color:var(--teal);background:none;border:none;cursor:pointer;padding:.15rem .4rem;border-radius:6px">\u21BB</button>'
+    +'</div>'
+    +'<div class="mkt-card" style="margin:.1rem 0 .45rem">'
+      +'<div class="mkt-sub">Pi Market Reference</div>'
+      +'<div class="mkt-price">'+priceStr+'</div>'
+      +(chgClass?'<span class="mkt-chg '+chgClass+'">'+chgStr+' 24h</span>':'')
+      +'<div class="mkt-row"><div class="mkt-stat"><div class="mkt-stat-l">Market Cap</div><div class="mkt-stat-v">'+mcapStr+'</div></div><div class="mkt-stat"><div class="mkt-stat-l">24h Volume</div><div class="mkt-stat-v">'+volStr+'</div></div></div>'
+    +'</div>'
+    +'<div style="background:var(--bg2);border:1px solid var(--border);border-radius:var(--r-lg);padding:.1rem .2rem;margin-bottom:.45rem">'
+      +currencies.map(function(cur){var val=_piRates&&_piRates[cur];var str=(val&&val>0)?((symbols[cur]||'')+val.toFixed(cur==='JPY'?2:4)):'---';return '<div class="receipt-row"><span class="receipt-key">1\u03C0 in '+cur+'</span><span class="receipt-val" style="color:'+(val&&val>0?'var(--t1)':'var(--t3)')+'">'+str+'</span></div>';}).join('')
+    +'</div>'
+    +'<div style="font-size:.44rem;font-weight:800;color:var(--t3);text-transform:uppercase;letter-spacing:.08em;margin-bottom:.28rem">Quick Converter</div>'
+    +'<div style="display:flex;gap:.35rem;margin-bottom:.32rem">'
+      +'<div style="position:relative;flex:1"><div style="position:absolute;left:.7rem;top:50%;transform:translateY(-50%);font-family:var(--m);font-size:.95rem;font-weight:800;color:var(--gold);pointer-events:none">\u03C0</div><input class="fi" id="rc-amt" type="number" placeholder="0.000" step="0.001" style="padding-left:2rem;font-family:var(--m);margin:0" oninput="rcConvert()"></div>'
+      +'<select class="fi" id="rc-cur" style="flex:.7;margin:0;cursor:pointer" onchange="rcConvert()">'+currencies.map(function(c){return '<option>'+c+'</option>';}).join('')+'</select>'
+    +'</div>'
+    +'<div id="rc-res" style="font-family:var(--m);font-size:1.35rem;font-weight:800;color:var(--gold);margin:.15rem 0;min-height:1.8rem">'+(hasRate?'Enter amount':'---')+'</div>'
+    +'<div id="rc-note" style="font-size:.4rem;color:var(--t3);margin-bottom:.35rem">'+(hasRate?'Reference only':'Rate unavailable')+'</div>'
+    +'<div style="font-size:.38rem;color:rgba(245,158,11,.55);line-height:1.8">\u26A0 Market reference only \u00B7 Not financial advice \u00B7 Source: '+(_piRateSource||'...')+'</div>');
+}
+function rcConvert(){
+  var amt=parseFloat((document.getElementById('rc-amt')||{}).value)||0;
+  var cur=((document.getElementById('rc-cur')||{}).value)||'USD';
+  var sym={USD:'$',NGN:'\u20A6',EUR:'\u20AC',GBP:'\u00A3',SAR:'\uFDFC',AED:'\u062F.\u0625',INR:'\u20B9',CAD:'CA$',CNY:'\u00A5',JPY:'\u00A5'};
+  var el=document.getElementById('rc-res'),nl=document.getElementById('rc-note');
+  if(!_piRate||_piRate<=0){if(el)el.textContent='Rate unavailable';return;}
+  if(!amt){if(el)el.textContent='---';if(nl)nl.textContent='Enter amount above';return;}
+  var val=_piRates&&_piRates[cur]?_piRates[cur]:_piRate;
+  if(el)el.textContent=(sym[cur]||'')+(amt*val).toFixed(cur==='JPY'?2:4)+' '+cur;
+  if(nl)nl.textContent=amt.toFixed(3)+'\u03C0 \u00D7 '+(sym[cur]||'')+val.toFixed(4)+' \u00B7 Reference only';
+}
+
+function renderProfile(){
+  var u=piUser||{},name=u.username||'Pioneer',finpiId=u.username?'FP-'+u.username.toUpperCase():'\u2014',isGuest=u.username==='Guest',p=profile||{};
+  document.getElementById('profile-scroll').innerHTML=
+    '<div class="bal-card" style="text-align:center;padding:1.3rem 1rem 1rem">'
+      +'<div style="width:72px;height:72px;border-radius:50%;background:var(--grd-blue);display:flex;align-items:center;justify-content:center;font-size:1.9rem;font-weight:900;color:#fff;margin:0 auto .55rem;box-shadow:var(--shadow-blue)">'+name[0].toUpperCase()+'</div>'
+      +'<div style="font-size:.95rem;font-weight:900;letter-spacing:-.02em">@'+name+'</div>'
+      +(p.name?'<div style="font-size:.55rem;color:var(--t2);margin-top:.1rem">'+p.name+'</div>':'')
+      +'<div style="font-size:.5rem;color:var(--teal);margin:.1rem 0;font-family:var(--m)">'+finpiId+'</div>'
+      +'<div style="font-size:.44rem;color:var(--t3);margin-top:.06rem">'+(isGuest?'Guest Mode':'Pi Sandbox')+'</div>'
+      +'<button class="btn bp btn-sm" style="margin-top:.65rem;min-height:40px" onclick="openSetup()">\u270F\uFE0F Edit Profile</button>'
+    +'</div>'
+    +'<div class="slbl">Account</div>'
+    +mr('\uD83D\uDD12','Security Center','Auth & sessions','openSecurity()')
+    +mr('\uD83D\uDD14','Notifications','View notifications','openNotifs()')
+    +mr('\u2699\uFE0F','Settings','App settings','openSettings()')
+    +'<div class="slbl">Finance</div>'
+    +'<div class="uc-grid">'
+      +uc('&#x1F4B1;','Pi Rate','Live rates','openRateCenter()','live')
+      +uc('&#x1F9EE;','Calculator','Convert & calc','openCalc()','live')
+      +uc('&#x1F4CA;','Budget','Spending limits','openBudget()','live')
+      +uc('&#x1F3AF;','Goals','Savings goals','openGoals()','live')
+      +uc('&#x1F4C8;','Analytics','Trends','openAnalytics()','live')
+      +uc('&#x1F4AA;','Health','Finance score','openHealth()','live')
+    +'</div>'
+    +'<div class="slbl">Business</div>'
+    +'<div class="uc-grid">'
+      +uc('&#x1F3EA;','Merchant','Store','openMerchant()','live')
+      +uc('&#x1F9FE;','Invoices','Billing','openInvoice()','live')
+      +uc('&#x1F916;','AI Assistant','Financial AI','openAI()','live')
+      +uc('&#x1F552;','Timeline','Activity log','openTimeline()','live')
+    +'</div>'
+    +'<div class="slbl">Data & Legal</div>'
+    +mr('\uD83D\uDCE4','Export Data','CSV & JSON backup','exportTx()')
+    +mr('\uD83D\uDCCB','Privacy Policy','How we handle data','showPrivacyPolicy()')
+    +mr('\uD83D\uDCC4','Terms of Service','App usage terms','showTermsOfService()')
+    +mr('\u2139\uFE0F','About FinPi','Version & info','openAbout()')
+    +'<div style="padding:.75rem .75rem .3rem"><button class="btn bd" style="width:100%;min-height:48px" onclick="confirmLogout()">Sign Out</button></div>'
+    +'<div style="padding:0 .75rem 2rem;font-size:.38rem;color:var(--t4);text-align:center;line-height:1.8">FinPi \u00B7 finpi-web.pages.dev \u00B7 Pi Mainnet \u00B7 v1.0.0<br>\u00A9 2026 FinPi \u00B7 finpi.app@gmail.com<br>Not affiliated with Pi Network Inc.</div>';
+}
+
+function openLegal(){openP('Legal & Policies',legalRow('\u274C\uFE0F','Privacy Policy','How we handle your data','showPrivacyPolicy()')+legalRow('\uD83D\uDCC4','Terms of Service','App usage terms','showTermsOfService()')+legalRow('\u26A0\uFE0F','Risk Disclosure','Pi payment risks','showRiskDisclosure()')+legalRow('\uD83D\uDD12','Security Policy','Our security commitment','showSecurityPolicy()')+legalRow('\uD83D\uDC65','Community Guidelines','Usage standards','showCommunityGuidelines()')+legalRow('\uD83D\uDD0D','Responsible Disclosure','Report vulnerabilities','showResponsibleDisclosure()')+'\u00A9 2026 FinPi \u00B7 finpi.app@gmail.com');}
+function legalRow(ico,title,sub,fn){return '<div style="display:flex;align-items:center;gap:.65rem;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.1);border-radius:12px;padding:.75rem .85rem;cursor:pointer;touch-action:manipulation;min-height:60px;margin-bottom:.3rem" onclick="'+fn+'" onpointerdown="this.style.background=\'rgba(255,255,255,.09)\'" onpointerup="this.style.background=\'rgba(255,255,255,.05)\'" onpointerleave="this.style.background=\'rgba(255,255,255,.05)\'"><div style="width:42px;height:42px;border-radius:11px;background:rgba(255,255,255,.08);display:flex;align-items:center;justify-content:center;font-size:1.1rem;flex-shrink:0">'+ico+'</div><div style="flex:1"><div style="font-size:.64rem;font-weight:700;color:#F0F6FF">'+title+'</div><div style="font-size:.44rem;color:rgba(240,246,255,.55);margin-top:.05rem">'+sub+'</div></div><div style="color:rgba(240,246,255,.3);font-size:.9rem">&#x203A;</div></div>';}
+function legalContent(title,html){openP(title,'<div style="font-size:.84rem;color:#CBD5E1;line-height:1.85"><div style="font-size:.62rem;color:rgba(240,246,255,.32);margin-bottom:.85rem;line-height:1.9">Effective: 31 July 2026 \u00B7 finpi-web.pages.dev<br>\u00A9 2026 FinPi \u00B7 finpi.app@gmail.com</div>'+html+'<div style="font-size:.55rem;color:rgba(240,246,255,.22);margin-top:1rem;padding-top:.8rem;border-top:1px solid rgba(255,255,255,.07)">\u00A9 2026 FinPi. All rights reserved. Independent third-party app. Not affiliated with Pi Network Inc.</div></div>');}
+function lH(t){return '<div style="font-size:.78rem;font-weight:700;color:#93C5FD;margin:1rem 0 .28rem">'+t+'</div>';}
+function lP(t){return '<p style="margin-bottom:.52rem;font-size:.82rem">'+t+'</p>';}
+function lW(t){return '<div style="background:rgba(239,68,68,.1);border:1px solid rgba(239,68,68,.25);border-radius:8px;padding:.62rem .82rem;margin:.48rem 0;font-size:.78rem;color:#FCA5A5;line-height:1.75">'+t+'</div>';}
+function lN(t){return '<div style="background:rgba(37,99,235,.12);border:1px solid rgba(37,99,235,.28);border-radius:8px;padding:.62rem .82rem;margin:.48rem 0;font-size:.78rem;color:#93C5FD;line-height:1.75">'+t+'</div>';}
+function lUL(items){return '<ul style="padding-left:1.1rem;margin-bottom:.52rem">'+items.map(function(i){return '<li style="margin-bottom:.18rem;font-size:.8rem;color:#CBD5E1">'+i+'</li>';}).join('')+'</ul>';}
+function showPrivacyPolicy(){legalContent('Privacy Policy',lN('FinPi is an independent third-party application. Not owned, operated, sponsored, endorsed, or administered by Pi Network or the Pi Core Team.')+lH('1. Data We Collect')+lP('Pi Authentication: Pi username, account identifier, public wallet information via Pi SDK.')+lW('FinPi does not request or store your Pi Wallet passphrase, private key, seed phrase, or wallet recovery phrase.')+lP('Transactions: Sender/recipient info, wallet addresses, amounts, payment IDs, dates, memos, receipts.')+lP('Financial Tools: Budgets, goals, invoices, analytics you voluntarily enter \u2014 stored locally on your device.')+lH('2. We Never Request')+lW('Never provide your Pi Wallet passphrase, private key, seed phrase, or recovery phrase to anyone claiming to represent FinPi.')+lH('3. How We Use Information')+lUL(['Authenticate you via Pi SDK','Process Pi payments via Pi SDK','Display transaction history and generate receipts','Provide financial tools and budgeting features','Maintain security and detect suspicious activity'])+lH('4. Data Storage')+lP('Most data is stored locally on your device. Some information may be processed by Cloudflare infrastructure. Clear local data anytime via Profile \u2192 Settings.')+lH('5. Contact')+lP('Email: finpi.app@gmail.com \u00B7 Website: finpi-web.pages.dev')+lW('Never send your Pi Wallet passphrase or private key through any support channel.'));}
+function showTermsOfService(){legalContent('Terms of Service',lN('By using FinPi you agree to these Terms. FinPi is an independent third-party application not affiliated with Pi Network.')+lH('1. Wallet Security')+lW('FinPi will never request your Pi Wallet passphrase, private key, seed phrase, or recovery phrase. Do not provide these to anyone claiming to represent FinPi.')+lH('2. Payments')+lP('FinPi enables sending, receiving, and requesting Pi via Pi SDK. You are responsible for verifying recipient, wallet address, amount, and payment details before confirming. Blockchain transactions may be irreversible.')+lH('3. Pi Market Information')+lP('Pi rate information is for reference only. FinPi does not guarantee Pi\'s value or investment returns. This is not financial advice.')+lH('4. Prohibited Activities')+lUL(['Fraud, scams, or impersonation','Requesting wallet passphrases or private keys from users','Illegal transactions or money laundering','Introducing malware or interfering with FinPi'])+lH('5. Governing Law')+lP('These Terms are governed by applicable laws of the Federal Republic of Nigeria.')+lH('6. Contact')+lP('Email: finpi.app@gmail.com \u00B7 Website: finpi-web.pages.dev')+lW('Never send your Pi Wallet passphrase or private key through any support channel.'));}
+function showRiskDisclosure(){legalContent('Risk Disclosure',lW('Pi payments on Mainnet are irreversible once confirmed. Always verify recipient and amount before confirming.')+lH('Cryptocurrency Risk')+lP('Pi is a cryptocurrency. Its value can fluctuate significantly. Past performance does not indicate future results.')+lH('Market Data')+lP('Pi rate data is for reference only. It may be delayed or inaccurate and does not constitute financial advice.')+lH('No Financial Advice')+lP('Nothing in FinPi constitutes financial, investment, or legal advice.'));}
+function showSecurityPolicy(){legalContent('Security Policy',lW('FinPi never asks for your Pi passphrase, private key, seed phrase, or recovery phrase.')+lH('Security Measures')+lUL(['Encrypted communications (HTTPS)','Pi SDK authentication controls','Cloudflare secure infrastructure','Access controls and regular security improvements'])+lH('Contact')+lP('Email: finpi.app@gmail.com'));}
+function showCommunityGuidelines(){legalContent('Community Guidelines',lH('Prohibited Uses')+lUL(['Fraudulent transactions or scams','Requesting wallet passphrases from other users','Payments for illegal goods or services','Impersonating Pi Network or FinPi'])+lH('Business Use')+lP('FinPi merchant and invoice features are for legitimate business use only.'));}
+function showResponsibleDisclosure(){legalContent('Responsible Disclosure',lN('We appreciate the security community helping improve FinPi.')+lH('Reporting')+lP('Email: finpi.app@gmail.com \u00B7 Include: description, steps to reproduce, and impact.')+lH('What We Promise')+lUL(['Acknowledge receipt promptly','Work to address validated vulnerabilities','Credit researchers who follow responsible disclosure'])+lW('Never send wallet credentials when reporting security issues.'));}
+
+function openCalc(){openP('Pi Calculator','<div style="padding:.5rem 0"><label class="fl">Pi Amount</label><input class="fi" id="calc-pi" type="number" placeholder="0.000" step="0.001" oninput="calcConvert()"><div id="calc-res" style="font-family:var(--m);font-size:1.4rem;font-weight:800;color:var(--gold);margin:.3rem 0">---</div><div style="font-size:.4rem;color:var(--t3)">Reference only \u00B7 Not financial advice</div></div>');}
+function calcConvert(){var v=parseFloat((document.getElementById('calc-pi')||{}).value)||0;var el=document.getElementById('calc-res');if(el)el.textContent=(_piRate&&_piRate>0)?'$'+(v*_piRate).toFixed(4)+' USD':'Rate loading\u2026';}
+function openBudget(){openP('Budget Tracker','<div class="empty"><div class="empty-i">\uD83D\uDCCA</div><div class="empty-t">Budget Tracker</div><div class="empty-s">Set spending limits and track your Pi usage</div><div class="empty-btn" onclick="toast(\'Coming soon\',\'s\')">\u2795 Add Budget</div></div>');}
+function openGoals(){openP('Savings Goals','<div class="empty"><div class="empty-i">\uD83C\uDFAF</div><div class="empty-t">Savings Goals</div><div class="empty-s">Set Pi savings targets and track progress</div><div class="empty-btn" onclick="toast(\'Coming soon\',\'s\')">\u2795 Add Goal</div></div>');}
+function openAnalytics(){
+  var s=txLog.filter(function(t){return t.type==='sent'&&t.status==='completed';}).reduce(function(a,t){return a+t.amount;},0);
+  var r=txLog.filter(function(t){return t.type==='received'&&t.status==='completed';}).reduce(function(a,t){return a+t.amount;},0);
+  var tc=txLog.filter(function(t){return t.status==='completed';}).length;
+  openP('Analytics','<div style="display:grid;grid-template-columns:1fr 1fr;gap:.38rem;margin-bottom:.6rem"><div class="mkt-stat"><div class="mkt-stat-l">Total Sent</div><div class="mkt-stat-v" style="color:var(--red)">\u03C0'+s.toFixed(3)+'</div></div><div class="mkt-stat"><div class="mkt-stat-l">Total Received</div><div class="mkt-stat-v" style="color:var(--green)">\u03C0'+r.toFixed(3)+'</div></div><div class="mkt-stat"><div class="mkt-stat-l">Transactions</div><div class="mkt-stat-v">'+tc+'</div></div><div class="mkt-stat"><div class="mkt-stat-l">Net Flow</div><div class="mkt-stat-v" style="color:'+(r-s>=0?'var(--green)':'var(--red)')+'">'+( r-s>=0?'+':'')+'\u03C0'+(r-s).toFixed(3)+'</div></div></div>'+(txLog.length?'<div style="font-size:.44rem;font-weight:700;color:var(--t3);text-transform:uppercase;letter-spacing:.08em;margin-bottom:.3rem">Recent Transactions</div>'+txLog.slice(0,10).map(txRow).join(''):'<div class="empty"><div class="empty-i">\uD83D\uDCC8</div><div class="empty-t">No data yet</div></div>'));
+}
+function openHealth(){var h=calcHealth();openP('Financial Health','<div style="text-align:center;padding:1rem 0"><div style="font-family:var(--m);font-size:3rem;font-weight:800;color:'+(h>=70?'var(--green)':h>=40?'var(--orange)':'var(--red)')+'">'+h+'</div><div style="font-size:.6rem;color:var(--t3);margin-top:.3rem">'+(h>=70?'\uD83D\uDFE2 Healthy finances':h>=40?'\uD83D\uDFE1 Fair \u2014 room to improve':'\uD83D\uDD34 Needs attention')+'</div></div><div style="font-size:.5rem;color:var(--t3);text-align:center;margin-top:.5rem;line-height:1.8">Based on your FinPi transaction history.<br>Higher score = better receive/send balance.</div>');}
+function calcHealth(){var s=txLog.filter(function(t){return t.type==='sent'&&t.status==='completed';}).reduce(function(a,t){return a+t.amount;},0);var r=txLog.filter(function(t){return t.type==='received'&&t.status==='completed';}).reduce(function(a,t){return a+t.amount;},0);if(r===0&&s===0)return 50;if(r===0)return 30;return Math.round(r/(r+s)*100);}
+function openMerchant(){openP('Merchant','<div class="empty"><div class="empty-i">\uD83C\uDFEA</div><div class="empty-t">Merchant Dashboard</div><div class="empty-s">Set up your Pi merchant profile and receive payments</div></div>');}
+function openInvoice(){openP('Invoices','<div class="empty"><div class="empty-i">\uD83E\uDDFE</div><div class="empty-t">Invoice Generator</div><div class="empty-s">Create professional Pi invoices for clients</div></div>');}
+function openAI(){openP('AI Assistant','<div class="empty"><div class="empty-i">\uD83E\uDD16</div><div class="empty-t">FinPi AI</div><div class="empty-s">AI-powered financial insights for your Pi activity</div></div>');}
+function openTimeline(){openP('Timeline','<div class="empty"><div class="empty-i">\uD83D\uDD52</div><div class="empty-t">Financial Timeline</div><div class="empty-s">A chronological view of your FinPi activity</div></div>');}
+function openSearch(){openP('Search','<input class="search-inp" placeholder="Search transactions, contacts..." oninput="doSearch(this.value)" autofocus><div id="search-res" style="margin-top:.5rem"></div>');}
+function doSearch(q){var el=document.getElementById('search-res');if(!el)return;if(!q){el.innerHTML='';return;}q=q.toLowerCase();var r=txLog.filter(function(t){return JSON.stringify(t).toLowerCase().includes(q);});el.innerHTML=r.length?r.slice(0,10).map(txRow).join(''):'<div class="empty"><div class="empty-t">No results</div></div>';}
+function openNotifs(){openP('Notifications',notifs.length?notifs.map(function(n){return '<div style="padding:.5rem 0;border-bottom:1px solid var(--border)"><div style="font-size:.58rem;font-weight:600">'+n.msg+'</div><div style="font-size:.4rem;color:var(--t3)">'+ago(n.date)+'</div></div>';}).join(''):'<div class="empty"><div class="empty-i">\uD83D\uDD14</div><div class="empty-t">No notifications</div></div>');}
+function openRecvQR(){var u=piUser||{},name=u.username||'Pioneer';var qrUrl='https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=pi%3A%2F%2F'+encodeURIComponent(name);openP('Receive Pi','<div style="text-align:center;padding:.5rem 0"><div style="font-size:.5rem;color:var(--t3);margin-bottom:.6rem">Share your username or QR to receive Pi</div><img src="'+qrUrl+'" style="width:180px;height:180px;border-radius:12px;background:#fff;padding:8px" onerror="this.style.display=\'none\'"><div style="margin:.65rem 0;font-family:var(--m);font-size:.75rem;font-weight:800;color:var(--teal)">@'+name+'</div><button class="btn bt" onclick="if(navigator.share)navigator.share({title:\'Pay me with Pi\',text:\'Send Pi to @'+name+'\',url:\'https://finpi-web.pages.dev\'}).catch(function(){toast(\'Copy: @'+name+'\',\'s\')});else toast(\'@'+name+' \u2014 share your username\',\'s\')">\uD83D\uDCF1 Share</button></div>');}
+function openQR(){openRecvQR();}
+function openPayReq(){openP('Request Pi','<div style="padding:.3rem 0"><label class="fl">Amount (\u03C0)</label><input class="fi" id="req-amt" type="number" placeholder="0.001" step="0.001"><label class="fl">Memo (optional)</label><input class="fi" id="req-memo" placeholder="e.g. Invoice #001"><button class="btn bp" onclick="genReqLink()">\uD83D\uDCCB Generate Request</button><div id="req-link" style="margin-top:.4rem"></div></div>');}
+function genReqLink(){var amt=(document.getElementById('req-amt')||{}).value||'0';var memo=(document.getElementById('req-memo')||{}).value||'';var u=piUser||{},name=u.username||'Pioneer';var link='https://finpi-web.pages.dev/?pay='+name+'&amt='+amt+(memo?'&memo='+encodeURIComponent(memo):'');var el=document.getElementById('req-link');if(el)el.innerHTML='<div style="background:var(--bg2);border:1px solid var(--border2);border-radius:var(--r);padding:.5rem .7rem;font-size:.5rem;font-family:var(--m);color:var(--teal);word-break:break-all;margin-bottom:.35rem">'+link+'</div><button class="btn bo" onclick="if(navigator.share)navigator.share({title:\'Pay me Pi\',text:\''+memo+'\',url:\''+link+'\'}).catch(function(){});else toast(\'Copy link above\',\'s\')">\uD83D\uDCF1 Share Link</button>';}
+function openPayLinks(){openP('Payment Links','<div class="empty"><div class="empty-i">\uD83D\uDD17</div><div class="empty-t">Payment Links</div><div class="empty-s">Create shareable payment links for Pi requests</div><div class="empty-btn" onclick="openPayReq()">\uD83D\uDCCB Create Request Link</div></div>');}
+function openAllContacts(){openP('Address Book',contacts.length?contacts.map(function(ct,i){return '<div class="tx"><div class="tx-ic" style="font-size:1.2rem">\uD83D\uDC64</div><div class="tx-inf"><div class="tx-nm">@'+ct.un+'</div><div class="tx-dt">'+(ct.lbl||'No label')+'</div></div><button class="btn bo btn-sm" onclick="quickPay(\''+ct.un+'\')">Pay</button></div>';}).join(''):'<div class="empty"><div class="empty-i">\uD83D\uDCD2</div><div class="empty-t">No contacts</div><div class="empty-s">Add Pi usernames to your address book</div><div class="empty-btn" onclick="openAddContact()">\u2795 Add Contact</div></div>');}
+function openAddContact(){openP('Add Contact','<div style="padding:.3rem 0"><label class="fl">Pi Username</label><input class="fi" id="add-un" placeholder="@username"><label class="fl">Label (optional)</label><input class="fi" id="add-lbl" placeholder="e.g. Business partner"><button class="btn bp" onclick="saveContact()">Save Contact</button></div>');}
+function saveContact(){var un=((document.getElementById('add-un')||{}).value||'').replace(/^@/,'').trim();var lbl=(document.getElementById('add-lbl')||{}).value||'';if(!un){toast('Enter username','e');return;}contacts.push({un:un,lbl:lbl,date:new Date().toISOString()});saveContacts();closeP();toast('Contact saved','s');}
+function deleteContact(i){contacts.splice(i,1);saveContacts();toast('Contact removed');}
+function quickPay(un){closeP();goTab('pay',document.querySelectorAll('.nb')[2]);setTimeout(function(){var el=document.getElementById('send-to');if(el)el.value=un;},200);}
+function openFavs(){openP('Favourites','<div class="empty"><div class="empty-i">\u2B50</div><div class="empty-t">No favourites</div><div class="empty-s">Star contacts to add them here</div></div>');}
+function openSetup(){openP('Edit Profile','<div style="padding:.3rem 0"><label class="fl">Display Name</label><input class="fi" id="prof-name" placeholder="Your name" value="'+(profile.name||'')+'"><button class="btn bp" onclick="saveProf()">Save</button></div>');}
+function saveProf(){profile.name=(document.getElementById('prof-name')||{}).value||'';saveProfile();closeP();renderProfile();toast('Profile saved','s');}
+function openSecurity(){openP('Security Center','<div class="empty"><div class="empty-i">\uD83D\uDD12</div><div class="empty-t">Security Center</div><div class="empty-s">Authentication and session management</div></div>');}
+function openSettings(){openP('Settings',mr('\uD83D\uDCE4','Export Data','CSV & JSON backup','exportTx()')+mr('\u200B\uD83D\uDDD1\uFE0F','Clear Local Data','Remove all app data','confirmClear()')+mr('\u2139\uFE0F','About FinPi','Version & info','openAbout()'));}
+function openExport(){var csv='ID,Type,Amount,Status,Date,To,Memo\n'+txLog.map(function(t){return [t.id,t.type,t.amount,t.status,t.date,(t.meta&&t.meta.to)||'',(t.memo||'').replace(/,/g,' ')].join(',');}).join('\n');var b=new Blob([csv],{type:'text/csv'});var a=document.createElement('a');a.href=URL.createObjectURL(b);a.download='finpi-transactions-'+Date.now()+'.csv';a.click();toast('Exported','s');}
+function exportTx(){openExport();}
+function openAbout(){openP('About FinPi','<div style="text-align:center;padding:1rem 0"><div style="font-size:3rem">\uD83D\uDCB0</div><div style="font-size:1.1rem;font-weight:800;margin:.4rem 0">FinPi</div><div style="font-size:.5rem;color:var(--t3);margin-bottom:1rem">Pi Financial Platform \u00B7 v1.0.0</div></div>'+mr('\uD83C\uDF10','Website','finpi-web.pages.dev','toast(\'finpi-web.pages.dev\')')+mr('\uD83D\uDCE7','Contact','finpi.app@gmail.com','window.location.href=\'mailto:finpi.app@gmail.com\'')+mr('\uD83D\uDCC4','Legal','Privacy & Terms','openLegal()')+'<div style="font-size:.4rem;color:var(--t4);text-align:center;margin-top:.8rem;line-height:1.9">\u00A9 2026 FinPi \u00B7 Abdullahi Bashir Abubakar<br>Not affiliated with Pi Network Inc.</div>');}
+function openEcosystem(){openP('Pi Ecosystem',mr('\uD83C\uDF10','Pi Network','minepi.com','window.location.href=\'https://minepi.com\'')+mr('\uD83D\uDCF1','Pi Browser','Open Pi Browser','toast(\'Open in Pi Browser app\')')+mr('\uD83D\uDCE7','Pi Support','Visit minepi.com/support','toast(\'Visit minepi.com/support\')'));}
+function openHelp(){openP('Help & FAQ',mr('\uD83D\uDCB8','How to Send Pi','Step by step guide','toast(\'Go to Pay \u2192 Send\')')+mr('\uD83D\uDCE5','How to Receive Pi','Your username & QR','openRecvQR()')+mr('\u2753','Payment not completing?','Troubleshooting','toast(\'Ensure you are in Pi Browser\')')+mr('\uD83D\uDCE7','Contact Support','finpi.app@gmail.com','window.location.href=\'mailto:finpi.app@gmail.com\'')+mr('\uD83D\uDCC4','Legal Pages','Privacy & Terms','openLegal()'));}
+function openReceipt(id){var tx=txLog.find(function(t){return String(t.id)===String(id);});if(!tx){toast('Receipt not found','e');return;}openP('Transaction Receipt','<div style="text-align:center;padding:.5rem 0 .3rem"><div style="font-size:1.8rem;margin-bottom:.2rem">'+(tx.type==='sent'?'\uD83D\uDCB8':'\uD83D\uDCE5')+'</div><div style="font-family:var(--m);font-size:1.5rem;font-weight:800;color:'+(tx.type==='sent'?'var(--red)':'var(--green)')+'">'+pi(tx.amount)+'</div></div><div style="background:var(--bg2);border:1px solid var(--border);border-radius:var(--r);padding:.55rem .75rem;margin:.4rem 0"><div class="receipt-row"><span class="receipt-key">Type</span><span class="receipt-val">'+tx.type+'</span></div><div class="receipt-row"><span class="receipt-key">Status</span><span class="receipt-val">'+tx.status+'</span></div>'+(tx.meta&&tx.meta.to?'<div class="receipt-row"><span class="receipt-key">To</span><span class="receipt-val">@'+tx.meta.to+'</span></div>':'')+(tx.meta&&tx.meta.from?'<div class="receipt-row"><span class="receipt-key">From</span><span class="receipt-val">@'+tx.meta.from+'</span></div>':'')+(tx.memo?'<div class="receipt-row"><span class="receipt-key">Memo</span><span class="receipt-val">'+tx.memo+'</span></div>':'')+(tx.finpi_ref?'<div class="receipt-row"><span class="receipt-key">Ref</span><span class="receipt-val">'+tx.finpi_ref+'</span></div>':'')+(tx.meta&&tx.meta.txid?'<div class="receipt-row"><span class="receipt-key">Tx ID</span><span class="receipt-val">'+tx.meta.txid.substring(0,20)+'...</span></div>':'')+'<div class="receipt-row" style="border:none"><span class="receipt-key">Date</span><span class="receipt-val">'+new Date(tx.date).toLocaleString()+'</span></div></div><button class="btn bo" onclick="exportSingleTx(\''+id+'\')">\uD83D\uDCE4 Export Receipt</button>');}
+function exportSingleTx(id){var tx=txLog.find(function(t){return String(t.id)===String(id);});if(!tx)return;var text='FinPi Transaction Receipt\n========================\nRef: '+(tx.finpi_ref||tx.id)+'\nType: '+tx.type+'\nAmount: '+pi(tx.amount)+'\nStatus: '+tx.status+'\nDate: '+new Date(tx.date).toLocaleString()+'\nNetwork: Pi Mainnet\n\nfinpi-web.pages.dev';var b=new Blob([text],{type:'text/plain'});var a=document.createElement('a');a.href=URL.createObjectURL(b);a.download='finpi-receipt-'+(tx.finpi_ref||tx.id)+'.txt';a.click();toast('Receipt exported','s');}
+function confirmLogout(){if(confirm('Sign out of FinPi?'))logout();}
+function logout(){piUser=null;localStorage.removeItem('fp_user');document.getElementById('app').style.display='none';document.getElementById('login').style.display='flex';var btn=document.getElementById('loginBtn'),tx=document.getElementById('signin-txt');if(btn)btn.disabled=false;if(tx)tx.textContent='\u03C0 Sign In with Pi';}
+function guestMode(){piUser={username:'Guest'};launchApp();}
+function confirmClear(){if(confirm('Clear all local FinPi data? Cannot be undone.')){localStorage.clear();txLog=[];contacts=[];budgets=[];goals=[];profile={};toast('Data cleared','s');}}
+
+function piLogin(){
+  var btn=document.getElementById('loginBtn'),btnTx=document.getElementById('signin-txt'),lmsg=document.getElementById('lmsg');
+  if(btn){btn.disabled=true;btn.style.opacity='0.7';}
+  if(btnTx)btnTx.textContent='Authenticating...';
+  if(lmsg)lmsg.textContent='Connecting to Pi Network...';
+  if(typeof Pi==='undefined'){setTimeout(function(){piUser={username:'Pioneer'};launchApp();toast('Demo mode \u2014 payments disabled');},500);return;}
+  Pi.init({version:'2.0',sandbox:true});
+  Pi.authenticate(['username','payments'],onIncompletePayment)
+    .then(function(auth){piUser=auth.user;localStorage.setItem('fp_user',JSON.stringify(piUser));console.log('[FinPi] Authenticated',piUser.username);launchApp();})
+    .catch(function(err){console.error('[FinPi] Auth failed:',err?err.message:err);if(btn){btn.disabled=false;btn.style.opacity='';}if(btnTx)btnTx.textContent='\u03C0 Sign In with Pi';if(lmsg)lmsg.textContent='Authentication failed. Try again.';});
+}
+
+function launchApp(){
+  if(typeof Pi!=='undefined'){try{Pi.init({version:'2.0',sandbox:true});}catch(e){}}
+  if(typeof Pi!=='undefined'){Pi.authenticate(['username','payments'],onIncompletePayment).then(function(auth){if(auth&&auth.user){piUser=auth.user;localStorage.setItem('fp_user',JSON.stringify(piUser));}}).catch(function(err){console.warn('[FinPi] Re-auth:',err?err.message:err);});}
+  loadData();
+  localStorage.setItem('fp_user',JSON.stringify(piUser));
+  document.getElementById('login').style.display='none';
+  document.getElementById('app').style.display='flex';
+  var av=document.getElementById('hdr-av');if(av&&piUser&&piUser.username)av.textContent=piUser.username[0].toUpperCase();
+  if('serviceWorker' in navigator){navigator.serviceWorker.register('/sw.js').then(function(reg){reg.update();if(reg.waiting)reg.waiting.postMessage({type:'SKIP_WAITING'});}).catch(function(){});}
+  if(_piRateInterval)clearInterval(_piRateInterval);
+  _piRateInterval=setInterval(fetchPiRate,300000);
+  setTimeout(fetchPiRate,800);
+  document.addEventListener('visibilitychange',function(){if(document.visibilityState==='visible'&&piUser){fetchPiRate();syncAllViews();}});
+  goTab('home',document.querySelector('.nb'));
+}
+
+window.addEventListener('load',function(){
+  window.addEventListener('online',function(){var b=document.getElementById('offbar');if(b)b.style.display='none';});
+  window.addEventListener('offline',function(){var b=document.getElementById('offbar');if(b){b.style.display='block';b.textContent='No internet connection';}});
+  var saved=localStorage.getItem('fp_user');
+  if(saved){try{piUser=JSON.parse(saved);launchApp();return;}catch(e){}}
+  piLogin();
+});
+</script>
+</body>
+</html>
