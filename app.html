@@ -1,0 +1,351 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>FinPi App</title>
+<script src="https://sdk.minepi.com/pi-sdk.js"></script>
+<style>
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+body{font-family:system-ui,sans-serif;background:#050A12;color:#F0F6FF;height:100vh;display:flex;flex-direction:column;overflow:hidden}
+#hdr{background:rgba(5,10,18,.97);border-bottom:1px solid rgba(255,255,255,.08);padding:.6rem 1rem;display:flex;align-items:center;justify-content:space-between;flex-shrink:0}
+.brand{font-size:1.2rem;font-weight:800}.brand b{color:#0D9488}
+#av{width:36px;height:36px;border-radius:9px;background:linear-gradient(135deg,#1E3A8A,#2563EB);display:flex;align-items:center;justify-content:center;font-weight:800;cursor:pointer}
+#main{flex:1;overflow-y:auto;padding:1rem;padding-bottom:80px}
+#nav{position:fixed;bottom:0;left:0;right:0;background:rgba(5,10,18,.98);border-top:1px solid rgba(255,255,255,.08);display:flex;height:64px;z-index:100}
+.nb{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:.1rem;cursor:pointer;border:none;background:none;color:rgba(240,246,255,.3);font-size:.4rem;font-weight:600;min-height:44px}
+.nb.on{color:#2563EB}
+.nb .i{font-size:1.3rem}
+/* Cards */
+.mkt{background:linear-gradient(135deg,rgba(200,169,81,.18),rgba(200,169,81,.06));border:1px solid rgba(200,169,81,.3);border-radius:16px;padding:1rem;margin-bottom:1rem}
+.price{font-size:2.2rem;font-weight:800;color:#C8A951}
+.lbl{font-size:.5rem;color:rgba(200,169,81,.6);text-transform:uppercase;letter-spacing:.1em;margin-bottom:.15rem}
+.stats{display:grid;grid-template-columns:1fr 1fr;gap:.5rem;margin:.6rem 0}
+.stat{background:rgba(0,0,0,.22);border-radius:10px;padding:.5rem .65rem}
+.stat-l{font-size:.45rem;color:rgba(240,246,255,.35);text-transform:uppercase;letter-spacing:.06em;margin-bottom:.05rem}
+.stat-v{font-size:.75rem;font-weight:700}
+.act{background:rgba(0,0,0,.2);border-radius:12px;padding:.7rem .85rem;margin-bottom:1rem}
+.act-row{display:flex;justify-content:space-between;align-items:center;padding:.15rem 0;border-bottom:1px solid rgba(255,255,255,.05);font-size:.62rem}
+.act-row:last-child{border-bottom:none}
+.qa{display:grid;grid-template-columns:1fr 1fr;gap:.5rem;margin-bottom:1rem}
+.qa-btn{border-radius:12px;padding:.8rem;display:flex;align-items:center;gap:.5rem;cursor:pointer;border:none;min-height:64px;text-align:left}
+.qa-ico{width:38px;height:38px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:1.1rem;flex-shrink:0}
+.qa-t{font-size:.65rem;font-weight:800;color:#F0F6FF}
+.qa-s{font-size:.42rem;color:rgba(240,246,255,.45)}
+/* Forms */
+.inp{width:100%;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.1);border-radius:10px;padding:.65rem .85rem;color:#F0F6FF;font-size:.8rem;margin-bottom:.5rem;min-height:50px;display:block}
+.inp:focus{border-color:#2563EB;outline:none}
+.inp::placeholder{color:rgba(240,246,255,.25)}
+.btn-p{width:100%;padding:.85rem;background:linear-gradient(135deg,#1E3A8A,#2563EB);border:none;border-radius:12px;color:#fff;font-size:.88rem;font-weight:700;cursor:pointer;min-height:54px;margin-top:.3rem}
+.btn-o{width:100%;padding:.75rem;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.1);border-radius:12px;color:rgba(240,246,255,.7);font-size:.82rem;cursor:pointer;min-height:48px;margin-top:.3rem}
+.sec{font-size:.5rem;color:rgba(240,246,255,.35);text-transform:uppercase;letter-spacing:.1em;margin:.8rem 0 .45rem}
+.tx-row{display:flex;align-items:center;gap:.6rem;padding:.65rem 0;border-bottom:1px solid rgba(255,255,255,.05);cursor:pointer}
+.tx-ico{width:40px;height:40px;border-radius:11px;background:rgba(255,255,255,.06);display:flex;align-items:center;justify-content:center;font-size:1rem;flex-shrink:0}
+.tx-nm{font-size:.65rem;font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.tx-dt{font-size:.45rem;color:rgba(240,246,255,.35);margin-top:.03rem}
+.tx-amt{font-size:.68rem;font-weight:700;text-align:right}
+.tx-st{font-size:.4rem;text-align:right;margin-top:.02rem}
+.mr{display:flex;align-items:center;gap:.6rem;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.08);border-radius:12px;padding:.7rem .85rem;cursor:pointer;border:none;width:100%;min-height:56px;margin-bottom:.35rem;text-align:left;color:#F0F6FF}
+.mr:active{background:rgba(255,255,255,.09)}
+.mr-i{width:38px;height:38px;border-radius:10px;background:rgba(255,255,255,.07);display:flex;align-items:center;justify-content:center;font-size:1rem;flex-shrink:0}
+.mr-t{font-size:.65rem;font-weight:700}
+.mr-s{font-size:.45rem;color:rgba(240,246,255,.4);margin-top:.03rem}
+/* Confirm overlay */
+#cov{display:none;position:fixed;inset:0;background:rgba(0,0,0,.85);z-index:200;align-items:flex-end}
+#cov.on{display:flex}
+.csh{width:100%;background:#081020;border-radius:20px 20px 0 0;border-top:2px solid rgba(37,99,235,.4);padding:1.2rem 1rem calc(2rem + env(safe-area-inset-bottom,0))}
+.c-lbl{font-size:.5rem;color:rgba(240,246,255,.35);text-align:center;letter-spacing:.15em;text-transform:uppercase;margin-bottom:.3rem}
+.c-amt{font-size:2.4rem;font-weight:800;color:#C8A951;text-align:center;margin:.2rem 0 .1rem}
+.c-to{font-size:.65rem;color:#0D9488;font-weight:600;text-align:center;margin-bottom:.6rem}
+.c-det{background:rgba(0,0,0,.3);border:1px solid rgba(255,255,255,.07);border-radius:10px;padding:.6rem .8rem;margin-bottom:.7rem}
+.c-row{display:flex;justify-content:space-between;padding:.16rem 0;border-bottom:1px solid rgba(255,255,255,.05);font-size:.58rem}
+.c-row:last-child{border-bottom:none}
+.c-k{color:rgba(240,246,255,.4)}.c-v{font-weight:600}
+.c-warn{background:rgba(245,158,11,.08);border:1px solid rgba(245,158,11,.18);border-radius:10px;padding:.5rem .7rem;margin-bottom:.7rem;font-size:.52rem;color:#F59E0B;line-height:1.75}
+</style>
+</head>
+<body>
+<div id="hdr">
+  <div class="brand">Fin<b>Pi</b></div>
+  <div id="av" onclick="showTab('profile')">F</div>
+</div>
+<div id="main"></div>
+<div id="nav">
+  <button class="nb on" onclick="showTab('home',this)"><div class="i">🏠</div>Home</button>
+  <button class="nb" onclick="showTab('pay',this)"><div class="i">💳</div>Pay</button>
+  <button class="nb" onclick="showTab('hist',this)"><div class="i">📋</div>History</button>
+  <button class="nb" onclick="showTab('profile',this)"><div class="i">👤</div>Profile</button>
+</div>
+
+<!-- Confirm overlay -->
+<div id="cov">
+  <div class="csh">
+    <div class="c-lbl">Confirm Payment</div>
+    <div class="c-amt" id="c-amt">π 0.000</div>
+    <div class="c-to" id="c-to">To: —</div>
+    <div class="c-det" id="c-det"></div>
+    <div class="c-warn">⚠ Sandbox · sandbox:true · No real Pi spent</div>
+    <button class="btn-p" id="c-ok" onclick="doSend()">✔ Confirm & Send</button>
+    <button class="btn-o" onclick="closeConfirm()">Cancel</button>
+  </div>
+</div>
+
+<script>
+/* STATE */
+var piUser = null;
+var txLog  = [];
+var _pay   = null;
+var _rate  = null;
+var _rSrc  = '';
+var _mcap  = null;
+var _vol   = null;
+var _chg   = null;
+var APPROVE = '/approve';
+var COMPLETE = '/complete';
+
+/* BOOT */
+try {
+  var u = localStorage.getItem('fp_user');
+  if (u) piUser = JSON.parse(u);
+} catch(e){}
+try {
+  var t = localStorage.getItem('fp_tx');
+  if (t) txLog = JSON.parse(t);
+} catch(e){}
+
+if (!piUser) { window.location = '/'; }
+
+/* Init */
+window.addEventListener('load', function() {
+  if (!piUser) return;
+  var av = document.getElementById('av');
+  if (av) av.textContent = piUser.username[0].toUpperCase();
+  /* Re-authenticate for payments scope */
+  if (typeof Pi !== 'undefined') {
+    try { Pi.init({version:'2.0', sandbox:true}); } catch(e){}
+    Pi.authenticate(['username','payments'], function(p){
+      if (!p || !p.identifier) return;
+      fetch(COMPLETE,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({paymentId:p.identifier})}).catch(function(){});
+    }).then(function(a){
+      if (a && a.user) {
+        piUser = a.user;
+        try { localStorage.setItem('fp_user', JSON.stringify(piUser)); } catch(e){}
+        var av2 = document.getElementById('av');
+        if (av2) av2.textContent = piUser.username[0].toUpperCase();
+      }
+    }).catch(function(){});
+  }
+  fetchRate();
+  showTab('home', document.querySelector('.nb'));
+});
+
+function saveTx(){ try { localStorage.setItem('fp_tx', JSON.stringify(txLog)); } catch(e){} }
+
+/* TABS */
+function showTab(tab, el) {
+  document.querySelectorAll('.nb').forEach(function(b){ b.classList.remove('on'); });
+  if (el) el.classList.add('on');
+  var m = document.getElementById('main');
+  if (tab === 'home')    m.innerHTML = homeHTML();
+  else if (tab === 'pay')     m.innerHTML = payHTML();
+  else if (tab === 'hist')    m.innerHTML = histHTML();
+  else if (tab === 'profile') m.innerHTML = profHTML();
+}
+
+/* HOME */
+function homeHTML() {
+  var sent = txLog.filter(function(t){return t.type==='sent'&&t.status==='completed';}).reduce(function(s,t){return s+t.amount;},0);
+  var recv = txLog.filter(function(t){return t.type==='received'&&t.status==='completed';}).reduce(function(s,t){return s+t.amount;},0);
+  var tc   = txLog.filter(function(t){return t.status==='completed';}).length;
+  var pr   = _rate ? '$'+_rate.toFixed(4) : 'Loading…';
+  var ch   = _chg  ? ((_chg>=0?'+':'')+_chg.toFixed(2)+'%') : '';
+  var chC  = _chg  ? (_chg>=0?'#10B981':'#EF4444') : 'rgba(240,246,255,.35)';
+  var mc   = _mcap ? '$'+(_mcap/1e9).toFixed(2)+'B' : '---';
+  var vl   = _vol  ? '$'+(_vol/1e6).toFixed(2)+'M'  : '---';
+  var h    = '<div class="mkt">'
+    +'<div class="lbl">Live Pi Price · '+(_rSrc||'CoinGecko')+'</div>'
+    +'<div class="price">'+pr+'</div>'
+    +(ch?'<span style="font-size:.62rem;font-weight:700;color:'+chC+'">'+ch+' 24h</span>':'')
+    +'<div class="stats">'
+      +'<div class="stat"><div class="stat-l">Market Cap</div><div class="stat-v">'+mc+'</div></div>'
+      +'<div class="stat"><div class="stat-l">24h Volume</div><div class="stat-v">'+vl+'</div></div>'
+    +'</div>'
+    +'<button onclick="fetchRate();alert(\'Refreshing rate…\')" style="font-size:.55rem;color:#0D9488;background:rgba(13,148,136,.1);border:1px solid rgba(13,148,136,.22);border-radius:8px;padding:.3rem .65rem;cursor:pointer;min-height:34px">↻ Refresh</button>'
+  +'</div>'
+  +'<div class="act">'
+    +'<div class="act-row"><span style="color:rgba(240,246,255,.4)">📤 Sent via FinPi</span><span style="color:#EF4444;font-weight:700">π '+sent.toFixed(3)+'</span></div>'
+    +'<div class="act-row"><span style="color:rgba(240,246,255,.4)">📥 Received via FinPi</span><span style="color:#10B981;font-weight:700">π '+recv.toFixed(3)+'</span></div>'
+    +'<div class="act-row" style="border:none"><span style="color:rgba(240,246,255,.4)">📋 Transactions</span><span style="font-weight:700">'+tc+'</span></div>'
+  +'</div>'
+  +'<div style="background:rgba(37,99,235,.08);border:1px solid rgba(37,99,235,.15);border-radius:10px;padding:.42rem .7rem;margin-bottom:.9rem;font-size:.5rem;color:rgba(93,150,246,.75)">📱 Full wallet balance · Open Pi Browser Wallet</div>'
+  +'<div class="sec">Quick Actions</div>'
+  +'<div class="qa">'
+    +'<button class="qa-btn" style="background:rgba(37,99,235,.14);border:1.5px solid rgba(37,99,235,.3)" onclick="showTab(\'pay\',document.querySelectorAll(\'.nb\')[1])">'
+      +'<div class="qa-ico" style="background:rgba(37,99,235,.25)">💸</div>'
+      +'<div><div class="qa-t">Send Pi</div><div class="qa-s">Sandbox test</div></div>'
+    +'</button>'
+    +'<button class="qa-btn" style="background:rgba(13,148,136,.12);border:1.5px solid rgba(13,148,136,.28)" onclick="alert(\'Your address: @\'+(piUser&&piUser.username?piUser.username:\'Pioneer\'))">'
+      +'<div class="qa-ico" style="background:rgba(13,148,136,.24)">📥</div>'
+      +'<div><div class="qa-t">Receive Pi</div><div class="qa-s">Share address</div></div>'
+    +'</button>'
+  +'</div>'
+  +(txLog.length?'<div class="sec">Recent</div>'+txLog.slice(0,5).map(txRow).join(''):'')
+  +'<div style="height:80px"></div>';
+  return h;
+}
+
+/* PAY */
+function payHTML() {
+  return '<div class="sec">Send Pi</div>'
+    +'<label style="font-size:.5rem;color:rgba(240,246,255,.4);text-transform:uppercase;letter-spacing:.06em;display:block;margin-bottom:.2rem">Recipient</label>'
+    +'<input class="inp" id="s-to" placeholder="@username or wallet address">'
+    +'<label style="font-size:.5rem;color:rgba(240,246,255,.4);text-transform:uppercase;letter-spacing:.06em;display:block;margin-bottom:.2rem">Amount (π)</label>'
+    +'<input class="inp" id="s-amt" type="number" placeholder="0.001" step="0.001" min="0.001">'
+    +'<label style="font-size:.5rem;color:rgba(240,246,255,.4);text-transform:uppercase;letter-spacing:.06em;display:block;margin-bottom:.2rem">Memo (optional)</label>'
+    +'<input class="inp" id="s-memo" placeholder="e.g. Payment for services">'
+    +'<div style="font-size:.5rem;color:#F59E0B;background:rgba(245,158,11,.08);border:1px solid rgba(245,158,11,.18);border-radius:10px;padding:.5rem .7rem;margin:.5rem 0;line-height:1.75">⚠ Sandbox · sandbox:true · No real Pi spent</div>'
+    +'<button class="btn-p" onclick="initSend()">π Review &amp; Send</button>'
+    +'<div style="height:80px"></div>';
+}
+
+/* HISTORY */
+function histHTML() {
+  return '<div class="sec">Transaction History</div>'
+    +(txLog.length ? txLog.map(txRow).join('') : '<div style="text-align:center;padding:3rem 1rem;color:rgba(240,246,255,.3)">No transactions yet</div>')
+    +'<div style="height:80px"></div>';
+}
+
+/* PROFILE */
+function profHTML() {
+  var name = piUser && piUser.username ? piUser.username : 'Guest';
+  return '<div style="text-align:center;padding:1.5rem 0 1.2rem">'
+    +'<div style="width:72px;height:72px;border-radius:50%;background:linear-gradient(135deg,#1E3A8A,#2563EB);display:flex;align-items:center;justify-content:center;font-size:2rem;font-weight:900;margin:0 auto .5rem">'+name[0].toUpperCase()+'</div>'
+    +'<div style="font-size:1rem;font-weight:800">@'+name+'</div>'
+    +'<div style="font-size:.55rem;color:rgba(240,246,255,.35);margin-top:.2rem">Sandbox Mode · finpi-app.pages.dev</div>'
+  +'</div>'
+  +'<button class="mr" onclick="ratePanel()"><div class="mr-i">💱</div><div><div class="mr-t">Pi Rate Center</div><div class="mr-s">Live market rates</div></div><div style="margin-left:auto;color:rgba(240,246,255,.25)">›</div></button>'
+  +'<button class="mr" onclick="exportTx()"><div class="mr-i">📤</div><div><div class="mr-t">Export Data</div><div class="mr-s">Download CSV</div></div><div style="margin-left:auto;color:rgba(240,246,255,.25)">›</div></button>'
+  +'<button class="mr" onclick="window.location.href=\'/privacy-policy.html\'"><div class="mr-i">📋</div><div><div class="mr-t">Privacy Policy</div><div class="mr-s">How we handle data</div></div><div style="margin-left:auto;color:rgba(240,246,255,.25)">›</div></button>'
+  +'<button class="mr" onclick="window.location.href=\'/terms-of-service.html\'"><div class="mr-i">📄</div><div><div class="mr-t">Terms of Service</div><div class="mr-s">App usage terms</div></div><div style="margin-left:auto;color:rgba(240,246,255,.25)">›</div></button>'
+  +'<button onclick="doLogout()" style="width:100%;padding:.8rem;background:rgba(239,68,68,.1);border:1px solid rgba(239,68,68,.25);border-radius:12px;color:#EF4444;font-size:.82rem;font-weight:600;cursor:pointer;margin-top:.5rem;min-height:48px">Sign Out</button>'
+  +'<div style="font-size:.42rem;color:rgba(240,246,255,.2);text-align:center;margin-top:1.2rem;line-height:2">© 2026 FinPi · finpi.app@gmail.com<br>Not affiliated with Pi Network Inc.</div>'
+  +'<div style="height:80px"></div>';
+}
+
+/* TX ROW */
+function txRow(tx) {
+  var s = tx.type==='sent';
+  var col = tx.status==='completed'?(s?'#EF4444':'#10B981'):'#F59E0B';
+  var ico = tx.status==='completed'?(s?'💸':'📥'):(tx.status==='failed'?'❌':'⏳');
+  var who = s?('@'+((tx.meta&&tx.meta.to)||'?')):('From: @'+((tx.meta&&tx.meta.from)||'?'));
+  var dt  = new Date(tx.date).toLocaleDateString();
+  return '<div class="tx-row">'
+    +'<div class="tx-ico">'+ico+'</div>'
+    +'<div style="flex:1;min-width:0"><div class="tx-nm">'+who+'</div>'
+      +'<div class="tx-dt">'+(tx.memo?tx.memo+' · ':'')+dt+'</div></div>'
+    +'<div><div class="tx-amt" style="color:'+col+'">'+(s?'-':'+')+' π '+(+tx.amount).toFixed(3)+'</div>'
+      +'<div class="tx-st" style="color:'+col+'">'+tx.status+'</div></div>'
+  +'</div>';
+}
+
+/* PAYMENT */
+function initSend() {
+  var to   = (document.getElementById('s-to').value||'').replace(/^@/,'').trim();
+  var amt  = parseFloat(document.getElementById('s-amt').value)||0;
+  var memo = document.getElementById('s-memo').value||'';
+  if (!to)  { alert('Enter recipient'); return; }
+  if (amt < 0.001) { alert('Minimum amount is π 0.001'); return; }
+  _pay = {to:to, amt:amt, memo:memo};
+  document.getElementById('c-amt').textContent = 'π '+amt.toFixed(3);
+  document.getElementById('c-to').textContent  = 'To: @'+to;
+  var det = '<div class="c-row"><span class="c-k">Amount</span><span class="c-v">π '+amt.toFixed(3)+'</span></div>'
+    +(_rate?'<div class="c-row"><span class="c-k">≈ USD</span><span class="c-v">$'+(amt*_rate).toFixed(4)+'</span></div>':'')
+    +'<div class="c-row"><span class="c-k">To</span><span class="c-v">@'+to+'</span></div>'
+    +(memo?'<div class="c-row"><span class="c-k">Memo</span><span class="c-v">'+memo+'</span></div>':'')
+    +'<div class="c-row" style="border:none"><span class="c-k">Mode</span><span class="c-v">Sandbox</span></div>';
+  document.getElementById('c-det').innerHTML = det;
+  document.getElementById('cov').className = 'on';
+}
+
+function closeConfirm() {
+  document.getElementById('cov').className = '';
+  _pay = null;
+}
+
+function doSend() {
+  if (!_pay) return;
+  if (typeof Pi === 'undefined') { alert('Open in Pi Browser'); closeConfirm(); return; }
+  var p = _pay;
+  _pay = null;
+  closeConfirm();
+  var ref = 'FP-'+Date.now().toString(36).toUpperCase();
+  var entry = {id:Date.now(), finpi_ref:ref, type:'sent', amount:p.amt, memo:p.memo, status:'pending', date:new Date().toISOString(), meta:{to:p.to, from:piUser&&piUser.username||''}};
+  txLog.unshift(entry); saveTx();
+  try { Pi.init({version:'2.0',sandbox:true}); } catch(e){}
+  Pi.createPayment({amount:p.amt, memo:p.memo||'FinPi', metadata:{to:p.to,ref:ref}}, {
+    onReadyForServerApproval: function(id) {
+      entry.meta.paymentId=id; entry.status='processing'; saveTx();
+      fetch(APPROVE,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({paymentId:id})}).catch(function(){});
+    },
+    onReadyForServerCompletion: function(id,txid) {
+      entry.meta.txid=txid;
+      fetch(COMPLETE,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({paymentId:id,txid:txid})})
+        .then(function(){entry.status='completed';saveTx();alert('✅ Sent π '+p.amt.toFixed(3)+' to @'+p.to);showTab('home',document.querySelector('.nb'));})
+        .catch(function(){entry.status='completed';saveTx();alert('✅ Sent π '+p.amt.toFixed(3)+' to @'+p.to);showTab('home',document.querySelector('.nb'));});
+    },
+    onCancel:  function(){ entry.status='cancelled'; saveTx(); alert('Cancelled'); },
+    onError:   function(e){ entry.status='failed'; entry.meta.error=String(e); saveTx(); alert('Error: '+String(e)); }
+  });
+}
+
+/* UTILS */
+function doLogout() {
+  piUser = null;
+  try { localStorage.removeItem('fp_user'); } catch(e){}
+  window.location = '/';
+}
+
+function ratePanel() {
+  var p = _rate?'$'+_rate.toFixed(4):'Unavailable';
+  var mc= _mcap?'$'+(_mcap/1e9).toFixed(2)+'B':'---';
+  var vl= _vol?'$'+(_vol/1e6).toFixed(2)+'M':'---';
+  alert('Pi Rate Center\n\nPrice: '+p+'\nMarket Cap: '+mc+'\n24h Volume: '+vl+'\nSource: '+(_rSrc||'CoinGecko')+'\n\n⚠ Reference only · Not financial advice');
+}
+
+function exportTx() {
+  var csv = 'ID,Type,Amount,Status,Date,To,Memo\n'
+    + txLog.map(function(t){ return [t.id,t.type,t.amount,t.status,t.date,(t.meta&&t.meta.to)||'',(t.memo||'')].join(','); }).join('\n');
+  var a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([csv],{type:'text/csv'}));
+  a.download = 'finpi-'+Date.now()+'.csv';
+  a.click();
+}
+
+/* RATE */
+function fetchRate() {
+  fetch('https://api.coingecko.com/api/v3/coins/pi-network?localization=false&tickers=false&community_data=false&developer_data=false')
+    .then(function(r){return r.json();})
+    .then(function(d){
+      var md = d.market_data;
+      var v  = md && md.current_price && md.current_price.usd;
+      if (v && v > 0) {
+        _rate = v; _rSrc = 'CoinGecko';
+        _chg  = md.price_change_percentage_24h || null;
+        _mcap = md.market_cap && md.market_cap.usd || null;
+        _vol  = md.total_volume && md.total_volume.usd || null;
+        return;
+      }
+      throw new Error('no data');
+    })
+    .catch(function(){
+      fetch('https://www.okx.com/api/v5/market/ticker?instId=PI-USDT')
+        .then(function(r){return r.json();})
+        .then(function(d){
+          var v = d.data && d.data[0] && parseFloat(d.data[0].last);
+          if (v && v > 0) { _rate = v; _rSrc = 'OKX'; }
+        }).catch(function(){});
+    });
+}
+</script>
+</body>
+</html>
