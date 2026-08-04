@@ -1,9 +1,9 @@
 {
-  "name": "finpi",
+  "name": "finpi-app",
   "version": "1.0.0",
-  "description": "FinPi — Pi Financial Platform",
-  "private": true,
+  "description": "FinPi - Pi Financial Platform",
+  "main": "index.html",
   "scripts": {
-    "deploy": "npx wrangler pages deploy . --project-name finpi"
+    "build": "echo 'No build step required'"
   }
 }
