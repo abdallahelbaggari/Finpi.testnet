@@ -2,21 +2,26 @@
 <html lang="en">
 <head>
 <script>
-/* Kill all old service workers and caches immediately */
-if ('serviceWorker' in navigator) {
-  navigator.serviceWorker.getRegistrations().then(function(regs) {
-    regs.forEach(function(reg) {
-      reg.unregister();
-      console.log('[FinPi] Unregistered SW:', reg.scope);
+/* AGGRESSIVE SW + CACHE KILLER - runs before anything else */
+(function(){
+  if(!('serviceWorker' in navigator)) return;
+  /* Unregister all SWs */
+  navigator.serviceWorker.getRegistrations().then(function(regs){
+    regs.forEach(function(r){
+      r.unregister().then(function(){ console.log('[FinPi] SW unregistered'); });
     });
   });
-  caches.keys().then(function(keys) {
-    keys.forEach(function(key) {
-      caches.delete(key);
-      console.log('[FinPi] Deleted cache:', key);
+  /* Delete all caches */
+  if(window.caches){
+    caches.keys().then(function(keys){
+      keys.forEach(function(k){ caches.delete(k); console.log('[FinPi] Cache deleted:',k); });
     });
-  });
-}
+  }
+  /* Override SW controller to prevent interception */
+  if(navigator.serviceWorker.controller){
+    navigator.serviceWorker.controller.postMessage({type:'SKIP_WAITING'});
+  }
+})();
 </script>
 <meta charset="UTF-8">
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
@@ -764,8 +769,11 @@ function doLaunch(){
   document.getElementById('app').style.display='flex';
   var av=document.getElementById('hdr-av');
   if(av&&piUser&&piUser.username)av.textContent=piUser.username[0].toUpperCase();
+  /* Unregister ALL service workers - prevents caching issues */
   if('serviceWorker' in navigator){
-    navigator.serviceWorker.register('/sw.js').then(function(reg){reg.update();}).catch(function(){});
+    navigator.serviceWorker.getRegistrations().then(function(regs){
+      regs.forEach(function(r){ r.unregister(); });
+    });
   }
   if(_piRateInterval)clearInterval(_piRateInterval);
   _piRateInterval=setInterval(fetchPiRate,300000);
