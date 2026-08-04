@@ -1,9 +1,4 @@
 {
   "name": "finpi-app",
-  "version": "1.0.0",
-  "description": "FinPi - Pi Financial Platform",
-  "main": "index.html",
-  "scripts": {
-    "build": "echo 'No build step required'"
-  }
+  "version": "1.0.0"
 }
