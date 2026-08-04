@@ -736,30 +736,36 @@ function guestMode(){piUser={username:'Guest'};doLaunch();}
 /* ═══ AUTH ═══ */
 function piLogin(){
   var btnTxt=document.getElementById('btn-txt');
-  if(btnTxt)btnTxt.textContent='Opening Pi\u2026';
+  if(btnTxt)btnTxt.textContent='Opening Pi…';
   setMsg('Connecting to Pi Network...');
-
-  if(typeof Pi==='undefined'){
-    /* Not in Pi Browser — show helpful message */
-    if(btnTxt)btnTxt.textContent='Sign In with Pi';
-    setMsg('Please open this app in Pi Browser to sign in.');
-    return;
-  }
-
-  try{Pi.init({version:'2.0',sandbox:true});}catch(e){console.warn('[FinPi] Pi.init:',e);}
-
-  Pi.authenticate(['username','payments'],onIncompletePayment)
-    .then(function(auth){
-      console.log('[FinPi] Auth OK',auth&&auth.user&&auth.user.username);
-      piUser=auth.user;
-      localStorage.setItem('fp_user',JSON.stringify(piUser));
-      doLaunch();
-    })
-    .catch(function(err){
-      console.error('[FinPi] Auth error:',err);
+  var tries=0;
+  function attempt(){
+    tries++;
+    if(typeof Pi==='undefined'){
+      if(tries<15){
+        setMsg('Loading Pi SDK... ('+tries+')');
+        setTimeout(attempt,700);
+        return;
+      }
       if(btnTxt)btnTxt.textContent='Sign In with Pi';
-      setMsg('Authentication failed. Try again.');
-    });
+      setMsg('Open in Pi Browser to sign in.');
+      return;
+    }
+    try{Pi.init({version:'2.0',sandbox:true});}catch(e){console.warn('[FinPi] Pi.init:',e);}
+    setMsg('Authenticating...');
+    Pi.authenticate(['username','payments'],onIncompletePayment)
+      .then(function(auth){
+        piUser=auth.user;
+        localStorage.setItem('fp_user',JSON.stringify(piUser));
+        doLaunch();
+      })
+      .catch(function(err){
+        console.error('[FinPi] Auth error:',err);
+        if(btnTxt)btnTxt.textContent='Sign In with Pi';
+        setMsg('Failed: '+(err&&err.message?err.message:'try again'));
+      });
+  }
+  attempt();
 }
 
 function doLaunch(){
@@ -793,14 +799,20 @@ window.addEventListener('load',function(){
   if(saved){
     try{
       piUser=JSON.parse(saved);
-      if(typeof Pi!=='undefined'){
+      /* Re-auth with Pi SDK if available */
+      var rTries=0;
+      function reAuth(){
+        rTries++;
+        if(typeof Pi==='undefined'){
+          if(rTries<10){setTimeout(reAuth,500);return;}
+          doLaunch();return;
+        }
         try{Pi.init({version:'2.0',sandbox:true});}catch(e){}
         Pi.authenticate(['username','payments'],onIncompletePayment)
           .then(function(auth){if(auth&&auth.user)piUser=auth.user;doLaunch();})
           .catch(function(){doLaunch();});
-      } else {
-        doLaunch();
       }
+      reAuth();
       return;
     }catch(e){}
   }
