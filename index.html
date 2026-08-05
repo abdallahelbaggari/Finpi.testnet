@@ -3,52 +3,94 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="theme-color" content="#050A12">
 <title>FinPi</title>
+<link rel="manifest" href="/manifest.json">
+<link rel="icon" href="/finpi-logo.svg" type="image/svg+xml">
 <script src="https://sdk.minepi.com/pi-sdk.js"></script>
 <style>
-body{margin:0;font-family:system-ui,sans-serif;background:#050A12;color:#F0F6FF;display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:100vh;padding:2rem;text-align:center}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:system-ui,sans-serif;background:#050A12;color:#F0F6FF;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  min-height:100vh;padding:2rem 1.5rem;text-align:center}
 h1{font-size:2rem;font-weight:800;margin:.5rem 0 .3rem}
 h1 b{color:#0D9488}
-p{color:rgba(240,246,255,.45);font-size:.85rem;margin-bottom:2rem}
-.btn{display:block;width:100%;max-width:360px;margin:.5rem auto;padding:1rem;border:none;border-radius:14px;font-size:1rem;font-weight:700;cursor:pointer;min-height:56px}
-.pi{background:linear-gradient(135deg,#1E3A8A,#2563EB);color:#fff}
-.gu{background:rgba(255,255,255,.08);color:rgba(240,246,255,.8);border:1px solid rgba(255,255,255,.12)}
-#st{color:rgba(240,246,255,.4);font-size:.8rem;margin-top:.5rem;min-height:1.2rem}
+.sub{color:rgba(240,246,255,.45);font-size:.85rem;margin-bottom:2rem}
+.btn{display:block;width:100%;max-width:360px;margin:.5rem auto;
+  padding:1rem;border:none;border-radius:14px;font-size:1rem;
+  font-weight:700;cursor:pointer;min-height:56px;touch-action:manipulation}
+.pi-btn{background:linear-gradient(135deg,#1E3A8A,#2563EB);color:#fff;
+  box-shadow:0 4px 20px rgba(37,99,235,.4)}
+.pi-btn:active{opacity:.85;transform:scale(.97)}
+.gu-btn{background:rgba(255,255,255,.08);color:rgba(240,246,255,.8);
+  border:1px solid rgba(255,255,255,.12)}
+.gu-btn:active{opacity:.75}
+#st{color:rgba(240,246,255,.4);font-size:.8rem;margin-top:.6rem;min-height:1.2rem}
+.foot{font-size:.6rem;color:rgba(240,246,255,.25);margin-top:1.5rem;line-height:2}
+.foot a{color:#0D9488;text-decoration:none}
 </style>
 </head>
 <body>
-<div style="font-size:3rem">💰</div>
+<div style="font-size:3rem;margin-bottom:.5rem">&#x1F4B0;</div>
 <h1>Fin<b>Pi</b></h1>
-<p>Pi Financial Platform · Sandbox</p>
+<p class="sub">Pi Financial Platform &middot; Pi Testnet</p>
 
-<button class="btn pi" onclick="signIn()">π Sign In with Pi</button>
-<button class="btn gu" onclick="guest()">👤 Guest Mode</button>
+<button class="btn pi-btn" onclick="signIn()">&#x03C0; Sign In with Pi</button>
+<button class="btn gu-btn" onclick="guest()">&#x1F464; Continue as Guest</button>
 <div id="st"></div>
 
+<div class="foot">
+  Pi SDK &middot; Pi Testnet &middot; sandbox:true<br>
+  <a href="/privacy-policy.html">Privacy Policy</a> &middot;
+  <a href="/terms-of-service.html">Terms of Service</a><br>
+  &copy; 2026 FinPi &middot; finpi-testnet.pages.dev
+</div>
+
 <script>
+function st(txt){ document.getElementById('st').textContent = txt; }
+
 function signIn(){
-  document.getElementById('st').textContent='Connecting...';
+  st('Connecting...');
   if(typeof Pi==='undefined'){
-    document.getElementById('st').textContent='Not in Pi Browser. Use guest mode.';
+    var n=0;
+    var t=setInterval(function(){
+      n++;
+      if(typeof Pi!=='undefined'){ clearInterval(t); doAuth(); return; }
+      if(n>15){ clearInterval(t); st('Open in Pi Browser to sign in.'); return; }
+      st('Loading Pi SDK... ('+n+')');
+    },600);
     return;
   }
-  Pi.init({version:'2.0',sandbox:true});
-  Pi.authenticate(['username','payments'],function(){})
-    .then(function(a){
-      localStorage.setItem('fp_user',JSON.stringify(a.user));
-      document.getElementById('st').textContent='Signed in as @'+a.user.username;
-      setTimeout(function(){window.location='/app.html';},800);
-    })
-    .catch(function(e){
-      document.getElementById('st').textContent='Failed: '+(e&&e.message?e.message:'try again');
-    });
+  doAuth();
 }
+
+function doAuth(){
+  try{ Pi.init({version:'2.0',sandbox:true}); }catch(e){}
+  st('Authenticating...');
+  Pi.authenticate(['username','payments'],function(p){
+    if(!p||!p.identifier)return;
+    fetch('/complete',{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({paymentId:p.identifier})}).catch(function(){});
+  })
+  .then(function(a){
+    localStorage.setItem('fp_user',JSON.stringify(a.user));
+    st('Signed in as @'+a.user.username+' ✓');
+    setTimeout(function(){ window.location='/app.html'; },600);
+  })
+  .catch(function(e){
+    st('Failed: '+(e&&e.message?e.message:'try again'));
+  });
+}
+
 function guest(){
   localStorage.setItem('fp_user',JSON.stringify({username:'Guest'}));
   window.location='/app.html';
 }
-// Auto-restore
-try{if(localStorage.getItem('fp_user')){window.location='/app.html';}}catch(e){}
+
+/* Auto-restore session */
+try{
+  if(localStorage.getItem('fp_user')){ window.location='/app.html'; }
+}catch(e){}
 </script>
 </body>
 </html>
