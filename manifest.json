@@ -1,0 +1,13 @@
+{
+  "name": "FinPi",
+  "short_name": "FinPi",
+  "description": "Pi Financial Platform - Pi Testnet",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#050A12",
+  "theme_color": "#050A12",
+  "icons": [
+    {"src": "/finpi-logo.svg", "sizes": "any", "type": "image/svg+xml"}
+  ],
+  "version": "2.0.0-testnet"
+}
