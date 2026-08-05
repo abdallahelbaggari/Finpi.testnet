@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<script>
+/* Unregister any service worker that may intercept this legal page */
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.getRegistrations().then(function(regs) {
+    regs.forEach(function(reg) { reg.unregister(); });
+  });
+}
+</script>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Privacy Policy — FinPi</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:system-ui,sans-serif;background:#050A12;color:#E2E8F0;line-height:1.75;min-height:100vh}
+.header{background:linear-gradient(135deg,#1E3A8A,#2563EB 60%,#0D9488);padding:1.1rem;display:flex;align-items:center;gap:.8rem}
+.back{color:#fff;font-size:1.3rem;text-decoration:none;padding:.35rem .65rem;border-radius:8px;background:rgba(255,255,255,.15);cursor:pointer;min-height:44px;display:flex;align-items:center}
+.brand{font-size:1.1rem;font-weight:900;color:#fff}
+.brand span{color:#1DE9B6}
+.tag{font-size:.72rem;color:rgba(255,255,255,.65);margin-left:.2rem}
+.content{padding:1.4rem 1.1rem;max-width:680px;margin:0 auto;padding-bottom:3rem}
+h1{font-size:1.25rem;font-weight:800;margin-bottom:.3rem;color:#F0F6FF}
+.meta{font-size:.72rem;color:#64748B;margin-bottom:1.4rem;line-height:1.9}
+h2{font-size:.95rem;font-weight:700;margin:1.4rem 0 .4rem;color:#93C5FD}
+p{font-size:.88rem;color:#CBD5E1;margin-bottom:.7rem;line-height:1.8}
+ul{padding-left:1.2rem;margin-bottom:.7rem}
+li{font-size:.88rem;color:#CBD5E1;margin-bottom:.26rem;line-height:1.7}
+.notice{background:rgba(37,99,235,.12);border:1px solid rgba(37,99,235,.28);border-radius:10px;padding:.85rem 1rem;margin:1rem 0;font-size:.84rem;color:#93C5FD;line-height:1.75}
+.warn{background:rgba(239,68,68,.1);border:1px solid rgba(239,68,68,.25);border-radius:10px;padding:.85rem 1rem;margin:1rem 0;font-size:.84rem;color:#FCA5A5;line-height:1.75}
+a{color:#0D9488}
+.footer{padding:1.1rem;border-top:1px solid rgba(255,255,255,.08);text-align:center;font-size:.7rem;color:#475569;line-height:2;margin-top:1.5rem}
+</style>
+</head>
+<body>
+<div class="header">
+  <a class="back" href="https://finpi-testnet.pages.dev">&#x2190;</a>
+  <div class="brand">Fin<span>Pi</span></div>
+  <div class="tag">/ Privacy Policy</div>
+</div>
+<div class="content">
+<h1>FinPi Privacy Policy</h1>
+<div class="meta">
+  Effective Date: 31 July 2026 &middot; Last Updated: 31 July 2026<br>
+  FinPi is an independent third-party application. Not owned, operated, sponsored, endorsed, or administered by Pi Network or the Pi Core Team.
+</div>
+
+<div class="notice">FinPi follows a data-minimisation approach and collects only information necessary to provide the features you use.</div>
+
+<h2>1. Information We Collect</h2>
+
+<h2>1.1 Pi Authentication Information</h2>
+<p>When you authenticate through Pi, FinPi may receive:</p>
+<ul>
+<li>Pi username</li>
+<li>Pi account identifier</li>
+<li>Public wallet information where legitimately available</li>
+<li>Authenticated profile information where legitimately available</li>
+</ul>
+<div class="warn">FinPi does not request or store your Pi Wallet passphrase, private key, seed phrase, or wallet recovery phrase.</div>
+
+<h2>1.2 Transaction Information</h2>
+<ul>
+<li>Sender and recipient information</li>
+<li>Public wallet addresses</li>
+<li>Transaction amount, type, and status</li>
+<li>Payment ID and blockchain transaction ID where available</li>
+<li>FinPi transaction reference</li>
+<li>Date, time, and network information</li>
+<li>Transaction narration or memo</li>
+<li>Receipt information</li>
+</ul>
+
+<h2>1.3 Profile Information</h2>
+<ul>
+<li>Name or display name (if voluntarily provided)</li>
+<li>Pi username and FinPi ID</li>
+<li>Profile preferences</li>
+</ul>
+
+<h2>1.4 Contacts</h2>
+<p>If you use FinPi contacts, information you choose to save may include contact name, Pi username, public wallet address, and associated transaction information. FinPi does not access your device contacts without explicit permission.</p>
+
+<h2>1.5 Financial Management Information</h2>
+<p>If you use optional financial tools, FinPi may process budgets, expenses, savings goals, invoices, products, merchant information, payment requests, and financial analytics you choose to enter. This information is stored locally on your device.</p>
+
+<h2>1.6 Technical Information</h2>
+<p>Limited technical information necessary to operate and secure the application, including browser type, device type, operating system, application version, language settings, technical logs, and error information.</p>
+
+<h2>2. Information We Never Request</h2>
+<div class="warn">FinPi will never ask you to provide your Pi Wallet passphrase, private key, seed phrase, wallet recovery phrase, or wallet password. Never provide these credentials to anyone claiming to represent FinPi.</div>
+
+<h2>3. How We Use Information</h2>
+<ul>
+<li>Authenticate you and provide requested FinPi features</li>
+<li>Process and verify supported Pi payments via Pi SDK</li>
+<li>Display transaction history and generate receipts</li>
+<li>Provide financial-management, budgeting, and goal features</li>
+<li>Provide merchant and invoicing functionality</li>
+<li>Maintain application security and detect suspicious activity</li>
+<li>Troubleshoot technical problems and improve reliability</li>
+<li>Comply with applicable legal requirements</li>
+</ul>
+
+<h2>4. Legal Basis for Processing</h2>
+<p>FinPi processes personal information only as necessary to provide requested services, maintain security, comply with legal obligations, and where applicable, with your consent. Where you use optional features such as financial tools, budgets, or contacts, processing is based on your voluntary use of those features.</p>
+
+<h2>5. Pi Payments and Blockchain Information</h2>
+<p>FinPi uses Pi Platform and Pi SDK mechanisms for payment functionality and does not ask users to provide wallet credentials directly. Blockchain transactions may be publicly visible and irreversible. Information recorded on a blockchain may not be capable of being deleted or changed by FinPi.</p>
+
+<h2>6. Market and Rate Information</h2>
+<p>FinPi may display Pi-related market reference-rate information obtained from external data providers. Such information may be delayed, unavailable, or inaccurate. FinPi does not guarantee any particular Pi value, exchange rate, or financial return. Any rate displayed should be treated as reference information only and does not constitute financial advice.</p>
+
+<h2>7. How We Share Information</h2>
+<p>FinPi may share information where reasonably necessary with:</p>
+<ul>
+<li>Infrastructure and hosting providers</li>
+<li>Pi Network infrastructure and payment services</li>
+<li>Market-data providers (for reference rate information)</li>
+<li>Security and technical service providers</li>
+<li>Law-enforcement or regulatory authorities where legally required</li>
+</ul>
+<p>FinPi does not sell personal information.</p>
+
+<h2>8. Data Storage</h2>
+<p>Some FinPi information is stored locally on your device to improve performance and user experience. Certain information may also be securely processed or stored by FinPi's infrastructure where necessary to provide requested services. You can clear all locally stored FinPi data at any time via Profile &rarr; Settings &rarr; Clear Local Data.</p>
+
+<h2>9. International Data Transfers</h2>
+<p>FinPi and its service providers may process information in countries other than your country of residence, including countries where Cloudflare and other infrastructure providers operate. Where required by applicable law, appropriate safeguards will be used for international data transfers.</p>
+
+<h2>10. Data Security</h2>
+<p>FinPi uses reasonable safeguards to protect your information, including:</p>
+<ul>
+<li>Encrypted communications (HTTPS)</li>
+<li>Authentication controls via Pi SDK</li>
+<li>Secure cloud infrastructure (Cloudflare)</li>
+<li>Access controls and regular security improvements</li>
+</ul>
+<p>No internet-connected system can guarantee absolute security. You are responsible for protecting your device and authentication environment.</p>
+
+<h2>11. Data Retention</h2>
+<p>FinPi retains information only for as long as reasonably necessary to provide the service, maintain transaction records, ensure security, and comply with legal requirements. Blockchain information may remain available independently of FinPi as blockchain records are controlled by the relevant network.</p>
+
+<h2>12. Your Privacy Rights</h2>
+<p>Subject to applicable law, you may have rights to request access, correction, or deletion of your personal information; request restriction of processing; object to certain processing; withdraw consent where applicable; and request data portability. You can clear all local FinPi data at any time via Profile &rarr; Settings &rarr; Clear Local Data.</p>
+
+<h2>13. Cookies and Local Storage</h2>
+<p>FinPi uses local storage and session storage for authentication, security, session management, preferences, and application functionality. Where applicable law requires consent for non-essential technologies, FinPi will seek appropriate consent.</p>
+
+<h2>14. Third-Party Services</h2>
+<p>FinPi interacts with third-party services including Pi Network and cloud infrastructure providers. Those services have their own privacy policies and terms. FinPi is not responsible for the privacy practices of third parties it does not control.</p>
+
+<h2>15. Children's Privacy</h2>
+<p>FinPi is not intended for individuals legally prohibited from using the service because of age. We do not knowingly collect children's personal information in violation of applicable law.</p>
+
+<h2>16. Changes to This Policy</h2>
+<p>FinPi may update this Privacy Policy from time to time. The Last Updated date will indicate the latest revision. Material changes may be communicated through the application.</p>
+
+<h2>17. Contact</h2>
+<p>For privacy questions, requests, or concerns, please contact FinPi:</p>
+<ul>
+<li>Email: <a href="mailto:finpi.app@gmail.com">finpi.app@gmail.com</a></li>
+<li>Website: <a href="https://finpi-testnet.pages.dev">finpi-testnet.pages.dev</a></li>
+<li>Application: FinPi</li>
+</ul>
+<div class="warn">Never send your Pi Wallet passphrase, private key, seed phrase, or recovery phrase through email or any support channel. FinPi will never request these credentials.</div>
+
+<h2>18. Independent Application Disclaimer</h2>
+<p>FinPi is an independent application and should not be interpreted as an official Pi Network application. Pi Network's guidance distinguishes community-developed apps from applications created by the Pi Core Team. FinPi's use of references to Pi is intended to describe compatibility or integration where permitted.</p>
+</div>
+<div class="footer">
+  &copy; 2026 FinPi. All rights reserved.<br>
+  Website: finpi-testnet.pages.dev &middot; Email: finpi.app@gmail.com<br><br>
+  FinPi is an independent third-party application and is not owned, operated,<br>sponsored, endorsed, or administered by Pi Network or the Pi Core Team.
+</div>
+</body>
+</html>
