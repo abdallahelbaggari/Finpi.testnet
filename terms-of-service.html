@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<script>
+/* Unregister any service worker that may intercept this legal page */
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.getRegistrations().then(function(regs) {
+    regs.forEach(function(reg) { reg.unregister(); });
+  });
+}
+</script>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Terms of Service — FinPi</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:system-ui,sans-serif;background:#050A12;color:#E2E8F0;line-height:1.75;min-height:100vh}
+.header{background:linear-gradient(135deg,#1E3A8A,#2563EB 60%,#0D9488);padding:1.1rem;display:flex;align-items:center;gap:.8rem}
+.back{color:#fff;font-size:1.3rem;text-decoration:none;padding:.35rem .65rem;border-radius:8px;background:rgba(255,255,255,.15);cursor:pointer;min-height:44px;display:flex;align-items:center}
+.brand{font-size:1.1rem;font-weight:900;color:#fff}
+.brand span{color:#1DE9B6}
+.tag{font-size:.72rem;color:rgba(255,255,255,.65);margin-left:.2rem}
+.content{padding:1.4rem 1.1rem;max-width:680px;margin:0 auto;padding-bottom:3rem}
+h1{font-size:1.25rem;font-weight:800;margin-bottom:.3rem;color:#F0F6FF}
+.meta{font-size:.72rem;color:#64748B;margin-bottom:1.4rem;line-height:1.9}
+h2{font-size:.95rem;font-weight:700;margin:1.4rem 0 .4rem;color:#93C5FD}
+p{font-size:.88rem;color:#CBD5E1;margin-bottom:.7rem;line-height:1.8}
+ul{padding-left:1.2rem;margin-bottom:.7rem}
+li{font-size:.88rem;color:#CBD5E1;margin-bottom:.26rem;line-height:1.7}
+.notice{background:rgba(37,99,235,.12);border:1px solid rgba(37,99,235,.28);border-radius:10px;padding:.85rem 1rem;margin:1rem 0;font-size:.84rem;color:#93C5FD;line-height:1.75}
+.warn{background:rgba(239,68,68,.1);border:1px solid rgba(239,68,68,.25);border-radius:10px;padding:.85rem 1rem;margin:1rem 0;font-size:.84rem;color:#FCA5A5;line-height:1.75}
+a{color:#0D9488}
+.footer{padding:1.1rem;border-top:1px solid rgba(255,255,255,.08);text-align:center;font-size:.7rem;color:#475569;line-height:2;margin-top:1.5rem}
+</style>
+</head>
+<body>
+<div class="header">
+  <a class="back" href="https://finpi-testnet.pages.dev">&#x2190;</a>
+  <div class="brand">Fin<span>Pi</span></div>
+  <div class="tag">/ Terms of Service</div>
+</div>
+<div class="content">
+<h1>FinPi Terms of Service</h1>
+<div class="meta">
+  Effective Date: 31 July 2026 &middot; Last Updated: 31 July 2026<br>
+  By using FinPi you agree to these Terms. If you do not agree, do not use FinPi.
+</div>
+
+<div class="notice">FinPi is an independent third-party application. Not owned, operated, sponsored, endorsed, or administered by Pi Network or the Pi Core Team.</div>
+
+<h2>1. About FinPi</h2>
+<p>FinPi is an independent third-party application designed to provide financial utilities, payment functionality, commerce tools, and related services within the Pi ecosystem. FinPi may integrate with Pi Network technology and services where permitted. FinPi is not affiliated with Pi Network or the Pi Core Team.</p>
+
+<h2>2. Eligibility</h2>
+<p>You may use FinPi only if you are legally permitted to use the Services, can legally agree to these Terms, and your use complies with applicable laws and Pi Network requirements. Certain features may be unavailable in particular jurisdictions.</p>
+
+<h2>3. Pi Authentication</h2>
+<p>Authentication is performed through supported Pi authentication mechanisms via Pi SDK. You must not impersonate another user, provide false information, access another user's account, or bypass authentication systems. FinPi does not require a separate password-based account where Pi authentication is used.</p>
+
+<h2>4. Wallet Security</h2>
+<div class="warn">FinPi will never request your Pi Wallet passphrase, private key, seed phrase, or recovery phrase. If anyone claiming to represent FinPi asks for your wallet passphrase or private key, do not provide it.</div>
+<p>You are responsible for protecting your wallet credentials and device. Pi Network specifically warns users that the Pi Wallet passphrase should only be entered in the official Pi Wallet environment.</p>
+
+<h2>5. Payments</h2>
+<p>Where available, FinPi allows users to send Pi, receive Pi, request Pi, create payment requests, generate receipts, and view transaction information via Pi SDK.</p>
+<p>You are responsible for verifying the recipient, wallet address, amount, narration, and all payment details before confirming. A blockchain transaction may be irreversible.</p>
+
+<h2>6. Payment Status</h2>
+<p>FinPi will distinguish payment states including pending, completed, failed, and cancelled. FinPi will not intentionally represent an unconfirmed payment as successfully completed. Payment status may depend on Pi Network infrastructure, blockchain conditions, connectivity, and third-party services.</p>
+
+<h2>7. Transaction Records and Receipts</h2>
+<p>FinPi may generate receipts and transaction records using available transaction information. A receipt or transaction reference does not itself change the blockchain status of a payment. FinPi will not present an invented identifier as a genuine blockchain identifier.</p>
+
+<h2>8. Pi Market Information</h2>
+<p>FinPi may provide Pi-related market information, reference rates, charts, and conversions for informational purposes only. FinPi does not guarantee Pi's market value, exchange rates, future prices, liquidity, profitability, or investment returns. This information does not constitute financial advice. Pi Network's guidelines prohibit misleading representations concerning Pi's value or valuation.</p>
+
+<h2>9. Financial Tools</h2>
+<p>FinPi may provide budgets, savings tools, goals, analytics, calculators, financial-health indicators, expense tracking, and other financial utilities. These tools are intended for informational and organisational purposes. Unless explicitly stated otherwise, FinPi does not provide personalised investment, legal, accounting, tax, or financial advice.</p>
+
+<h2>10. Merchant and Business Features</h2>
+<p>Where available, FinPi may provide merchant profiles, products, catalogues, invoices, payment requests, business analytics, receipts, and payment links. Merchants are responsible for the accuracy and legality of their business information, products, services, prices, and transactions. FinPi does not guarantee the quality, legality, availability, or delivery of goods or services offered by independent merchants.</p>
+
+<h2>11. Prohibited Activities</h2>
+<p>You may not use FinPi to:</p>
+<ul>
+<li>Commit fraud or scam users</li>
+<li>Impersonate individuals or organisations</li>
+<li>Request wallet passphrases, private keys, or recovery phrases</li>
+<li>Facilitate illegal transactions or money laundering</li>
+<li>Finance terrorism or evade applicable sanctions</li>
+<li>Introduce malware or interfere with FinPi infrastructure</li>
+<li>Circumvent security mechanisms or exploit vulnerabilities</li>
+<li>Infringe intellectual-property rights</li>
+<li>Conduct prohibited gambling or lottery activities involving Pi</li>
+</ul>
+
+<h2>12. User Responsibilities</h2>
+<ul>
+<li>Keep your device secure and protect your wallet credentials</li>
+<li>Review all transactions before confirming them</li>
+<li>Enter accurate payment information</li>
+<li>Comply with applicable laws in your jurisdiction</li>
+<li>Ensure your use of FinPi does not harm other users</li>
+</ul>
+
+<h2>13. Third-Party Services</h2>
+<p>FinPi may depend on Pi Network infrastructure, blockchain infrastructure, Cloudflare, market-data providers, and other technical providers. Third-party services may experience interruptions or changes outside FinPi's control.</p>
+
+<h2>14. Availability</h2>
+<p>FinPi aims to provide reliable services but does not guarantee uninterrupted availability. Services may temporarily become unavailable due to maintenance, upgrades, network problems, blockchain conditions, Pi Network service availability, security incidents, or circumstances beyond reasonable control.</p>
+
+<h2>15. Security</h2>
+<p>FinPi uses reasonable security measures including encrypted communications (HTTPS), authentication controls, and secure cloud infrastructure. No online service can guarantee complete security. If you discover suspicious activity or a security vulnerability, report it through the official FinPi support channel. Never send wallet secrets when reporting an issue.</p>
+
+<h2>16. Intellectual Property</h2>
+<p>FinPi's original software, interface, design, branding, graphics, documentation, text, logos, and original features are owned by or licensed to FinPi. You may use FinPi only for its intended purposes and may not reproduce or commercially exploit FinPi's proprietary materials without appropriate permission.</p>
+
+<h2>17. Pi Trademarks</h2>
+<p>Pi, Pi Network, and associated Pi trademarks are owned by their respective rights holders. FinPi does not claim ownership of Pi trademarks. FinPi's references to Pi are intended to accurately communicate compatibility or integration where permitted. Pi Network's trademark rules state that third-party apps must not use Pi trademarks in a manner that implies sponsorship or endorsement.</p>
+
+<h2>18. Coming Soon Features</h2>
+<p>Some features may be labelled Coming Soon and may not yet be available. FinPi will not represent a Coming Soon feature as a currently functioning service.</p>
+
+<h2>19. Privacy</h2>
+<p>Your use of FinPi is also governed by the <a href="https://finpi-testnet.pages.dev/legal/privacy-policy.html">FinPi Privacy Policy</a>, which forms part of these Terms.</p>
+
+<h2>20. Suspension or Termination</h2>
+<p>FinPi may suspend, restrict, or terminate access where reasonably necessary to protect users, prevent fraud, investigate abuse, address security threats, comply with legal requirements, or enforce these Terms. Termination does not reverse transactions already recorded on a blockchain.</p>
+
+<h2>21. Disclaimer</h2>
+<p>To the maximum extent permitted by applicable law, FinPi is provided "as is" and "as available." FinPi does not guarantee that all features will always be available, services will always be uninterrupted, third-party data will always be accurate, or that blockchain transactions will always succeed. Nothing in these Terms excludes rights that cannot legally be excluded.</p>
+
+<h2>22. Limitation of Liability</h2>
+<p>To the maximum extent permitted by applicable law, FinPi will not be liable for indirect, incidental, consequential, special, or punitive losses arising from use of the Services, including losses resulting from incorrect recipient information, user error, blockchain network conditions, third-party service failures, market fluctuations, device compromise, or loss of wallet credentials. Nothing in this section excludes liability that cannot legally be excluded.</p>
+
+<h2>23. Indemnification</h2>
+<p>To the extent permitted by law, you agree to be responsible for claims, losses, liabilities, and reasonable expenses arising from your unlawful use of FinPi, violation of these Terms, fraudulent or abusive conduct, or infringement of third-party rights.</p>
+
+<h2>24. Changes to These Terms</h2>
+<p>FinPi may update these Terms periodically. The updated version will display a revised Last Updated date. Where appropriate, significant changes may be communicated through the application.</p>
+
+<h2>25. Governing Law</h2>
+<p>These Terms shall be governed by applicable laws of the Federal Republic of Nigeria, subject to any mandatory laws applicable to you. Any dispute shall be handled through competent courts or legally recognised dispute-resolution mechanisms.</p>
+
+<h2>26. Contact</h2>
+<p>If you have questions regarding these Terms, need support, or wish to report security concerns, please contact FinPi:</p>
+<ul>
+<li>Email: <a href="mailto:finpi.app@gmail.com">finpi.app@gmail.com</a></li>
+<li>Website: <a href="https://finpi-testnet.pages.dev">finpi-testnet.pages.dev</a></li>
+<li>Application: FinPi</li>
+</ul>
+<div class="warn">Never send your Pi Wallet passphrase, private key, seed phrase, or recovery phrase through email or any support channel. FinPi will never request these credentials.</div>
+
+<h2>27. Independent Application Disclaimer</h2>
+<p>FinPi is an independent application and should not be interpreted as an official Pi Network application. Pi Network's current guidance distinguishes community-developed apps from applications created by the Pi Core Team. FinPi's use of references to Pi is intended to describe compatibility or integration where permitted.</p>
+</div>
+<div class="footer">
+  &copy; 2026 FinPi. All rights reserved.<br>
+  Website: finpi-testnet.pages.dev &middot; Email: finpi.app@gmail.com<br><br>
+  FinPi is an independent third-party application and is not owned, operated,<br>
+  sponsored, endorsed, or administered by Pi Network or the Pi Core Team.
+</div>
+</body>
+</html>
