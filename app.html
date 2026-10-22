@@ -1,6 +1,12 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
+<script>/* Pi sandbox: true only when the app is opened inside the Pi Sandbox (desktop testing at sandbox.minepi.com); false in the Pi Browser. The same code runs as the mainnet and the testnet app: the network comes from the Pi app and its API key. */
+window.PI_SANDBOX=(function(){try{var r=document.referrer||'',a=location.ancestorOrigins?[].slice.call(location.ancestorOrigins).join(' '):'';return /sandbox\.minepi\.com/.test(r+' '+a);}catch(e){return false;}})();</script>
+<script>/* FinPi network: the testnet copy runs on a *-testnet address. On mainnet, Send hands over to Pi Wallet, because a payment made inside the app goes to the app, not to the person. */
+window.FP_TESTNET=/(^|[.-])testnet[.-]/i.test(location.hostname);
+window.FP_NOTE=FP_TESTNET?'Testnet · test Pi only · no real Pi spent':'You finish the transfer in Pi Wallet. Pi transfers can’t be reversed.';</script>
+
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>FinPi App</title>
@@ -85,7 +91,7 @@ body{font-family:system-ui,sans-serif;background:#050A12;color:#F0F6FF;height:10
     <div class="c-amt" id="c-amt">π 0.000</div>
     <div class="c-to" id="c-to">To: —</div>
     <div class="c-det" id="c-det"></div>
-    <div class="c-warn">⚠ Testnet · Pi Testnet · sandbox:true · No real Pi spent</div>
+    <div class="c-warn" id="c-warn"></div><script>document.getElementById('c-warn').textContent='⚠ '+FP_NOTE;</script>
     <button class="btn-p" id="c-ok" onclick="doSend()">✔ Confirm & Send</button>
     <button class="btn-o" onclick="closeConfirm()">Cancel</button>
   </div>
@@ -123,7 +129,7 @@ window.addEventListener('load', function() {
   if (av) av.textContent = piUser.username[0].toUpperCase();
   /* Re-authenticate for payments scope */
   if (typeof Pi !== 'undefined') {
-    try { Pi.init({version:'2.0', sandbox:true}); } catch(e){}
+    try { Pi.init({version:'2.0', sandbox: window.PI_SANDBOX}); } catch(e){}
     Pi.authenticate(['username','payments'], function(p){
       if (!p || !p.identifier) return;
       fetch(COMPLETE,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({paymentId:p.identifier})}).catch(function(){});
@@ -183,7 +189,7 @@ function homeHTML() {
   +'<div class="qa">'
     +'<button class="qa-btn" style="background:rgba(37,99,235,.14);border:1.5px solid rgba(37,99,235,.3)" onclick="showTab(\'pay\',document.querySelectorAll(\'.nb\')[1])">'
       +'<div class="qa-ico" style="background:rgba(37,99,235,.25)">💸</div>'
-      +'<div><div class="qa-t">Send Pi</div><div class="qa-s">Sandbox test</div></div>'
+      +'<div><div class="qa-t">Send Pi</div><div class="qa-s">With Pi Wallet</div></div>'
     +'</button>'
     +'<button class="qa-btn" style="background:rgba(13,148,136,.12);border:1.5px solid rgba(13,148,136,.28)" onclick="alert(\'Your address: @\'+(piUser&&piUser.username?piUser.username:\'Pioneer\'))">'
       +'<div class="qa-ico" style="background:rgba(13,148,136,.24)">📥</div>'
@@ -204,7 +210,7 @@ function payHTML() {
     +'<input class="inp" id="s-amt" type="number" placeholder="0.001" step="0.001" min="0.001">'
     +'<label style="font-size:.5rem;color:rgba(240,246,255,.4);text-transform:uppercase;letter-spacing:.06em;display:block;margin-bottom:.2rem">Memo (optional)</label>'
     +'<input class="inp" id="s-memo" placeholder="e.g. Payment for services">'
-    +'<div style="font-size:.5rem;color:#F59E0B;background:rgba(245,158,11,.08);border:1px solid rgba(245,158,11,.18);border-radius:10px;padding:.5rem .7rem;margin:.5rem 0;line-height:1.75">⚠ Testnet · Pi Testnet · sandbox:true · No real Pi spent</div>'
+    +'<div style="font-size:.5rem;color:#F59E0B;background:rgba(245,158,11,.08);border:1px solid rgba(245,158,11,.18);border-radius:10px;padding:.5rem .7rem;margin:.5rem 0;line-height:1.75">⚠ '+FP_NOTE+'</div>'
     +'<button class="btn-p" onclick="initSend()">π Review &amp; Send</button>'
     +'<div style="height:80px"></div>';
 }
@@ -222,7 +228,7 @@ function profHTML() {
   return '<div style="text-align:center;padding:1.5rem 0 1.2rem">'
     +'<div style="width:72px;height:72px;border-radius:50%;background:linear-gradient(135deg,#1E3A8A,#2563EB);display:flex;align-items:center;justify-content:center;font-size:2rem;font-weight:900;margin:0 auto .5rem">'+name[0].toUpperCase()+'</div>'
     +'<div style="font-size:1rem;font-weight:800">@'+name+'</div>'
-    +'<div style="font-size:.55rem;color:rgba(240,246,255,.35);margin-top:.2rem">Pi Testnet · finpi-testnet.pages.dev</div>'
+    +'<div style="font-size:.55rem;color:rgba(240,246,255,.35);margin-top:.2rem">'+(FP_TESTNET?'Pi Testnet':'Pi Mainnet')+'</div>'
   +'</div>'
   +'<button class="mr" onclick="ratePanel()"><div class="mr-i">💱</div><div><div class="mr-t">Pi Rate Center</div><div class="mr-s">Live market rates</div></div><div style="margin-left:auto;color:rgba(240,246,255,.25)">›</div></button>'
   +'<button class="mr" onclick="exportTx()"><div class="mr-i">📤</div><div><div class="mr-t">Export Data</div><div class="mr-s">Download CSV</div></div><div style="margin-left:auto;color:rgba(240,246,255,.25)">›</div></button>'
@@ -279,10 +285,11 @@ function doSend() {
   var p = _pay;
   _pay = null;
   closeConfirm();
+  if (!FP_TESTNET) { fpWalletHandoff(p); return; }
   var ref = 'FP-'+Date.now().toString(36).toUpperCase();
   var entry = {id:Date.now(), finpi_ref:ref, type:'sent', amount:p.amt, memo:p.memo, status:'pending', date:new Date().toISOString(), meta:{to:p.to, from:piUser&&piUser.username||''}};
   txLog.unshift(entry); saveTx();
-  try { Pi.init({version:'2.0',sandbox:true}); } catch(e){}
+  try { Pi.init({version:'2.0',sandbox: window.PI_SANDBOX}); } catch(e){}
   Pi.createPayment({amount:p.amt, memo:p.memo||'FinPi', metadata:{to:p.to,ref:ref}}, {
     onReadyForServerApproval: function(id) {
       entry.meta.paymentId=id; entry.status='processing'; saveTx();
@@ -348,5 +355,25 @@ function fetchRate() {
     });
 }
 </script>
+<script>
+/* Mainnet Send: copy the recipient, then open Pi Wallet to finish the transfer there. */
+function fpWalletHandoff(p){
+  var to=String(p.to||'').replace(/^@/,'');
+  try{ if(navigator.clipboard) navigator.clipboard.writeText(to); }catch(e){}
+  var ref='FP-'+Date.now().toString(36).toUpperCase();
+  try{ txLog.unshift({id:Date.now(),finpi_ref:ref,type:'sent',amount:p.amt,memo:p.memo,status:'opened in Pi Wallet',date:new Date().toISOString(),meta:{to:to,from:(window.piUser&&piUser.username)||''}}); saveTx(); }catch(e){}
+  var d=document.createElement('div');
+  d.style.cssText='position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,.6);display:flex;align-items:flex-end;justify-content:center';
+  d.innerHTML='<div style="width:100%;max-width:480px;background:#0B1424;color:#F0F6FF;border-radius:22px 22px 0 0;padding:20px 18px 26px;font-family:inherit">'
+    +'<div style="font-size:1.05rem;font-weight:800;margin-bottom:6px">Send π '+Number(p.amt)+' to @'+to.replace(/[<>&"]/g,'')+'</div>'
+    +'<ol style="margin:0 0 14px;padding-left:18px;line-height:1.7;font-size:.9rem;color:rgba(240,246,255,.75)"><li>Tap Open Pi Wallet</li><li>Choose Send and paste @'+to.replace(/[<>&"]/g,'')+' (copied)</li><li>Enter π '+Number(p.amt)+' and confirm</li></ol>'
+    +'<a href="https://wallet.pinet.com" style="display:block;text-align:center;padding:14px;border-radius:14px;background:#2563EB;color:#fff;font-weight:800;text-decoration:none">Open Pi Wallet</a>'
+    +'<button style="display:block;width:100%;margin-top:10px;padding:12px;border-radius:14px;border:1px solid rgba(255,255,255,.15);background:none;color:#F0F6FF;font-weight:700">Close</button></div>';
+  d.querySelector('button').onclick=function(){ d.remove(); };
+  d.onclick=function(e){ if(e.target===d) d.remove(); };
+  document.body.appendChild(d);
+}
+</script>
+<script>/* Testnet copy: same code, a clear label so nobody mistakes test Pi for real Pi */(function(){if(!/(^|[.-])testnet[.-]/i.test(location.hostname))return;document.title="[Testnet] "+document.title;var b=document.createElement("div");b.textContent="TESTNET";b.setAttribute("aria-label","Testnet: test Pi only");b.style.cssText="position:fixed;left:12px;bottom:calc(86px + env(safe-area-inset-bottom));z-index:99999;padding:3px 10px;border-radius:999px;background:#B45309;color:#fff;font:800 11px/1.4 system-ui,sans-serif;letter-spacing:.06em;pointer-events:none;opacity:.92";(document.body||document.documentElement).appendChild(b);})();</script>
 </body>
 </html>

@@ -1,96 +1,58 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
+<script>/* Pi sandbox: true only when the app is opened inside the Pi Sandbox (desktop testing at sandbox.minepi.com); false in the Pi Browser. The same code runs as the mainnet and the testnet app: the network comes from the Pi app and its API key. */
+window.PI_SANDBOX=(function(){try{var r=document.referrer||'',a=location.ancestorOrigins?[].slice.call(location.ancestorOrigins).join(' '):'';return /sandbox\.minepi\.com/.test(r+' '+a);}catch(e){return false;}})();</script>
+
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<meta name="theme-color" content="#050A12">
 <title>FinPi</title>
-<link rel="manifest" href="/manifest.json">
-<link rel="icon" href="/finpi-logo.svg" type="image/svg+xml">
 <script src="https://sdk.minepi.com/pi-sdk.js"></script>
 <style>
-*{box-sizing:border-box;margin:0;padding:0}
-body{font-family:system-ui,sans-serif;background:#050A12;color:#F0F6FF;
-  display:flex;flex-direction:column;align-items:center;justify-content:center;
-  min-height:100vh;padding:2rem 1.5rem;text-align:center}
+body{margin:0;font-family:system-ui,sans-serif;background:#050A12;color:#F0F6FF;display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:100vh;padding:2rem;text-align:center}
 h1{font-size:2rem;font-weight:800;margin:.5rem 0 .3rem}
 h1 b{color:#0D9488}
-.sub{color:rgba(240,246,255,.45);font-size:.85rem;margin-bottom:2rem}
-.btn{display:block;width:100%;max-width:360px;margin:.5rem auto;
-  padding:1rem;border:none;border-radius:14px;font-size:1rem;
-  font-weight:700;cursor:pointer;min-height:56px;touch-action:manipulation}
-.pi-btn{background:linear-gradient(135deg,#1E3A8A,#2563EB);color:#fff;
-  box-shadow:0 4px 20px rgba(37,99,235,.4)}
-.pi-btn:active{opacity:.85;transform:scale(.97)}
-.gu-btn{background:rgba(255,255,255,.08);color:rgba(240,246,255,.8);
-  border:1px solid rgba(255,255,255,.12)}
-.gu-btn:active{opacity:.75}
-#st{color:rgba(240,246,255,.4);font-size:.8rem;margin-top:.6rem;min-height:1.2rem}
-.foot{font-size:.6rem;color:rgba(240,246,255,.25);margin-top:1.5rem;line-height:2}
-.foot a{color:#0D9488;text-decoration:none}
+p{color:rgba(240,246,255,.45);font-size:.85rem;margin-bottom:2rem}
+.btn{display:block;width:100%;max-width:360px;margin:.5rem auto;padding:1rem;border:none;border-radius:14px;font-size:1rem;font-weight:700;cursor:pointer;min-height:56px}
+.pi{background:linear-gradient(135deg,#1E3A8A,#2563EB);color:#fff}
+.gu{background:rgba(255,255,255,.08);color:rgba(240,246,255,.8);border:1px solid rgba(255,255,255,.12)}
+#st{color:rgba(240,246,255,.4);font-size:.8rem;margin-top:.5rem;min-height:1.2rem}
 </style>
 </head>
 <body>
-<div style="font-size:3rem;margin-bottom:.5rem">&#x1F4B0;</div>
+<div style="font-size:3rem">💰</div>
 <h1>Fin<b>Pi</b></h1>
-<p class="sub">Pi Financial Platform &middot; Pi Testnet</p>
+<p>Pi Financial Platform · Sandbox</p>
 
-<button class="btn pi-btn" onclick="signIn()">&#x03C0; Sign In with Pi</button>
-<button class="btn gu-btn" onclick="guest()">&#x1F464; Continue as Guest</button>
+<button class="btn pi" onclick="signIn()">π Sign In with Pi</button>
+<button class="btn gu" onclick="guest()">👤 Guest Mode</button>
 <div id="st"></div>
 
-<div class="foot">
-  Pi SDK &middot; Pi Testnet &middot; sandbox:true<br>
-  <a href="/privacy-policy.html">Privacy Policy</a> &middot;
-  <a href="/terms-of-service.html">Terms of Service</a><br>
-  &copy; 2026 FinPi &middot; finpi-testnet.pages.dev
-</div>
-
 <script>
-function st(txt){ document.getElementById('st').textContent = txt; }
-
 function signIn(){
-  st('Connecting...');
+  document.getElementById('st').textContent='Connecting...';
   if(typeof Pi==='undefined'){
-    var n=0;
-    var t=setInterval(function(){
-      n++;
-      if(typeof Pi!=='undefined'){ clearInterval(t); doAuth(); return; }
-      if(n>15){ clearInterval(t); st('Open in Pi Browser to sign in.'); return; }
-      st('Loading Pi SDK... ('+n+')');
-    },600);
+    document.getElementById('st').textContent='Not in Pi Browser. Use guest mode.';
     return;
   }
-  doAuth();
+  Pi.init({version:'2.0',sandbox: window.PI_SANDBOX});
+  Pi.authenticate(['username','payments'],function(){})
+    .then(function(a){
+      localStorage.setItem('fp_user',JSON.stringify(a.user));
+      document.getElementById('st').textContent='Signed in as @'+a.user.username;
+      setTimeout(function(){window.location='/app.html';},800);
+    })
+    .catch(function(e){
+      document.getElementById('st').textContent='Failed: '+(e&&e.message?e.message:'try again');
+    });
 }
-
-function doAuth(){
-  try{ Pi.init({version:'2.0',sandbox:true}); }catch(e){}
-  st('Authenticating...');
-  Pi.authenticate(['username','payments'],function(p){
-    if(!p||!p.identifier)return;
-    fetch('/complete',{method:'POST',headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({paymentId:p.identifier})}).catch(function(){});
-  })
-  .then(function(a){
-    localStorage.setItem('fp_user',JSON.stringify(a.user));
-    st('Signed in as @'+a.user.username+' ✓');
-    setTimeout(function(){ window.location='/app.html'; },600);
-  })
-  .catch(function(e){
-    st('Failed: '+(e&&e.message?e.message:'try again'));
-  });
-}
-
 function guest(){
   localStorage.setItem('fp_user',JSON.stringify({username:'Guest'}));
   window.location='/app.html';
 }
-
-/* Auto-restore session */
-try{
-  if(localStorage.getItem('fp_user')){ window.location='/app.html'; }
-}catch(e){}
+// Auto-restore
+try{if(localStorage.getItem('fp_user')){window.location='/app.html';}}catch(e){}
 </script>
+<script>/* Testnet copy: same code, a clear label so nobody mistakes test Pi for real Pi */(function(){if(!/(^|[.-])testnet[.-]/i.test(location.hostname))return;document.title="[Testnet] "+document.title;var b=document.createElement("div");b.textContent="TESTNET";b.setAttribute("aria-label","Testnet: test Pi only");b.style.cssText="position:fixed;left:12px;bottom:calc(86px + env(safe-area-inset-bottom));z-index:99999;padding:3px 10px;border-radius:999px;background:#B45309;color:#fff;font:800 11px/1.4 system-ui,sans-serif;letter-spacing:.06em;pointer-events:none;opacity:.92";(document.body||document.documentElement).appendChild(b);})();</script>
 </body>
 </html>

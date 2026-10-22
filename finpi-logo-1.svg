@@ -1,0 +1,27 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" width="200" height="200">
+  <defs>
+    <linearGradient id="fg" x1="0%" y1="100%" x2="100%" y2="0%">
+      <stop offset="0%"   stop-color="#1565C0"/>
+      <stop offset="33%"  stop-color="#1976D2"/>
+      <stop offset="60%"  stop-color="#1E88E5"/>
+      <stop offset="80%"  stop-color="#00BCD4"/>
+      <stop offset="100%" stop-color="#1DE9B6"/>
+    </linearGradient>
+    <linearGradient id="fg2" x1="0%" y1="100%" x2="100%" y2="0%">
+      <stop offset="0%"   stop-color="#1565C0"/>
+      <stop offset="50%"  stop-color="#1E88E5"/>
+      <stop offset="100%" stop-color="#1DE9B6"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Outer circle ring -->
+  <circle cx="100" cy="100" r="90" fill="none" stroke="url(#fg)" stroke-width="16"/>
+
+  <!-- Bold geometric F — integrated with circle -->
+  <!-- Vertical stem -->
+  <rect x="68" y="54" width="16" height="92" rx="7" fill="url(#fg2)"/>
+  <!-- Top horizontal bar -->
+  <rect x="68" y="54" width="58" height="16" rx="7" fill="url(#fg2)"/>
+  <!-- Middle horizontal bar -->
+  <rect x="68" y="92" width="48" height="14" rx="7" fill="url(#fg2)"/>
+</svg>

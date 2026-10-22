@@ -1,7 +1,7 @@
 /* ================================================================
    FinPi · functions/complete.js · Cloudflare Pages Function
    Route: /complete (POST)
-   Pi Network Testnet · sandbox:true
+   Pi Network (mainnet or testnet, set by PI_API_KEY)
    ALWAYS return HTTP 200 — non-200 = Payment Expired on Pi side
 ================================================================ */
 
@@ -10,9 +10,9 @@ export async function onRequestGet(context) {
   return new Response(JSON.stringify({
     success: true,
     message: "FinPi /complete endpoint is live",
-    app: "finpi-testnet.pages.dev",
+    app: "FinPi",
     route: "/complete",
-    network: "Pi Testnet · sandbox:true",
+    network: "set by PI_API_KEY",
     pi_api_key_present: !!key,
     pi_api_key_length: key ? key.length : 0,
     timestamp: new Date().toISOString()

@@ -1,7 +1,7 @@
 /* ================================================================
    FinPi · functions/approve.js · Cloudflare Pages Function
    Route: /approve (POST)
-   Pi Network Testnet · sandbox:true
+   Pi Network (mainnet or testnet, set by PI_API_KEY)
    ALWAYS return HTTP 200 — non-200 = Payment Expired on Pi side
 ================================================================ */
 
@@ -10,12 +10,11 @@ export async function onRequestGet(context) {
   return new Response(JSON.stringify({
     success: true,
     message: "FinPi /approve endpoint is live",
-    app: "finpi-testnet.pages.dev",
+    app: "FinPi",
     route: "/approve",
-    network: "Pi Testnet · sandbox:true",
+    network: "set by PI_API_KEY",
     pi_api_key_present: !!key,
     pi_api_key_length: key ? key.length : 0,
-    pi_api_key_prefix: key ? key.substring(0, 8) + "..." : "MISSING — set PI_API_KEY in Cloudflare Pages env",
     timestamp: new Date().toISOString()
   }), {
     status: 200,
@@ -71,6 +70,26 @@ export async function onRequestPost(context) {
 
     /* Call Pi API — approve */
     console.log("[FinPi] Calling Pi API approve for:", paymentId);
+    /* Check the payment with Pi before approving it: a pass must be paid in full,
+       and every amount must be a real positive number. A rejected payment simply
+       expires and the user is not charged. */
+    try {
+      const chk = await fetch(`https://api.minepi.com/v2/payments/${paymentId}`, { headers: { 'Authorization': `Key ${PI_API_KEY}` } });
+      if (chk.ok) {
+        const pay = await chk.json();
+        const md = (pay && pay.metadata) || {};
+        const amt = Number(pay && pay.amount);
+        const PRICES = {'copa_pass': 1, 'spl_pass': 1, 'fan_pass': 1, 'pilgrim_pass': 1};
+        const st = (pay && pay.status) || {};
+        if (st.developer_approved) {
+          return new Response(JSON.stringify({ approved: true, step: 'already_approved' }), { status: 200, headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' } });
+        }
+        if (!(amt > 0) || amt > 100000 || (PRICES[md.type] && amt + 1e-9 < PRICES[md.type])) {
+          console.warn('Payment rejected: amount does not match', paymentId, amt, md.type);
+          return new Response(JSON.stringify({ approved: false, error: 'Payment amount does not match the price' }), { status: 200, headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' } });
+        }
+      }
+    } catch (e) { console.warn('Payment check skipped:', e && e.message); }
     const piRes = await fetch(
       `https://api.minepi.com/v2/payments/${paymentId}/approve`,
       {
