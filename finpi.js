@@ -135,6 +135,7 @@
   }
   function verifyUrl(r) { return r && /^[a-f0-9]{64}$/i.test(r.txid || '') ? location.origin + '/receipt.html#tx=' + r.txid.toLowerCase() + '&net=' + (/Testnet/.test(r.net || '') ? 'test' : 'main') : ''; }
   function rcptTitle(r) { return r.kind === 'refund' ? 'Refund · transfer to ' + r.other : r.kind === 'supporter' ? 'FinPi Supporter' : r.dir === 'in' ? 'From ' + r.other : 'To ' + r.other; }
+  function valTxt(r) { return r && r.usd ? (r.lr && r.lc && r.lc !== 'USD' ? money(r.amount * r.lr, r.lc) + ' · ' : '') + money(r.amount * r.usd, 'USD') : ''; }
   function rateTxt(r) { return r && r.usd ? '1 π = ' + money(r.usd, 'USD', 4) + (r.lr && r.lc && r.lc !== 'USD' ? ' · ' + money(r.lr, r.lc, r.lr < 1 ? 4 : 2) : '') : ''; }
   function spec(r) {
     var d = new Date(r.ts), when = [['Date', d.toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' })], ['Time', d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })]];
@@ -147,12 +148,12 @@
     if (r.kind === 'wallet') {
       var wi = r.dir === 'in';
       return Object.assign(base, { title: wi ? 'Payment received' : 'Payment receipt',
-        rows: [['From', wi ? short(r.from || r.addr) : mine], ['To', wi ? mine : short(r.addr)], ['Narration', r.narr || '—'], ['Category', wi ? '' : r.cat], ['Pi rate', rate], ['Paid with', 'Pi Wallet'], ['Reference', r.pid]].concat(when, [['Network', r.net], ['Sender address', r.from, 1], ['Recipient address', wi ? r.to : r.addr, 1], ['Transaction ID', r.txid, 1]]),
+        rows: [['From', wi ? short(r.from || r.addr) : mine], ['To', wi ? mine : short(r.addr)], ['Narration', r.narr || '—'], ['Category', wi ? '' : r.cat], ['Value', valTxt(r)], ['Pi rate', rate], ['Paid with', 'Pi Wallet'], ['Reference', r.pid]].concat(when, [['Network', r.net], ['Sender address', r.from, 1], ['Recipient address', wi ? r.to : r.addr, 1], ['Transaction ID', r.txid, 1]]),
         thanks: wi ? 'Received · verified by FinPi' : 'Paid · verified by FinPi', note: 'Paid from Pi Wallet and verified by FinPi on the public Pi blockchain. Scan the code to check it.' });
     }
     var inn = r.dir === 'in', fee = inn ? 0 : (r.fee || 0.01), A = r.tk === 'address';
     return Object.assign(base, { title: inn ? 'Transfer received' : 'Transfer receipt',
-      rows: [['From', inn ? r.other : mine], ['To', inn ? mine : (A ? 'Pi wallet address' : r.other)], ['Narration', r.narr || '—'], ['Category', inn ? '' : r.cat], ['Pi rate', rate]].concat(fee ? [['Blockchain fee', fpi(fee) + ' π'], ['Total paid', fpi(r7(Number(r.amount) + fee)) + ' π']] : [], [['Reference', r.pid]], when, [['Network', r.net], [inn ? 'Your address' : 'Recipient address', r.addr, 1], ['Transaction ID', r.txid, 1]]),
+      rows: [['From', inn ? r.other : mine], ['To', inn ? mine : (A ? 'Pi wallet address' : r.other)], ['Narration', r.narr || '—'], ['Category', inn ? '' : r.cat], ['Value', valTxt(r)], ['Pi rate', rate]].concat(fee ? [['Blockchain fee', fpi(fee) + ' π'], ['Total paid', fpi(r7(Number(r.amount) + fee)) + ' π']] : [], [['Reference', r.pid]], when, [['Network', r.net], [inn ? 'Your address' : 'Recipient address', r.addr, 1], ['Transaction ID', r.txid, 1]]),
       thanks: inn ? 'Received with FinPi' : 'Sent with FinPi', note: (A ? 'Paid in FinPi and delivered automatically to the wallet address on the Pi blockchain.' : 'Paid in FinPi and delivered automatically through Pi Network’s official payments.') + ' Scan the code to check it on the Pi blockchain.' });
   }
   function fontsReady() { try { return document.fonts && document.fonts.ready ? Promise.race([document.fonts.ready, new Promise(function (r) { setTimeout(r, 1500); })]) : Promise.resolve(); } catch (e) { return Promise.resolve(); } }
@@ -170,6 +171,7 @@
     else rows.push(['From', inn ? r.other : mine], ['To', inn ? mine : (r.tk === 'address' ? 'Pi wallet address' : r.other)]);
     if (r.narr && r.kind !== 'supporter') rows.push(['Narration', r.narr]);
     if (r.cat && !inn) rows.push(['Category', r.cat]);
+    if (r.usd) rows.push(['Value at payment time', (r.lr && r.lc && r.lc !== 'USD' ? money(r.amount * r.lr, r.lc) + ' · ' : '') + money(r.amount * r.usd, 'USD')]);
     if (rateTxt(r)) rows.push([Math.abs((r.saved || r.ts) - r.ts) > 3600e3 ? 'Pi rate (when saved)' : 'Pi rate', rateTxt(r)]);
     if (fee) rows.push(['Amount', fpi(r.amount) + ' π'], ['Blockchain fee', fpi(fee) + ' π'], ['Total paid', fpi(r7(Number(r.amount) + fee)) + ' π']);
     rows.push(['Date', d.toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'long', year: 'numeric' })], ['Time', d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })], ['Network', r.net || NETN], ['Status', 'Completed']);
@@ -270,7 +272,7 @@
     $('#av').textContent = signedIn() ? me().charAt(0) : 'G';
     $('#netb').hidden = !TEST; bellDot(); render(S.tab);
   }
-  function afterSignIn() { register(); loadCfg().then(function () { sync(); }); }
+  function afterSignIn() { register(); loadCfg().then(function () { sync(); if (pendingCode) { var c = pendingCode; pendingCode = null; openCode(c); } }); }
 
   /* ── transfers: server status, registration, sync ── */
   function loadCfg() {
@@ -332,6 +334,7 @@
     var addrOn = true, userOn = !!S.cfg.enabled, kind = !userOn || (pre.u && isG(pre.u)) ? 'addr' : 'user';
     var payees = get('payees', []).filter(function (p) { return addrOn || !isG(p); }).slice(0, 6);
     var w = sheet('Send Pi',
+      (pre.link || pre.x && pre.a ? '<div class="note gray" style="margin-bottom:8px">' + ic('qr') + '<span>Payment request from ' + esc(isG(pre.u) ? short(pre.u) : '@' + pre.u) + (pre.a ? ' for <b>' + fpi(pre.a) + ' π</b>' : '') + (pre.x ? ' · “' + esc(pre.x) + '”' : '') + '. Check it is someone you know.</span></div>' : '') +
       (userOn ? '<div class="seg" role="tablist" style="margin-bottom:4px"><button type="button" data-k="user">Username</button><button type="button" data-k="addr">Wallet address</button></div>' : '<p class="sh-sub">Fill in the payment, pay it from your own Pi Wallet, and FinPi makes the receipt automatically.</p>') +
       '<div id="k-user"><label class="l" for="s-u">To</label><div class="to"><span>@</span><input id="s-u" autocomplete="off" autocapitalize="none" spellcheck="false" placeholder="username" maxlength="60"></div></div>' +
       '<div id="k-addr" hidden><label class="l" for="s-g">Pi wallet address</label><textarea class="in num" id="s-g" rows="2" maxlength="60" autocapitalize="characters" spellcheck="false" placeholder="G…" style="font-size:14px;resize:none"></textarea></div>' +
@@ -570,6 +573,87 @@
     };
   }
 
+  /* ── request & scan: payment codes (QR) and links that open FinPi with the payment filled in ── */
+  function enc(o) { return btoa(unescape(encodeURIComponent(JSON.stringify(o)))).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, ''); }
+  function dec(t) { try { t = t.replace(/-/g, '+').replace(/_/g, '/'); while (t.length % 4) t += '='; return JSON.parse(decodeURIComponent(escape(atob(t)))); } catch (e) { return null; } }
+  function payLink(o) { return location.origin + '/#pay=' + enc(o); }
+  /* what a scanned or opened code asks for: { u: @username or G-address, a: amount, x: reason } */
+  function parseCode(t) {
+    t = String(t || '').trim(); var m = /#pay=([A-Za-z0-9_-]{4,1200})/.exec(t);
+    if (m) { var o = dec(m[1]); if (o && (isG(String(o.u || '')) || USER_RE.test(String(o.u || '')))) { var a = Number(o.a); return { u: String(o.u), a: a > 0 && a <= 1e7 ? r7(a) : 0, x: String(o.x || '').slice(0, 80), link: true }; } return null; }
+    var g = /(G[A-Z2-7]{55})/.exec(t.toUpperCase()); if (g && validG(g[1])) { var am = /amount=([0-9.]+)/i.exec(t); return { u: g[1], a: am ? r7(am[1]) : 0, x: '' }; }
+    return null;
+  }
+  function openCode(c) {
+    if (!c) return;
+    if (!isG(c.u) && !S.cfg.enabled) { toast('This request is for a FinPi @username. Ask for their wallet address to pay from Pi Wallet.'); return; }
+    if (!isG(c.u) && needSignIn('Sign in with Pi to pay @' + c.u + '.')) { pendingCode = c; return; }
+    go('pay'); setTimeout(function () { sendSheet(c); }, 250);
+  }
+  var pendingCode = null;
+  function readHash() { var c = /#pay=/.test(location.hash) ? parseCode(location.hash) : null; if (/#pay=/.test(location.hash)) { try { history.replaceState(null, '', location.pathname); } catch (e) {} } return c; }
+  function requestSheet() {
+    var un = S.cfg.enabled && signedIn(), a0 = get('addr', '');
+    if (!un && !a0) {
+      var w0 = sheet('Request Pi', '<p class="sh-sub">To request Pi, add your Pi wallet address once. People will pay to it from Pi Wallet' + (S.cfg.enabled ? ' or FinPi' : '') + '.</p><button type="button" class="btn" data-x="aa">' + ic('card') + 'Add my wallet address</button>');
+      $('[data-x="aa"]', w0).onclick = function () { addrSheet(true); }; return;
+    }
+    var w = sheet('Request Pi', '<p class="sh-sub">Create a payment code. The payer scans it with FinPi, checks the details and pays you.</p>' +
+      '<label class="l" for="q-a">Amount</label><div class="amt"><input id="q-a" type="number" inputmode="decimal" placeholder="0.00"><span>π</span></div><div class="hint num" id="q-c"></div>' +
+      '<label class="l" for="q-x">What is it for?</label><input class="in" id="q-x" maxlength="80" placeholder="e.g. Rent, groceries, shared taxi">' +
+      '<button type="button" class="btn" id="q-go">' + ic('qr') + 'Create payment code</button>');
+    var a = $('#q-a', w); a.oninput = function () { $('#q-c', w).textContent = conv(r7(a.value)); }; setTimeout(function () { a.focus(); }, 120);
+    $('#q-go', w).onclick = function () {
+      var v = r7(a.value), x = $('#q-x', w).value.trim();
+      if (!(v >= 0.01)) return toast('Enter the amount in π'); if (!x) return toast('Say what the payment is for');
+      var to = un ? me() : a0, link = payLink({ u: to, a: v, x: x });
+      var who = un ? '@' + me() : short(a0), text = (un ? '@' + me() : 'I') + ' requested ' + fpi(v) + ' π (' + conv(v).replace('≈ ', '≈') + ') for “' + x + '”. Pay with FinPi:\n' + link;
+      var w2 = sheet('Payment request', '<div class="big"><div class="v">' + fpi(v) + ' π</div><div class="c">' + esc(conv(v)) + '</div><div class="w">To ' + esc(who) + ' · ' + esc(x) + '</div></div>' +
+        '<div class="qr">' + (window.FPQR ? FPQR.svg(link, 230, '#0A1F55') : '') + '</div><p class="small muted" style="text-align:center;margin-top:6px">Scan with FinPi (or the phone camera) to pay.</p>' +
+        '<button type="button" class="btn" data-x="sh">' + ic('share') + 'Share request</button><button type="button" class="btn ghost" data-x="cp">' + ic('copy') + 'Copy link</button>');
+      $('[data-x="sh"]', w2).onclick = function () { shareText('FinPi payment request', text); };
+      $('[data-x="cp"]', w2).onclick = function () { copy(link); };
+    };
+  }
+  /* QR scanner: camera, or a photo of a QR code from the gallery */
+  var jsqrP = null;
+  function loadJsQR() { if (window.jsQR) return Promise.resolve(); if (!jsqrP) jsqrP = new Promise(function (ok, no) { var s = document.createElement('script'); s.src = 'vendor/jsqr.js?v=1'; s.onload = ok; s.onerror = function () { jsqrP = null; no(); }; document.head.appendChild(s); }); return jsqrP; }
+  function decodeImageData(d) { try { var q = window.jsQR && jsQR(d.data, d.width, d.height, { inversionAttempts: 'attemptBoth' }); return q ? q.data : ''; } catch (e) { return ''; } }
+  function scanSheet() {
+    var stream = null, raf = 0, done = false, cv = document.createElement('canvas'), cx = cv.getContext('2d', { willReadFrequently: true });
+    var w = sheet('Scan QR code', '<p class="sh-sub">Point the camera at a FinPi payment code or a Pi wallet address QR.</p>' +
+      '<div class="scan"><video id="sc-v" playsinline muted></video><div class="scan-f"></div><div class="scan-m" id="sc-m">Starting camera…</div></div>' +
+      '<label class="btn ghost" style="cursor:pointer">' + ic('down') + 'Scan a photo from the gallery<input type="file" id="sc-f" accept="image/*" hidden></label>', { onClose: stop });
+    function stop() { done = true; cancelAnimationFrame(raf); if (stream) stream.getTracks().forEach(function (t) { t.stop(); }); }
+    function found(t) {
+      var c = parseCode(t); if (!c) { $('#sc-m', w) && ($('#sc-m', w).textContent = 'This QR code is not a Pi payment code.'); return false; }
+      stop(); w.remove(); if (navigator.vibrate) try { navigator.vibrate(60); } catch (e) {} openCode(c); return true;
+    }
+    var v = $('#sc-v', w), msg = $('#sc-m', w);
+    loadJsQR().then(function () {
+      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) { msg.textContent = 'Camera is not available here. Scan a photo instead.'; return; }
+      return navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment', width: { ideal: 1280 } }, audio: false }).then(function (s) {
+        if (done) { s.getTracks().forEach(function (t) { t.stop(); }); return; }
+        stream = s; v.srcObject = s; v.play(); msg.textContent = 'Looking for a QR code…';
+        var last = 0;
+        (function tick(ts) {
+          if (done) return; raf = requestAnimationFrame(tick);
+          if (ts - last < 180 || v.readyState < 2) return; last = ts;
+          var W = v.videoWidth, H = v.videoHeight, k = Math.min(1, 720 / Math.max(W, H)); cv.width = W * k; cv.height = H * k;
+          cx.drawImage(v, 0, 0, cv.width, cv.height); var t = decodeImageData(cx.getImageData(0, 0, cv.width, cv.height)); if (t) found(t);
+        })(0);
+      });
+    }).catch(function () { msg.textContent = 'Camera permission was not given. You can scan a photo instead.'; });
+    $('#sc-f', w).onchange = function () {
+      var f = this.files && this.files[0]; if (!f) return; msg.textContent = 'Reading photo…';
+      loadJsQR().then(function () {
+        var img = new Image(), u = URL.createObjectURL(f);
+        img.onload = function () { var k = Math.min(1, 1400 / Math.max(img.width, img.height)); cv.width = img.width * k; cv.height = img.height * k; cx.drawImage(img, 0, 0, cv.width, cv.height); URL.revokeObjectURL(u); var t = decodeImageData(cx.getImageData(0, 0, cv.width, cv.height)); if (!t || !found(t)) msg.textContent = t ? 'This QR code is not a Pi payment code.' : 'No QR code found in this photo. Try a clearer one.'; };
+        img.src = u;
+      }).catch(function () { msg.textContent = 'Could not load the scanner. Check your connection.'; });
+    };
+  }
+
   /* ── receive: your @username and your wallet address ── */
   function receiveSheet() {
     var a = get('addr', ''), sug = get('addrSug', ''), un = S.cfg.enabled && signedIn();
@@ -719,7 +803,7 @@
       var R = rcpts();
       return '<div class="hello"><h1>' + hour() + (signedIn() ? ', @' + esc(me()) : '') + '</h1><p>' + (signedIn() ? 'Here is your Pi today.' : 'You are exploring. Sign in to send and receive Pi.') + '</p></div>' +
         '<div class="hero" data-act="price" data-p="hero" role="button" tabindex="0" aria-label="Pi price details">' + heroHTML() + '</div>' +
-        '<div class="qa"><button type="button" data-act="send"><i>' + ic('send') + '</i>Send</button><button type="button" data-act="receive"><i class="t">' + ic('req') + '</i>Receive</button><button type="button" data-tab="wallet"><i class="n">' + ic('conv') + '</i>Convert</button><button type="button" data-tab="activity"><i class="a">' + ic('rcpt') + '</i>Receipts</button></div>' +
+        '<div class="qa"><button type="button" data-act="send"><i>' + ic('send') + '</i>Send</button><button type="button" data-act="request"><i class="t">' + ic('req') + '</i>Request</button><button type="button" data-act="scan"><i class="n">' + ic('qr') + '</i>Scan</button><button type="button" data-act="receive"><i class="a">' + ic('card') + '</i>Receive</button></div>' +
         '<div class="sec"><h2>Overview</h2></div><div class="card" data-p="month">' + monthHTML() + '</div>' +
         '<div class="sec"><h2>Recent activity</h2>' + (R.length ? '<button type="button" data-tab="activity">See all</button>' : '') + '</div>' +
         (R.length ? '<div class="list">' + R.slice(0, 4).map(txRow).join('') + '</div>' : '<div class="list"><div class="empty">' + ic('act') + '<div>No payments yet. Your receipts appear here.</div></div></div>') +
@@ -730,7 +814,9 @@
       return '<div class="ph"><h1>Send &amp; receive</h1><p>Every payment is recorded on the Pi blockchain, with a professional receipt and the Pi rate in your currency.</p></div>' +
         '<div class="tiles" style="margin-top:14px">' +
         '<button type="button" class="tile" data-act="send"><i>' + ic('send') + '</i><b>Send Pi</b><small>' + (on ? 'To a @username or a wallet address' : 'From your Pi Wallet to any address') + '</small></button>' +
-        '<button type="button" class="tile" data-act="receive"><i class="t">' + ic('req') + '</i><b>Receive Pi</b><small>' + (on ? 'Your @username and wallet address' : 'Your wallet address and QR code') + '</small></button></div>' +
+        '<button type="button" class="tile" data-act="request"><i class="t">' + ic('req') + '</i><b>Request Pi</b><small>A payment code with the amount</small></button>' +
+        '<button type="button" class="tile" data-act="scan"><i class="n">' + ic('qr') + '</i><b>Scan to pay</b><small>A payment code or wallet QR</small></button>' +
+        '<button type="button" class="tile" data-act="receive"><i class="a">' + ic('card') + '</i><b>Receive Pi</b><small>' + (on ? 'Your @username and wallet address' : 'Your wallet address and QR code') + '</small></button></div>' +
         (pl.length ? '<div class="sec"><h2>Recent people</h2></div><div class="chips">' + pl.slice(0, 8).map(function (p) { return '<button type="button" class="chip" data-act="send-to" data-u="' + esc(p) + '">' + esc(toLabel(p)) + '</button>'; }).join('') + '</div>' : '') +
         '<div class="sec"><h2>How it works</h2></div><div class="card"><div class="note gray">' + ic('lock') + '<span>' + (on ? 'Pay inside FinPi (approved in Pi’s window, delivered in seconds, refunded automatically if it cannot be delivered), or pay from your own Pi Wallet.' : 'Fill in the payment in FinPi, pay it from your own Pi Wallet, and FinPi finds it on the Pi blockchain and makes your receipt with the Pi rate.') + ' FinPi never holds your Pi.</span></div></div>' +
         '<div class="tiles" style="margin-top:12px"><button type="button" class="tile" data-act="get-rcpt"><i class="n">' + ic('rcpt') + '</i><b>Get a receipt</b><small>For any Pi payment, from its transaction ID</small></button><button type="button" class="tile" data-act="verify"><i class="a">' + ic('check') + '</i><b>Verify a payment</b><small>Check any transaction on the blockchain</small></button></div>';
@@ -795,7 +881,7 @@
 
   /* ── actions ── */
   var A = {
-    send: function () { sendSheet(); }, receive: function () { receiveSheet(); }, 'get-rcpt': function () { addTxSheet(null); },
+    send: function () { sendSheet(); }, receive: function () { receiveSheet(); }, request: function () { requestSheet(); }, scan: function () { scanSheet(); }, 'get-rcpt': function () { addTxSheet(null); },
     'send-to': function (el) { sendSheet({ u: el.dataset.u }); },
     signin: function () { signIn(); },
     price: function () { go('wallet'); }, 'price-retry': function (el, e) { e.stopPropagation(); loadPrice(true); paintPrice(); },
@@ -886,11 +972,13 @@
   function start() {
     if (TEST) { $('#ld-net').textContent = 'Pi Testnet'; }
     $('#signin').onclick = function () { signIn(); };
-    $('#explore').onclick = function () { S.guest = true; showApp(); };
+    $('#explore').onclick = function () { S.guest = true; showApp(); if (pendingCode) { var c = pendingCode; pendingCode = null; openCode(c); } };
     loadPrice(true); paintPrice(); initPi(); loadCfg();
     var u = get('user', null);
     if (u && u.username && window.Pi) { $('#signin-t').textContent = 'Signing in as @' + u.username + '…'; signIn(true).then(function (ok) { if (!ok) $('#signin-t').textContent = 'Sign in with Pi'; }); }
     checkPendingWallet();
+    var hc = readHash(); if (hc) { pendingCode = hc; var lm = $('#ld-msg'); if (lm) { lm.style.color = 'var(--blue)'; lm.textContent = 'You opened a payment request. Sign in with Pi or explore to pay it.'; } }
+    addEventListener('hashchange', function () { var c = readHash(); if (c) { if ($('#app').hidden) { pendingCode = c; } else openCode(c); } });
     setInterval(function () { if (!document.hidden) { loadPrice(); sync(); checkPendingWallet(); } }, 60000);
     document.addEventListener('visibilitychange', function () { if (!document.hidden) { loadPrice(); sync(); checkPendingWallet(); } });
     if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(function () {});
