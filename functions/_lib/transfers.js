@@ -2,7 +2,7 @@
 // The sender pays FinPi in Pi's own pop-up (U2A); FinPi's code then pays the recipient through Pi Network's official
 // App-to-User flow (A2U). If delivery cannot be done, the code refunds the sender automatically on the Pi blockchain.
 // Nobody reviews, approves, holds or reverses individual transfers: published rules are applied the same way to everyone.
-// Secrets (Cloudflare → Settings → Variables and Secrets): PI_API_KEY, APP_WALLET_SEED ('S…'). D1 binding: FP_DB.
+// Secrets (Cloudflare → Settings → Variables and Secrets): PI_API_KEY, APP_WALLET_SEED ('S…'). D1 binding: FP_DB (or DB).
 // Optional fixed rules: MAX_TRANSFER, DAILY_LIMIT, DAILY_COUNT, GLOBAL_DAILY_LIMIT. TRANSFERS_ENABLED = 0 pauses new transfers for everyone
 // (transfers already paid are still delivered or refunded automatically).
 import { keypairFromSeed, buildPayment, accountToBytes } from './stellar.js';
@@ -17,7 +17,13 @@ export const USER_RE = /^[A-Za-z0-9_.-]{2,40}$/;
 const round7 = (n) => Math.round(Number(n) * 1e7) / 1e7;
 
 // On automatically once the app wallet key is added; TRANSFERS_ENABLED = 0 pauses transfers at any time.
-export function enabled(env) { return String(env.TRANSFERS_ENABLED || '') !== '0' && !!env.APP_WALLET_SEED && !!env.PI_API_KEY && !!env.FP_DB; }
+// The database binding may be named FP_DB (recommended), DB or FINPI_DB.
+export function DBB(env) { return env.FP_DB || env.DB || env.FINPI_DB || null; }
+const seedOk = (env) => /^S[A-Z2-7]{55}$/.test(String(env.APP_WALLET_SEED || '').trim());
+export const piKey = (env) => String(env.PI_API_KEY || '').trim();
+/* What is set up (yes/no only, never any secret), so the developer can see why transfers are off. */
+export function setup(env) { return { pi_api_key: !!piKey(env), app_wallet_seed: seedOk(env), database: !!DBB(env), paused: String(env.TRANSFERS_ENABLED || '').trim() === '0' }; }
+export function enabled(env) { const s = setup(env); return !s.paused && s.pi_api_key && s.app_wallet_seed && s.database; }
 // Starts at 50 π per transfer for safety; raise it with MAX_TRANSFER (for example 500).
 export function maxTransfer(env) { const m = Number(env.MAX_TRANSFER); return m > 0 ? m : 50; }
 const numEnv = (v, d) => { const n = Number(v); return n > 0 ? n : d; };
@@ -50,7 +56,7 @@ export async function paidBefore(env, fromUid, toUid) {
 /* Light abuse protection: at most `max` calls per hour per bucket from one network. The IP is never stored, only a salted one-way hash. */
 export async function rateOk(env, request, bucket, max) {
   try {
-    const d = env.FP_DB; if (!d) return true;
+    const d = DBB(env); if (!d) return true;
     await d.exec('CREATE TABLE IF NOT EXISTS rl (k TEXT PRIMARY KEY, n INTEGER, w INTEGER)');
     const ip = request.headers.get('CF-Connecting-IP') || request.headers.get('x-forwarded-for') || 'x', w = Math.floor(Date.now() / 3600000);
     const h = [...new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(bucket + '|' + ip + '|' + (env.PI_API_KEY || 'hm'))))].map((b) => b.toString(16).padStart(2, '0')).join('').slice(0, 32);
@@ -64,7 +70,7 @@ export async function rateOk(env, request, bucket, max) {
 export async function cancelPayment(env, pid) { try { await piApi(env, '/payments/' + encodeURIComponent(pid) + '/cancel', 'POST', {}); } catch (e) {} }
 
 export async function piApi(env, path, method, body) {
-  const r = await fetch(PI + path, { method: method || 'GET', headers: { Authorization: 'Key ' + env.PI_API_KEY, 'Content-Type': 'application/json' }, body: body ? JSON.stringify(body) : undefined });
+  const r = await fetch(PI + path, { method: method || 'GET', headers: { Authorization: 'Key ' + piKey(env), 'Content-Type': 'application/json' }, body: body ? JSON.stringify(body) : undefined });
   let d = null; try { d = await r.json(); } catch (e) {}
   return { ok: r.ok, status: r.status, d };
 }
@@ -74,7 +80,7 @@ export async function me(token) {
 }
 let migrated = false;
 export async function db(env) {
-  const d = env.FP_DB;
+  const d = DBB(env);
   await d.exec('CREATE TABLE IF NOT EXISTS users (uid TEXT PRIMARY KEY, username TEXT, ts INTEGER)');
   await d.exec('CREATE UNIQUE INDEX IF NOT EXISTS users_name ON users (username COLLATE NOCASE)');
   await d.exec('CREATE TABLE IF NOT EXISTS transfers (pid TEXT PRIMARY KEY, from_uid TEXT, from_user TEXT, to_uid TEXT, to_user TEXT, amount TEXT, narr TEXT, status TEXT, a2u_id TEXT, a2u_txid TEXT, to_addr TEXT, err TEXT, ts INTEGER, done_ts INTEGER)');
@@ -102,7 +108,7 @@ export async function checkTransferPayment(env, pay) {
 const STALE = 300000;            // a job left running this long is taken over (longer than a transaction's 180 s life on the blockchain)
 const WAIT_UNCERTAIN = 200000;   // after an attempt whose result is unknown, wait until its transaction can no longer land
 const REFUND_AFTER = { tries: 6, ms: 3600000 };   // delivery keeps failing: refund automatically
-export function configured(env) { return !!env.APP_WALLET_SEED && !!env.PI_API_KEY && !!env.FP_DB; }
+export function configured(env) { const s = setup(env); return s.pi_api_key && s.app_wallet_seed && s.database; }
 export async function payout(env, request, pid) {
   if (!/^[A-Za-z0-9_-]{6,80}$/.test(String(pid || ''))) return { ok: false, error: 'Bad payment id' };
   if (!configured(env)) return { ok: false, error: 'Transfers are not set up' };

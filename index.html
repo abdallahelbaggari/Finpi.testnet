@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>FinPi · Pi payments, clear and verified</title>
-<meta name="description" content="FinPi: live Pi rates in your currency, send and request Pi by @username, business payment links, budgets, and receipts anyone can verify on the Pi blockchain.">
+<meta name="description" content="FinPi: live Pi rates in your currency, send and receive Pi by @username, your wallet balance, budgets, and receipts anyone can verify on the Pi blockchain.">
 <meta name="theme-color" content="#0A1F55">
 <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' https://sdk.minepi.com https://*.minepi.com https://*.pinet.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com data:; img-src 'self' data: blob: https:; connect-src 'self' https:; frame-src https:; object-src 'none'; base-uri 'self'; form-action 'self'">
 <link rel="manifest" href="manifest.webmanifest">
@@ -12,7 +12,7 @@
 <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@500;600;700&family=Poppins:wght@400;500;600;700&display=swap">
-<link rel="stylesheet" href="finpi.css?v=2">
+<link rel="stylesheet" href="finpi.css?v=3">
 <script src="https://sdk.minepi.com/pi-sdk.js"></script>
 </head>
 <body>
@@ -21,13 +21,13 @@
   <section class="ld-hero">
     <div class="ld-top"><div class="brand"><img src="icons/icon-192.png" alt="">FinPi</div><span class="ld-net" id="ld-net">Pi Mainnet</span></div>
     <h1 class="ld-h">Your Pi, <em>clear</em> and <em>verified.</em></h1>
-    <p class="ld-p">Live Pi rates in your currency, send and request Pi by @username, and receipts anyone can check on the Pi blockchain.</p>
+    <p class="ld-p">Live Pi rates in your currency, send and receive Pi by @username, and receipts anyone can check on the Pi blockchain.</p>
     <div class="ld-rate" id="ld-rate"><span class="live off" id="ld-live"></span><span>1 π =</span><b id="ld-rate-v">…</b><span id="ld-rate-c"></span></div>
   </section>
   <section class="ld-card">
     <div class="ld-feat">
-      <div><i><svg class="ic" viewBox="0 0 24 24"><line x1="7" y1="17" x2="17" y2="7"/><polyline points="7 7 17 7 17 17"/></svg></i><span><b>Send &amp; request by @username</b><small>You approve every payment in Pi’s own window.</small></span></div>
-      <div><i class="t"><svg class="ic" viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg></i><span><b>Payment links &amp; QR for business</b><small>Get paid in Pi for what you sell.</small></span></div>
+      <div><i><svg class="ic" viewBox="0 0 24 24"><line x1="7" y1="17" x2="17" y2="7"/><polyline points="7 7 17 7 17 17"/></svg></i><span><b>Send &amp; receive by @username</b><small>You approve every payment in Pi’s own window.</small></span></div>
+      <div><i class="t"><svg class="ic" viewBox="0 0 24 24"><rect x="1" y="4" width="22" height="16" rx="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg></i><span><b>Your wallet at a glance</b><small>Balance and history in your own currency.</small></span></div>
       <div><i><svg class="ic" viewBox="0 0 24 24"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg></i><span><b>Receipts verified on the blockchain</b><small>Anyone can scan and check them.</small></span></div>
       <div><i class="t"><svg class="ic" viewBox="0 0 24 24"><path d="M21.21 15.89A10 10 0 1 1 8 2.83"/><path d="M22 12A10 10 0 0 0 12 2v10z"/></svg></i><span><b>Budgets &amp; insights</b><small>See where your Pi goes each month.</small></span></div>
     </div>
@@ -60,6 +60,6 @@
 <div id="toast" role="status" aria-live="polite"></div>
 <script src="qr.js?v=1"></script>
 <script src="finpi-receipt.js?v=2"></script>
-<script src="finpi.js?v=2"></script>
+<script src="finpi.js?v=3"></script>
 </body>
 </html>

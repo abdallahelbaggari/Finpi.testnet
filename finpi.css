@@ -221,3 +221,13 @@ a.li{color:inherit;font-weight:inherit}
 .skel{display:inline-block;min-width:120px;height:1em;border-radius:8px;background:rgba(255,255,255,.25)}
 @media (min-width:700px){.qa{gap:14px}.ld-hero{padding-left:40px;padding-right:40px}.ld-card{max-width:560px;margin-left:auto;margin-right:auto}}
 @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+
+/* fit every screen: grids never grow wider than the phone */
+.qa{grid-template-columns:repeat(4,minmax(0,1fr))}
+.tiles,.two{grid-template-columns:repeat(2,minmax(0,1fr))}
+.stats{grid-template-columns:repeat(3,minmax(0,1fr))}
+.conv{grid-template-columns:minmax(0,1fr)}
+.conv input,.amt input,.to input{width:100%;min-width:0}
+input,select,textarea{max-width:100%}
+.card,.list,.hero,.tile,.li .grow{min-width:0}
+#view{width:100%;overflow-x:hidden}

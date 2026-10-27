@@ -3,9 +3,9 @@
 //   POST {a:'payout', paymentId}            → pays the recipient for a completed transfer (idempotent; also run by /complete)
 //   POST {a:'list', accessToken}            → the signed-in user's sent and received transfers
 //   POST {a:'check', accessToken, to, amt}  → would this transfer be accepted? (limits, holds, first-time payee) before the Pi pop-up opens
-import { H, json, me, db, payout, pub, enabled, maxTransfer, FEE, isTest, limits, rateOk, checkTransferPayment, checkLimits, userByName, paidBefore, USER_RE } from './_lib/transfers.js';
+import { H, json, me, db, payout, pub, enabled, maxTransfer, FEE, isTest, limits, rateOk, checkTransferPayment, checkLimits, userByName, paidBefore, USER_RE, DBB, setup } from './_lib/transfers.js';
 export async function onRequestGet({ request, env }) {
-  return json({ ok: true, payments: !!env.PI_API_KEY, enabled: enabled(env), max: maxTransfer(env), daily: limits(env).day, fee: FEE, net: isTest(request) ? 'Pi Testnet' : 'Pi Mainnet' });
+  return json({ ok: true, payments: setup(env).pi_api_key, setup: setup(env), enabled: enabled(env), max: maxTransfer(env), daily: limits(env).day, fee: FEE, net: isTest(request) ? 'Pi Testnet' : 'Pi Mainnet' });
 }
 export async function onRequestPost({ request, env }) {
   const b = await request.json().catch(() => ({}));
@@ -27,7 +27,7 @@ export async function onRequestPost({ request, env }) {
   }
   if (b.a === 'list') {
     if (!(await rateOk(env, request, 'list', 240))) return json({ ok: false, error: 'Busy' });
-    if (!env.FP_DB) return json({ ok: false, setup: true });
+    if (!DBB(env)) return json({ ok: false, setup: true });
     const u = await me(b.accessToken); if (!u) return json({ ok: false, error: 'Sign in with Pi first' });
     const d = await db(env), net = { name: isTest(request) ? 'Pi Testnet' : 'Pi Mainnet' };
     const r = await d.prepare('SELECT * FROM transfers WHERE from_uid = ? OR to_uid = ? ORDER BY ts DESC LIMIT 60').bind(u.uid, u.uid).all();

@@ -1,4 +1,4 @@
-/* FinPi — app logic. Pi sign-in, live rates, send/request/business links/split bills (automatic, verified on the Pi blockchain),
+/* FinPi — app logic. Pi sign-in, live rates, send by @username, receive by @username or wallet address (automatic, verified on the Pi blockchain),
    receipts, budgets and insights. Icons: Feather (MIT). Everything personal stays on this phone except what transfers need. */
 (function () {
   'use strict';
@@ -177,12 +177,11 @@
   }
   function heroHTML() {
     var p = S.p, c = curr(), r = rateIn(c), ch = p && typeof p.change24h === 'number' ? p.change24h : null;
-    if (!p || !p.usd) return '<div class="hero-k"><span><span class="live off"></span>Pi price</span></div><div class="hero-v" style="font-family:var(--f);font-size:22px">' + (pBusy ? '<span class="skel"></span>' : 'Rate unavailable right now') + '</div><div class="hero-s">' + (pBusy ? 'Loading live rate…' : '<button type="button" class="cur-b" data-act="price-retry">' + ic('refresh', 'width:14px;height:14px') + 'Try again</button>') + '</div>';
-    return '<div class="hero-k"><span><span class="live' + (p.stale ? ' off' : '') + '"></span>' + (p.stale ? 'Last known Pi price' : 'Pi price · live') + '</span>' + (ch !== null ? '<span class="pill ' + (ch >= 0 ? 'up' : 'dn') + '">' + (ch >= 0 ? '▲ ' : '▼ ') + Math.abs(ch).toFixed(2) + '%</span>' : '') + '</div>' +
+    if (!p || !p.usd) return '<div class="hero-k"><span><span class="live off"></span>Pi price</span></div><div class="hero-v" style="font-family:var(--f);font-size:22px">' + (pBusy ? '<span class="skel"></span>' : 'Rate unavailable right now') + '</div><div class="hero-s">' + (pBusy ? '' : '<button type="button" class="cur-b" data-act="price-retry">' + ic('refresh', 'width:14px;height:14px') + 'Try again</button>') + '</div>';
+    return '<div class="hero-k"><span><span class="live"></span>Pi price</span>' + (ch !== null ? '<span class="pill ' + (ch >= 0 ? 'up' : 'dn') + '">' + (ch >= 0 ? '▲ ' : '▼ ') + Math.abs(ch).toFixed(2) + '%</span>' : '') + '</div>' +
       '<div class="hero-v">1 π = ' + money(p.usd, 'USD', p.usd < 1 ? 4 : 2) + '</div>' +
       '<div class="hero-s">' + (c !== 'USD' && r ? '<span>≈ <span class="num">' + money(r, c, r < 1 ? 4 : 2) + '</span></span>' : '') + '<button type="button" class="cur-b" data-act="currency">' + ic('globe', 'width:14px;height:14px') + esc(c) + '</button></div>' +
-      spark(p.spark, 300, 58, '#5EEAD4', .35) +
-      '<div class="hero-f"><span>7 days</span><span>' + esc(p.source || 'Market data') + ' · ' + (p.updated ? ago(Date.parse(p.updated)) : '') + '</span></div>';
+      spark(p.spark, 300, 58, '#5EEAD4', .35);
   }
   function paintPrice() {
     var h = $('[data-p="hero"]'); if (h) h.innerHTML = heroHTML();
@@ -223,7 +222,7 @@
     $('#av').textContent = signedIn() ? me().charAt(0) : 'G';
     $('#netb').hidden = !TEST; bellDot(); render(S.tab);
   }
-  function afterSignIn() { register(); loadCfg().then(function () { sync(); openPending(); }); }
+  function afterSignIn() { register(); loadCfg().then(function () { sync(); }); }
 
   /* ── transfers: server status, registration, sync ── */
   function loadCfg() {
@@ -264,40 +263,19 @@
   }
   function rerender() { if (!$('.sh-wrap') && !$('#app').hidden) render(S.tab); }
 
-  /* ── payment links (#pay=…) ── */
-  function enc(o) { return btoa(unescape(encodeURIComponent(JSON.stringify(o)))).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, ''); }
-  function dec(t) { try { t = t.replace(/-/g, '+').replace(/_/g, '/'); while (t.length % 4) t += '='; return JSON.parse(decodeURIComponent(escape(atob(t)))); } catch (e) { return null; } }
-  function payLink(o) { return location.origin + '/#pay=' + enc(o); }
-  var pending = null;
-  function parseHash() {
-    var m = /#(?:pay|send)=([A-Za-z0-9_-]{4,1200})/.exec(location.hash || ''); if (!m) return false;
-    var o = dec(m[1]); try { history.replaceState(null, '', location.pathname); } catch (e) {}
-    if (!o || !USER_RE.test(String(o.u || ''))) return false;
-    var a = Number(o.a); pending = { u: String(o.u), a: a > 0 && a <= 1e6 ? r7(a) : 0, x: String(o.x || '').slice(0, 80), b: String(o.b || '').slice(0, 40), link: true };
-    return true;
-  }
-  parseHash();
-  addEventListener('hashchange', function () { if (parseHash()) { if (signedIn()) openPending(); else { $('#app').hidden = true; $('#landing').hidden = false; reqMsg(); } } });
-  function reqMsg() { if (!pending) return; var m = $('#ld-msg'); m.style.color = 'var(--blue)'; m.textContent = (pending.b || '@' + pending.u) + ' sent you a payment request. Sign in with Pi to pay.'; }
-  function openPending() {
-    if (!pending || !signedIn()) return;
-    if (!S.cfg.enabled) { toast('Sending Pi is not available right now'); pending = null; return; }
-    var p = pending; pending = null; go('pay'); setTimeout(function () { sendSheet(p); }, 300);
-  }
-
   /* ── send flow ── */
   function guardPay() {
     if (needSignIn('Sign in with Pi to send and receive Pi.')) return false;
-    if (!S.cfg.enabled) { toast('Sending Pi is not available right now'); return false; }
+    if (!S.cfg.enabled) { loadCfg(); toast('Sending is being switched on. Please try again shortly.'); return false; }
     if (!window.Pi || !initPi()) { toast('Open FinPi in the Pi Browser to pay'); return false; }
     return true;
   }
   function sendSheet(pre) {
     pre = pre || {}; if (!guardPay()) return;
     var payees = get('payees', []).slice(0, 6);
-    var w = sheet(pre.b ? 'Pay ' + pre.b : 'Send Pi',
-      (pre.b || pre.link ? '<div class="note gray">' + ic('link') + '<span>' + (pre.b ? '<b>' + esc(pre.b) + '</b> (@' + esc(pre.u) + ') asks you to pay' : '@' + esc(pre.u) + ' asks you to pay') + (pre.x ? ' for “' + esc(pre.x) + '”' : '') + '. Check it is someone you know.</span></div>' : '<p class="sh-sub">Send Pi to any FinPi user by their Pi username.</p>') +
-      '<label class="l" for="s-u">To</label><div class="to"><span>@</span><input id="s-u" autocomplete="off" autocapitalize="none" spellcheck="false" placeholder="username" maxlength="40"></div><div class="hint" id="s-uh"></div>' +
+    var w = sheet('Send Pi',
+      '<p class="sh-sub">Send Pi to any FinPi user by their Pi username.</p>' +
+      '<label class="l" for="s-u">To</label><div class="to"><span>@</span><input id="s-u" autocomplete="off" autocapitalize="none" spellcheck="false" placeholder="username" maxlength="60"></div><div class="hint" id="s-uh"></div>' +
       (payees.length && !pre.u ? '<div class="chips" style="margin-top:2px">' + payees.map(function (p) { return '<button type="button" class="chip" data-pu="' + esc(p) + '">@' + esc(p) + '</button>'; }).join('') + '</div>' : '') +
       '<label class="l" for="s-a">Amount</label><div class="amt"><input id="s-a" type="number" inputmode="decimal" min="0" step="any" placeholder="0.00"><span>π</span></div><div class="hint num" id="s-c"></div>' +
       '<label class="l">Category</label><div class="chips" id="s-cat">' + CATS.map(function (c) { return '<button type="button" class="chip" data-c="' + c + '">' + c + '</button>'; }).join('') + '</div>' +
@@ -317,6 +295,7 @@
     a.oninput = sum;
     u.oninput = function () {
       var name = u.value.trim().replace(/^@/, ''); ok = null; clearTimeout(tm); var h = $('#s-uh', w);
+      if (/^G[A-Z2-7]{40,}$/.test(name) || /^G[A-Z2-7]{55}$/.test(name.toUpperCase())) { h.innerHTML = '<span class="bad">That is a wallet address. FinPi sends to a FinPi @username; to pay a wallet address, use Pi Wallet.</span>'; return; }
       if (!USER_RE.test(name)) { h.textContent = ''; return; }
       h.textContent = 'Checking…';
       tm = setTimeout(function () {
@@ -332,7 +311,7 @@
     if (pre.u) { u.value = pre.u; u.oninput(); }
     if (pre.a > 0) { a.value = pre.a; }
     if (pre.x) $('#s-x', w).value = pre.x;
-    if (cat) setCat(cat); else if (pre.b) setCat('Business');
+    if (cat) setCat(cat);
     sum();
     $('#s-go', w).onclick = function () {
       var v = r7(a.value), x = $('#s-x', w).value.trim(), btn = this;
@@ -344,7 +323,7 @@
       api('/transfer', { a: 'check', accessToken: S.token, to: ok, amt: v }).then(function (d) {
         btn.disabled = false; btn.textContent = 'Continue';
         if (!d || !d.ok) return toast((d && d.error) || 'This transfer cannot be sent right now');
-        review(d.to || ok, v, x, cat, { first: d.first, link: !!pre.link, biz: pre.b });
+        review(d.to || ok, v, x, cat, { first: d.first });
       }).catch(function () { btn.disabled = false; btn.textContent = 'Continue'; toast('No connection. Check your internet and try again.'); });
     };
     if (!pre.u) setTimeout(function () { u.focus(); }, 120);
@@ -352,16 +331,15 @@
   function review(to, amt, narr, cat, o) {
     var warn = [];
     if (o.first) warn.push('<div class="note warn">' + ic('warn') + '<span>First time paying <b>@' + esc(to) + '</b>. Only send to people and businesses you know and trust. FinPi staff will never ask you to send Pi.</span></div>');
-    if (o.link) warn.push('<div class="note warn">' + ic('link') + '<span>This came from a payment link. Check the name and amount are what you agreed.</span></div>');
     warn.push('<div class="note gray">' + ic('info') + '<span>Delivered automatically in seconds. If it cannot be delivered, you are refunded automatically. Delivered transfers cannot be reversed.</span></div>');
     var w = sheet('Check before you send',
       '<div class="big"><div class="v">' + fpi(amt) + ' π</div><div class="c">' + esc(conv(amt)) + '</div><div class="w">To @' + esc(to) + '</div></div>' +
-      '<div class="sum"><div><span>To</span><b class="t">@' + esc(to) + '</b></div>' + (o.biz ? '<div><span>Business</span><b class="t">' + esc(o.biz) + '</b></div>' : '') + '<div><span>For</span><b class="t">' + esc(narr) + '</b></div>' + (cat ? '<div><span>Category</span><b class="t">' + esc(cat) + '</b></div>' : '') +
+      '<div class="sum"><div><span>To</span><b class="t">@' + esc(to) + '</b></div>' + '<div><span>For</span><b class="t">' + esc(narr) + '</b></div>' + (cat ? '<div><span>Category</span><b class="t">' + esc(cat) + '</b></div>' : '') +
       '<div><span>They receive</span><b>' + fpi(amt) + ' π</b></div><div><span>Blockchain fee</span><b>' + S.cfg.fee + ' π</b></div><div class="tot"><span>You pay</span><b>' + fpi(r7(amt + S.cfg.fee)) + ' π</b></div></div>' +
       '<div style="margin-top:12px">' + warn.join('') + '</div>' +
       '<button type="button" class="btn" id="rv-ok">' + ic('lock') + 'Confirm and pay</button><button type="button" class="btn ghost" id="rv-ed">Edit</button>');
     $('#rv-ok', w).onclick = function () { pay(to, amt, narr, cat); };
-    $('#rv-ed', w).onclick = function () { sendSheet({ u: to, a: amt, x: narr, cat: cat, b: o.biz, link: o.link }); };
+    $('#rv-ed', w).onclick = function () { sendSheet({ u: to, a: amt, x: narr, cat: cat }); };
   }
   function pay(to, amt, narr, cat) {
     if (S.cfg.payments === false) { closeSheets(); return toast('Pi payments open soon. Nothing was charged.'); }
@@ -411,64 +389,22 @@
     } catch (e) { step(1, '✕ ' + esc(e.message || e), 'err'); }
   }
 
-  /* ── request, business link, split bill ── */
-  function linkSheet(title, intro, link, text, extra) {
-    var w = sheet(title, '<p class="sh-sub">' + intro + '</p><div class="qr">' + (window.FPQR ? FPQR.svg(link, 220, '#0A1F55') : '') + '</div><div class="linkbox">' + esc(link) + '</div>' +
-      '<button type="button" class="btn" data-x="sh">' + ic('share') + 'Share link</button><button type="button" class="btn ghost" data-x="cp">' + ic('copy') + 'Copy link</button>' + (extra || ''));
-    $('[data-x="sh"]', w).onclick = function () { shareText('FinPi', text + '\n' + link); };
-    $('[data-x="cp"]', w).onclick = function () { copy(link); };
-    return w;
+  /* ── receive: your @username and your wallet address ── */
+  function receiveSheet() {
+    if (needSignIn('Sign in with Pi to receive Pi.')) return;
+    var a = get('addr', ''), sug = get('addrSug', '');
+    var w = sheet('Receive Pi', '<p class="sh-sub">Share your @username or your wallet address. Nothing is paid until the sender approves in Pi’s window.</p>' +
+      '<div class="card" style="margin-top:8px"><p class="small">Your FinPi username</p><div class="row"><div class="grow" style="font-size:24px;font-weight:700;overflow-wrap:anywhere">@' + esc(me()) + '</div><button type="button" class="tbtn" data-x="cu" aria-label="Copy username">' + ic('copy') + '</button></div><p class="small muted" style="margin-top:4px">FinPi users send to this in seconds.</p></div>' +
+      '<div class="card"><p class="small">Your Pi wallet address</p>' + (a ? '<div class="row"><div class="grow num" style="font-size:13.5px;overflow-wrap:anywhere">' + esc(a) + '</div><button type="button" class="tbtn" data-x="ca" aria-label="Copy address">' + ic('copy') + '</button></div><p class="small muted" style="margin-top:4px">Anyone can send to it from Pi Wallet.</p>'
+        : (sug ? '<button type="button" class="btn soft" data-x="ua">' + ic('check') + 'Use my address ' + esc(short(sug)) + '</button>' : '') + '<button type="button" class="btn ghost" data-x="aa">' + ic('card') + 'Add wallet address</button>') + '</div>' +
+      '<button type="button" class="btn" data-x="sh">' + ic('share') + 'Share my details</button>');
+    var t = function () { return 'Send me Pi on FinPi: @' + me() + (get('addr', '') ? '\nPi wallet address: ' + get('addr', '') : ''); };
+    var cu = $('[data-x="cu"]', w); if (cu) cu.onclick = function () { copy('@' + me()); };
+    var ca = $('[data-x="ca"]', w); if (ca) ca.onclick = function () { copy(a); };
+    var ua = $('[data-x="ua"]', w); if (ua) ua.onclick = function () { if (validG(sug)) { put('addr', sug); put('addrSug', ''); receiveSheet(); loadWal(); } };
+    var aa = $('[data-x="aa"]', w); if (aa) aa.onclick = function () { addrSheet(true); };
+    $('[data-x="sh"]', w).onclick = function () { shareText('FinPi', t()); };
   }
-  function requestSheet() {
-    if (!guardPay()) return;
-    var w = sheet('Request Pi', '<p class="sh-sub">Create a link and QR code. The other person opens it in FinPi, checks the details and approves in Pi’s window.</p>' +
-      '<label class="l" for="q-a">Amount</label><div class="amt"><input id="q-a" type="number" inputmode="decimal" placeholder="0.00"><span>π</span></div><div class="hint num" id="q-c"></div>' +
-      '<label class="l" for="q-x">What is it for?</label><input class="in" id="q-x" maxlength="80" placeholder="e.g. Shared taxi, dinner, rent">' +
-      '<button type="button" class="btn" id="q-go">' + ic('qr') + 'Create request</button>');
-    var a = $('#q-a', w); a.oninput = function () { $('#q-c', w).textContent = conv(r7(a.value)); }; setTimeout(function () { a.focus(); }, 120);
-    $('#q-go', w).onclick = function () {
-      var v = r7(a.value), x = $('#q-x', w).value.trim();
-      if (!(v >= 0.01)) return toast('Enter the amount in π'); if (v > S.cfg.max) return toast('The most per transfer is ' + S.cfg.max + ' π'); if (!x) return toast('Say what the payment is for');
-      linkSheet('Your request', 'Ask them to scan this code or open the link in the Pi Browser.', payLink({ u: me(), a: v, x: x }), '@' + me() + ' requests ' + fpi(v) + ' π for “' + x + '” on FinPi. Open to pay securely:');
-    };
-  }
-  function bizSheet() {
-    if (!guardPay()) return;
-    var w = sheet('Business payment link', '<p class="sh-sub">Get paid in Pi for what you sell. Share the link or print the QR code at your counter.</p>' +
-      '<label class="l" for="b-n">Business name</label><input class="in" id="b-n" maxlength="40" placeholder="e.g. Amina’s Kitchen" value="' + esc(get('biz', '')) + '">' +
-      '<label class="l" for="b-x">Item or service</label><input class="in" id="b-x" maxlength="80" placeholder="e.g. Jollof rice, phone repair">' +
-      '<label class="l" for="b-a">Price (leave empty to let the customer enter it)</label><div class="amt"><input id="b-a" type="number" inputmode="decimal" placeholder="Any amount"><span>π</span></div><div class="hint num" id="b-c"></div>' +
-      '<button type="button" class="btn teal" id="b-go">' + ic('qr') + 'Create payment link</button>');
-    var a = $('#b-a', w); a.oninput = function () { $('#b-c', w).textContent = conv(r7(a.value)); };
-    $('#b-go', w).onclick = function () {
-      var n = $('#b-n', w).value.trim(), x = $('#b-x', w).value.trim(), v = r7(a.value) || 0;
-      if (!n) return toast('Add your business name'); if (!x) return toast('Say what the customer pays for');
-      if (v && v < 0.01) return toast('The smallest price is 0.01 π'); if (v > S.cfg.max) return toast('The most per payment is ' + S.cfg.max + ' π');
-      put('biz', n);
-      var o = { u: me(), x: x, b: n }; if (v) o.a = v;
-      var link = payLink(o), L = get('links', []); L.unshift({ n: n, x: x, a: v, link: link, ts: Date.now() }); put('links', L.slice(0, 30));
-      linkSheet(n, 'Customers scan this code in FinPi, check the details and pay you in Pi’s window. You get a verified receipt for each payment.', link, n + ' · ' + x + (v ? ' · ' + fpi(v) + ' π' : '') + ' — pay with Pi on FinPi:');
-      render(S.tab);
-    };
-  }
-  function splitSheet() {
-    if (!guardPay()) return;
-    var w = sheet('Split a bill', '<p class="sh-sub">Share one link with everyone. Each person pays their share to you.</p>' +
-      '<label class="l" for="p-t">Total bill</label><div class="amt"><input id="p-t" type="number" inputmode="decimal" placeholder="0.00"><span>π</span></div>' +
-      '<label class="l" for="p-n">Number of people, including you</label><div class="amt"><input id="p-n" type="number" inputmode="numeric" min="2" max="20" value="2"><span>people</span></div>' +
-      '<label class="l" for="p-x">What is it for?</label><input class="in" id="p-x" maxlength="60" placeholder="e.g. Dinner on Friday">' +
-      '<div class="sum" id="p-s" hidden></div><button type="button" class="btn" id="p-go">' + ic('users') + 'Create split link</button>');
-    var t = $('#p-t', w), n = $('#p-n', w);
-    function share() { var T = r7(t.value), N = Math.round(+n.value); return T > 0 && N >= 2 && N <= 20 ? r7(Math.ceil(T / N * 100) / 100) : 0; }
-    function up() { var s = share(), e = $('#p-s', w); e.hidden = !s; e.innerHTML = '<div><span>Each person pays</span><b>' + fpi(s) + ' π</b></div><div><span>You collect from ' + (Math.round(+n.value) - 1) + '</span><b>' + fpi(r7(s * (Math.round(+n.value) - 1))) + ' π</b></div>'; }
-    t.oninput = n.oninput = up; setTimeout(function () { t.focus(); }, 120);
-    $('#p-go', w).onclick = function () {
-      var s = share(), x = $('#p-x', w).value.trim();
-      if (!s) return toast('Enter the total and 2 to 20 people'); if (s > S.cfg.max) return toast('Each share must be ' + S.cfg.max + ' π or less'); if (!x) return toast('Say what the bill is for');
-      linkSheet('Split: ' + x, 'Everyone opens the same link and pays ' + fpi(s) + ' π to you. You get a receipt for each payment.', payLink({ u: me(), a: s, x: 'Split · ' + x }), 'Your share of “' + x + '” is ' + fpi(s) + ' π. Pay @' + me() + ' on FinPi:');
-    };
-  }
-
   /* ── wallet address (read-only, from the public Pi blockchain) ── */
   function validG(a) {
     if (!/^G[A-Z2-7]{55}$/.test(a)) return false;
@@ -494,7 +430,7 @@
     if (!a) {
       var sug = get('addrSug', '');
       return '<div class="row"><div class="grow"><h3>Your Pi balance</h3><p>Add your Pi wallet address to see your balance and history in ' + esc(curr()) + '. Read-only: FinPi can never move your Pi.</p></div></div>' +
-        (sug ? '<button type="button" class="btn soft" data-act="addr-use">' + ic('check') + 'Use ' + esc(short(sug)) + ' (from your FinPi payments)</button>' : '') +
+        (sug ? '<button type="button" class="btn soft" data-act="addr-use">' + ic('check') + 'Use my address ' + esc(short(sug)) + '</button>' : '') +
         '<button type="button" class="btn ghost" data-act="addr-set">' + ic('card') + 'Add wallet address</button>';
     }
     if (!W || W.addr !== a) return '<h3>Your Pi balance</h3><p class="num">' + esc(short(a)) + '</p><p style="margin-top:8px">Loading from the Pi blockchain…</p>';
@@ -543,12 +479,11 @@
 
   /* ── price & currency sheets ── */
   function wChartHTML() {
-    var p = S.p; if (!p || !p.usd) return '<div class="empty">' + ic('act') + '<div>' + (pBusy ? 'Loading live rate…' : 'Rate unavailable right now.') + '</div></div>';
+    var p = S.p; if (!p || !p.usd) return '<div class="empty">' + ic('act') + '<div>' + (pBusy ? '' : 'Rate unavailable right now.') + '</div></div>';
     var s = p.spark || [], mn = s.length ? Math.min.apply(null, s) : p.usd, mx = s.length ? Math.max.apply(null, s) : p.usd, c = curr(), r = rateIn(c), ch = p.change24h;
     return '<div class="row" style="align-items:flex-end"><div class="grow"><p class="small">1 π in US dollars</p><div class="num" style="font-size:30px;font-weight:700">' + money(p.usd, 'USD', 4) + '</div></div>' + (typeof ch === 'number' ? '<span class="chip" style="color:' + (ch >= 0 ? 'var(--ok)' : 'var(--bad)') + ';font-weight:700">' + (ch >= 0 ? '▲ ' : '▼ ') + Math.abs(ch).toFixed(2) + '%</span>' : '') + '</div>' +
       '<div class="chart" style="margin-top:8px">' + spark(s, 300, 150, '#1D4ED8', .22) + '</div>' +
-      '<div class="stats"><div><small>7-day low</small><b>' + money(mn, 'USD', 4) + '</b></div><div><small>7-day high</small><b>' + money(mx, 'USD', 4) + '</b></div><div><small>In ' + esc(c) + '</small><b>' + (r ? money(r, c, r < 1 ? 4 : 2) : '—') + '</b></div></div>' +
-      '<p class="small muted" style="margin-top:10px">' + (p.stale ? 'Last known price' : 'Live') + ' · ' + esc(p.source || 'market data') + (p.updated ? ' · updated ' + ago(Date.parse(p.updated)) : '') + '. Public market data, for information only.</p>';
+      '<div class="stats"><div><small>7-day low</small><b>' + money(mn, 'USD', 4) + '</b></div><div><small>7-day high</small><b>' + money(mx, 'USD', 4) + '</b></div><div><small>In ' + esc(c) + '</small><b>' + (r ? money(r, c, r < 1 ? 4 : 2) : '—') + '</b></div></div>' ;
   }
   function curSheet() {
     var codes = S.fx ? Object.keys(S.fx).filter(function (c) { return /^[A-Z]{3}$/.test(c); }) : ['USD', 'NGN', 'SAR'];
@@ -600,11 +535,10 @@
   var TIPS = ['FinPi staff will never ask you to send Pi or share your passphrase.', 'Check the @username and amount on the final screen before you approve.', 'A receipt is genuine only if its QR code checks out on the Pi blockchain.', 'Your passphrase and secret key (starting with S) are for you alone. Never type them into any app.'];
   var T = {
     home: function () {
-      var R = rcpts(), on = S.cfg.enabled;
+      var R = rcpts();
       return '<div class="hello"><h1>' + hour() + (signedIn() ? ', @' + esc(me()) : '') + '</h1><p>' + (signedIn() ? 'Here is your Pi today.' : 'You are exploring. Sign in to send and receive Pi.') + '</p></div>' +
         '<div class="hero" data-act="price" data-p="hero" role="button" tabindex="0" aria-label="Pi price details">' + heroHTML() + '</div>' +
-        '<div class="qa">' + (on ? '<button type="button" data-act="send"><i>' + ic('send') + '</i>Send</button><button type="button" data-act="request"><i class="t">' + ic('req') + '</i>Request</button><button type="button" data-act="biz"><i class="n">' + ic('qr') + '</i>Get paid</button><button type="button" data-act="split"><i class="a">' + ic('users') + '</i>Split</button>'
-          : '<button type="button" data-tab="wallet"><i>' + ic('conv') + '</i>Convert</button><button type="button" data-act="check-addr"><i class="t">' + ic('search') + '</i>Address</button><button type="button" data-act="verify"><i class="n">' + ic('check') + '</i>Verify</button><button type="button" data-tab="activity"><i class="a">' + ic('rcpt') + '</i>Receipts</button>') + '</div>' +
+        '<div class="qa"><button type="button" data-act="send"><i>' + ic('send') + '</i>Send</button><button type="button" data-act="receive"><i class="t">' + ic('req') + '</i>Receive</button><button type="button" data-tab="wallet"><i class="n">' + ic('conv') + '</i>Convert</button><button type="button" data-tab="activity"><i class="a">' + ic('rcpt') + '</i>Receipts</button></div>' +
         (signedIn() ? '<div class="sec"><h2>Wallet</h2><button type="button" data-tab="wallet">Open</button></div><div class="card" data-p="wbal">' + walBalHTML() + '</div>' : '') +
         '<div class="sec"><h2>Overview</h2></div><div class="card" data-p="month">' + monthHTML() + '</div>' +
         '<div class="sec"><h2>Recent activity</h2>' + (R.length ? '<button type="button" data-tab="activity">See all</button>' : '') + '</div>' +
@@ -612,17 +546,15 @@
         '<div class="note" style="margin-top:16px">' + ic('shield') + '<span>' + TIPS[new Date().getDate() % TIPS.length] + '</span></div>';
     },
     pay: function () {
-      var on = S.cfg.enabled, L = get('links', []), pl = get('payees', []);
-      return '<div class="ph"><h1>Pay &amp; get paid</h1><p>Every payment is approved by you in Pi’s window and recorded on the Pi blockchain.</p></div>' +
-        (!on ? '<div class="note warn">' + ic('info') + '<span>' + (signedIn() ? 'Sending and requesting Pi are not available right now. Rates, receipts and wallet tools still work.' : 'Sign in with Pi to send and request Pi.') + '</span></div>' + (signedIn() ? '' : '<button type="button" class="btn" data-act="signin" style="margin-top:12px"><span class="pi-dot">π</span>Sign in with Pi</button>') : '') +
+      var on = S.cfg.enabled, pl = get('payees', []);
+      return '<div class="ph"><h1>Send &amp; receive</h1><p>Pay by @username. Every payment is approved by you in Pi’s window and recorded on the Pi blockchain.</p></div>' +
+        (!signedIn() ? '<div class="note">' + ic('info') + '<span>Sign in with Pi to send and receive Pi.</span></div><button type="button" class="btn" data-act="signin" style="margin-top:12px"><span class="pi-dot">π</span>Sign in with Pi</button>'
+          : !on ? '<div class="note warn">' + ic('info') + '<span>Sending is being switched on. You can still receive Pi to your wallet address, and use rates, receipts and wallet tools.</span></div>' : '') +
         '<div class="tiles" style="margin-top:14px">' +
         '<button type="button" class="tile" data-act="send"><i>' + ic('send') + '</i><b>Send Pi</b><small>To any FinPi user by @username</small></button>' +
-        '<button type="button" class="tile" data-act="request"><i class="t">' + ic('req') + '</i><b>Request Pi</b><small>Share a link or QR code</small></button>' +
-        '<button type="button" class="tile" data-act="biz"><i class="n">' + ic('biz') + '</i><b>Business link</b><small>Get paid for what you sell</small></button>' +
-        '<button type="button" class="tile" data-act="split"><i class="a">' + ic('users') + '</i><b>Split a bill</b><small>Everyone pays their share</small></button></div>' +
+        '<button type="button" class="tile" data-act="receive"><i class="t">' + ic('req') + '</i><b>Receive Pi</b><small>Your @username and wallet address</small></button></div>' +
         (pl.length && on ? '<div class="sec"><h2>Recent people</h2></div><div class="chips">' + pl.slice(0, 8).map(function (p) { return '<button type="button" class="chip" data-act="send-to" data-u="' + esc(p) + '">@' + esc(p) + '</button>'; }).join('') + '</div>' : '') +
-        (L.length ? '<div class="sec"><h2>My payment links</h2></div><div class="list">' + L.slice(0, 10).map(function (l, i) { return '<div class="li"><span class="ico">' + ic('qr') + '</span><span class="grow"><b>' + esc(l.n) + ' · ' + esc(l.x) + '</b><small>' + (l.a ? fpi(l.a) + ' π' : 'Customer enters amount') + ' · ' + ago(l.ts) + '</small></span><button type="button" class="tbtn" data-act="link-open" data-i="' + i + '" aria-label="Show QR">' + ic('qr') + '</button><button type="button" class="tbtn" data-act="link-del" data-i="' + i + '" aria-label="Delete">' + ic('trash') + '</button></div>'; }).join('') + '</div>' : '') +
-        '<div class="sec"><h2>How it works</h2></div><div class="card"><div class="note gray">' + ic('lock') + '<span>You pay the amount plus a ' + S.cfg.fee + ' π blockchain fee in Pi’s window. FinPi’s software then delivers it to the recipient within seconds through Pi Network’s official payments, or refunds you automatically if it cannot. No person reviews or holds your payment.</span></div><p class="small" style="margin-top:10px">Limits for everyone’s safety: up to ' + S.cfg.max + ' π per transfer and ' + S.cfg.daily + ' π per day.</p></div>';
+        '<div class="sec"><h2>How it works</h2></div><div class="card"><div class="note gray">' + ic('lock') + '<span>You pay the amount plus a ' + S.cfg.fee + ' π blockchain fee in Pi’s window. FinPi delivers it to the recipient within seconds through Pi Network’s official payments, or refunds you automatically if it cannot. No person reviews or holds your payment.</span></div><p class="small" style="margin-top:10px">Limits for everyone’s safety: up to ' + S.cfg.max + ' π per transfer and ' + S.cfg.daily + ' π per day.</p></div>';
     },
     wallet: function () {
       var c = curr();
@@ -687,7 +619,7 @@
 
   /* ── actions ── */
   var A = {
-    send: function () { sendSheet(); }, request: requestSheet, biz: bizSheet, split: splitSheet,
+    send: function () { sendSheet(); }, receive: function () { receiveSheet(); },
     'send-to': function (el) { sendSheet({ u: el.dataset.u }); },
     signin: function () { signIn(); },
     price: function () { go('wallet'); }, 'price-retry': function (el, e) { e.stopPropagation(); loadPrice(true); paintPrice(); },
@@ -700,8 +632,6 @@
       sheet('Notifications', N.length ? '<div class="list">' + N.map(function (n) { return '<div class="li"><span class="ico">' + ic(n.ic || 'bell') + '</span><span class="grow"><b>' + esc(n.t) + '</b><small style="white-space:normal">' + esc(n.b) + '</small><small>' + ago(n.ts) + '</small></span></div>'; }).join('') + '</div><button type="button" class="btn ghost" data-act="notes-clear">Clear all</button>' : '<div class="empty">' + ic('bell') + '<div>No notifications yet.</div></div>');
     },
     'notes-clear': function () { put('notes', []); closeSheets(); bellDot(); },
-    'link-open': function (el) { var l = get('links', [])[+el.dataset.i]; if (l) linkSheet(l.n, 'Customers scan this code in FinPi and pay you in Pi’s window.', l.link, l.n + ' · ' + l.x + (l.a ? ' · ' + fpi(l.a) + ' π' : '') + ' — pay with Pi on FinPi:'); },
-    'link-del': function (el) { var L = get('links', []); L.splice(+el.dataset.i, 1); put('links', L); render(S.tab); toast('Link deleted'); },
     csv: function () {
       var rows = [['date', 'type', 'direction', 'amount_pi', 'counterparty', 'narration', 'category', 'network', 'transaction_id']].concat(rcpts().map(function (r) { return [new Date(r.ts).toISOString(), r.kind, r.dir, r.amount, r.other || '', r.narr || '', r.cat || '', r.net || '', r.txid || '']; }));
       var csv = rows.map(function (r) { return r.map(function (x) { x = String(x == null ? '' : x); if (/^[=+\-@]/.test(x)) x = "'" + x; return /[",\n]/.test(x) ? '"' + x.replace(/"/g, '""') + '"' : x; }).join(','); }).join('\n');
@@ -779,8 +709,7 @@
   function start() {
     if (TEST) { $('#ld-net').textContent = 'Pi Testnet'; }
     $('#signin').onclick = function () { signIn(); };
-    $('#explore').onclick = function () { S.guest = true; showApp(); if (pending) needSignIn('Sign in with Pi to pay ' + (pending.b || '@' + pending.u) + '.'); };
-    reqMsg();
+    $('#explore').onclick = function () { S.guest = true; showApp(); };
     loadPrice(true); paintPrice(); initPi(); loadCfg();
     var u = get('user', null);
     if (u && u.username && window.Pi) { $('#signin-t').textContent = 'Signing in as @' + u.username + '…'; signIn(true).then(function (ok) { if (!ok) $('#signin-t').textContent = 'Sign in with Pi'; }); }
