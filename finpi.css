@@ -256,3 +256,25 @@ input,select,textarea{max-width:100%}
 .scan-f{position:absolute;inset:14%;border-radius:22px;box-shadow:0 0 0 999px rgba(11,27,51,.45);border:3px solid #5EEAD4}
 .scan-m{position:absolute;left:12px;right:12px;bottom:12px;text-align:center;color:#fff;font-size:13.5px;font-weight:600;text-shadow:0 1px 3px rgba(0,0,0,.6)}
 label.btn{margin-top:12px}
+/* contacts, links, splits, reminders */
+.lb{background:none;border:0;padding:0;margin:0;text-align:left;font:inherit;color:inherit;cursor:pointer;min-width:0}
+.lb small+small{margin-top:1px}
+.tick{flex:none;width:38px;height:38px;border-radius:50%;border:2px solid var(--line2);background:#fff;color:transparent;display:flex;align-items:center;justify-content:center}
+.tick .ic{width:20px;height:20px}.tick.on{background:var(--ok);border-color:var(--ok);color:#fff}
+.chk{display:flex;align-items:center;gap:10px;margin-top:14px;font-size:14.5px;font-weight:500}
+.chk input{width:20px;height:20px;accent-color:var(--blue)}
+.li .chip{flex:none;min-height:34px;padding:6px 14px}
+input[type=date].in{min-height:50px}
+/* welcome screens */
+#onb{position:fixed;inset:0;z-index:200;background:linear-gradient(180deg,#F5F8FF 0%,#fff 60%);display:flex;flex-direction:column;padding:calc(env(safe-area-inset-top) + 16px) 22px calc(env(safe-area-inset-bottom) + 22px);animation:fade .2s ease;overflow-y:auto}
+.onb-top{display:flex;align-items:center;justify-content:space-between;min-height:44px}
+.onb-skip{font-weight:600;color:var(--mute);font-size:15px;padding:8px 4px}
+.onb-img{flex:1;display:flex;align-items:center;justify-content:center;min-height:220px}
+.onb-img svg{width:min(100%,360px);height:auto}
+.onb-txt{text-align:center;max-width:420px;margin:0 auto}
+.onb-txt h2{font-size:26px;font-weight:700;letter-spacing:-.02em;line-height:1.2;color:var(--ink)}
+.onb-txt p{margin-top:10px;color:var(--mute);font-size:15px;line-height:1.55}
+.onb-dots{display:flex;justify-content:center;gap:8px;margin:24px 0 18px}
+.onb-dots i{width:8px;height:8px;border-radius:99px;background:#CBD5E1;transition:width .2s}
+.onb-dots i.on{width:26px;background:var(--blue)}
+.onb-b{max-width:420px;width:100%;margin:0 auto}
