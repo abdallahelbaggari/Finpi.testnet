@@ -277,7 +277,7 @@
   /* ── transfers: server status, registration, sync ── */
   function loadCfg() {
     return api('/transfer?a=status').then(function (d) {
-      if (d && d.ok) { S.cfg = { enabled: !!d.enabled, payments: d.payments !== false, addresses: d.addresses !== false, fee: d.fee || 0.01, max: d.max || 50, daily: d.daily || 200 }; if (!$('.sh-wrap')) render(S.tab); }
+      if (d && d.ok) { S.cfg = { enabled: !!d.enabled, usernames: !!d.usernames, payments: d.payments !== false, addresses: d.addresses !== false, fee: d.fee || 0.01, max: d.max || 50, daily: d.daily || 200 }; if (!$('.sh-wrap')) render(S.tab); }
     }).catch(function () {});
   }
   var registered = false;
@@ -331,11 +331,11 @@
   function toLabel(t) { return isG(t) ? short(t) : '@' + t; }
   function sendSheet(pre) {
     pre = pre || {};
-    var addrOn = true, userOn = !!S.cfg.enabled, kind = !userOn || (pre.u && isG(pre.u)) ? 'addr' : 'user';
+    var addrOn = true, userOn = !!(S.cfg.enabled && S.cfg.usernames), kind = !userOn || (pre.u && isG(pre.u)) ? 'addr' : 'user';
     var payees = get('payees', []).filter(function (p) { return addrOn || !isG(p); }).slice(0, 6);
     var w = sheet('Send Pi',
       (pre.link || pre.x && pre.a ? '<div class="note gray" style="margin-bottom:8px">' + ic('qr') + '<span>Payment request from ' + esc(isG(pre.u) ? short(pre.u) : '@' + pre.u) + (pre.a ? ' for <b>' + fpi(pre.a) + ' π</b>' : '') + (pre.x ? ' · “' + esc(pre.x) + '”' : '') + '. Check it is someone you know.</span></div>' : '') +
-      (userOn ? '<div class="seg" role="tablist" style="margin-bottom:4px"><button type="button" data-k="user">Username</button><button type="button" data-k="addr">Wallet address</button></div>' : '<p class="sh-sub">Fill in the payment, pay it from your own Pi Wallet, and FinPi makes the receipt automatically.</p>') +
+      (userOn ? '<div class="seg" role="tablist" style="margin-bottom:4px"><button type="button" data-k="user">Username</button><button type="button" data-k="addr">Wallet address</button></div>' : (S.cfg.enabled ? '<p class="sh-sub">Send Pi to any Pi wallet address. You approve in Pi’s window right here in FinPi.</p>' : '<p class="sh-sub">Fill in the payment, pay it from your own Pi Wallet, and FinPi makes the receipt automatically.</p>')) +
       '<div id="k-user"><label class="l" for="s-u">To</label><div class="to"><span>@</span><input id="s-u" autocomplete="off" autocapitalize="none" spellcheck="false" placeholder="username" maxlength="60"></div></div>' +
       '<div id="k-addr" hidden><label class="l" for="s-g">Pi wallet address</label><textarea class="in num" id="s-g" rows="2" maxlength="60" autocapitalize="characters" spellcheck="false" placeholder="G…" style="font-size:14px;resize:none"></textarea></div>' +
       '<div class="hint" id="s-uh"></div>' +
@@ -345,7 +345,7 @@
       '<label class="l" for="s-x">Narration</label><input class="in" id="s-x" maxlength="80" placeholder="What is it for? e.g. Rent, groceries, gift">' +
       '<div class="sum" id="s-sum" hidden></div>' +
       '<button type="button" class="btn" id="s-go">Continue</button>' +
-      '<p class="small muted" style="margin-top:12px;text-align:center">' + ic('lock', 'width:14px;height:14px;vertical-align:-2px') + (userOn ? ' You approve in Pi’s own window. Limits in FinPi: ' + S.cfg.max + ' π per transfer, ' + S.cfg.daily + ' π a day.' : ' You approve the payment in your own Pi Wallet. FinPi never holds your Pi.') + '</p>');
+      '<p class="small muted" style="margin-top:12px;text-align:center">' + ic('lock', 'width:14px;height:14px;vertical-align:-2px') + (S.cfg.enabled ? ' You approve in Pi’s own window, inside FinPi. Up to ' + S.cfg.max + ' π per payment.' : ' You approve the payment in your own Pi Wallet. FinPi never holds your Pi.') + '</p>');
     var u = $('#s-u', w), g = $('#s-g', w), a = $('#s-a', w), h = $('#s-uh', w), ok = null, tm = null, cat = pre.cat || '';
     function setKind(k) {
       kind = k; ok = null; h.innerHTML = '';
@@ -431,7 +431,7 @@
       '<div><span>They receive</span><b>' + fpi(amt) + ' π</b></div><div><span>' + (o.wallet ? 'Network fee (Pi Wallet)' : 'Blockchain fee') + '</span><b>' + S.cfg.fee + ' π</b></div><div class="tot"><span>You pay</span><b>' + fpi(r7(amt + S.cfg.fee)) + ' π</b></div></div>' +
       '<div style="margin-top:12px">' + warn.join('') + '</div>' +
       (A && (o.wallet || !S.cfg.enabled) ? '<button type="button" class="btn" id="rv-w">' + ic('card') + 'Continue in Pi Wallet</button>'
-        : '<button type="button" class="btn" id="rv-ok">' + ic('lock') + 'Confirm and pay in FinPi</button>' + (A ? '<button type="button" class="btn soft" id="rv-w">' + ic('card') + 'Pay from my Pi Wallet instead</button>' : '')) +
+        : '<button type="button" class="btn" id="rv-ok">' + ic('lock') + 'Confirm and pay</button>') +
       '<button type="button" class="btn ghost" id="rv-ed">Edit</button>');
     var ok1 = $('#rv-ok', w); if (ok1) ok1.onclick = function () { if (!window.Pi || !initPi()) return toast('Open FinPi in the Pi Browser to pay inside FinPi'); pay(to, amt, narr, cat); };
     var ok2 = $('#rv-w', w); if (ok2) ok2.onclick = function () { walletPay(to, amt, narr, cat); };
@@ -446,6 +446,7 @@
     var refused = false, tries = 0;
     function step(n, m, cls) { for (var i = 1; i <= 3; i++) { var e = $('#st' + i); if (e) e.className = i < n ? 'done' : i === n ? 'on' : ''; } var s = $('#st-m'); if (s) { s.className = 'status' + (cls ? ' ' + cls : ''); s.innerHTML = m; } }
     function finish(row) {
+      put('ipend', get('ipend', []).filter(function (x) { return x.pid !== row.pid; }));
       var pend = get('pend', {}); pend[row.pid] = { cat: cat }; put('pend', pend);
       saveTransfer(row, 'out');
       var pl = get('payees', []).filter(function (x) { return x.toLowerCase() !== to.toLowerCase(); }); pl.unshift(to); put('payees', pl.slice(0, 12));
@@ -456,7 +457,7 @@
       var d2 = document.createElement('button'); d2.type = 'button'; d2.className = 'btn ghost'; d2.textContent = 'Done'; d2.onclick = function () { closeSheets(); render(S.tab); };
       var sh = $('.sh', w); if (sh) { sh.appendChild(b); sh.appendChild(d2); }
     }
-    function refunded(row) { saveRefund(row); step(3, '↩ This transfer could not be delivered, so ' + fpi(amt) + ' π was refunded to you automatically on the Pi blockchain.', 'err'); }
+    function refunded(row) { put('ipend', get('ipend', []).filter(function (x) { return x.pid !== row.pid; })); saveRefund(row); step(3, '↩ This transfer could not be delivered, so ' + fpi(amt) + ' π was refunded to you automatically on the Pi blockchain.', 'err'); }
     try {
       Pi.createPayment({ amount: r7(amt + S.cfg.fee), memo: ('FinPi transfer to ' + lab).slice(0, 60), metadata: A ? { type: 'transfer', addr: to, amt: amt, narr: narr } : { type: 'transfer', to: to, amt: amt, narr: narr } }, {
         onReadyForServerApproval: function (pid) {
@@ -464,6 +465,7 @@
           api('/approve', { paymentId: pid }).then(function (d) { if (d && d.approved === false) { refused = true; step(1, '✕ ' + esc(d.error || 'This transfer was refused.') + ' You have not been charged.', 'err'); } }).catch(function () {});
         },
         onReadyForServerCompletion: function (pid, txid) {
+          var ip = get('ipend', []).filter(function (x) { return x.pid !== pid; }); ip.unshift({ pid: pid, ts: Date.now() }); put('ipend', ip.slice(0, 20));
           step(2, 'Confirming your payment on the Pi blockchain…');
           api('/complete', { paymentId: pid, txid: txid }).then(function (d) {
             step(3, 'Delivering to ' + esc(lab) + '…');
@@ -507,6 +509,17 @@
     var pl = get('payees', []).filter(function (x) { return x !== p.to; }); pl.unshift(p.to); put('payees', pl.slice(0, 12));
     addNote('check', 'Payment confirmed', fpi(p.amt) + ' π to ' + short(p.to) + ' · ' + p.narr, 'wp-' + p.ref);
     return rcpts().filter(function (x) { return x.txid === r.transaction_hash; })[0];
+  }
+  function checkPendingInApp() {
+    get('ipend', []).forEach(function (p) {
+      if (Date.now() - p.ts > 7 * 86400e3) { put('ipend', get('ipend', []).filter(function (x) { return x.pid !== p.pid; })); return; }
+      api('/transfer', { a: 'payout', paymentId: p.pid }).then(function (x) {
+        if (!x || !x.row || !(x.ok || x.refunded)) return;
+        put('ipend', get('ipend', []).filter(function (y) { return y.pid !== p.pid; }));
+        if (x.ok && saveTransfer(x.row, 'out')) { addNote('send', 'Payment delivered', fpi(x.row.amount) + ' π to ' + short(x.row.to_addr), 'out-' + p.pid); rerender(); }
+        else if (x.refunded && saveRefund(x.row)) rerender();
+      }).catch(function () {});
+    });
   }
   function checkPendingWallet() {
     wpend().forEach(function (p) {
@@ -586,14 +599,14 @@
   }
   function openCode(c) {
     if (!c) return;
-    if (!isG(c.u) && !S.cfg.enabled) { toast('This request is for a FinPi @username. Ask for their wallet address to pay from Pi Wallet.'); return; }
+    if (!isG(c.u) && !(S.cfg.enabled && S.cfg.usernames)) { toast('This request is for a FinPi @username. Ask for their wallet address to pay from Pi Wallet.'); return; }
     if (!isG(c.u) && needSignIn('Sign in with Pi to pay @' + c.u + '.')) { pendingCode = c; return; }
     go('pay'); setTimeout(function () { sendSheet(c); }, 250);
   }
   var pendingCode = null;
   function readHash() { var c = /#pay=/.test(location.hash) ? parseCode(location.hash) : null; if (/#pay=/.test(location.hash)) { try { history.replaceState(null, '', location.pathname); } catch (e) {} } return c; }
   function requestSheet() {
-    var un = S.cfg.enabled && signedIn(), a0 = get('addr', '');
+    var un = S.cfg.enabled && S.cfg.usernames && signedIn(), a0 = get('addr', '');
     if (!un && !a0) {
       var w0 = sheet('Request Pi', '<p class="sh-sub">To request Pi, add your Pi wallet address once. People will pay to it from Pi Wallet' + (S.cfg.enabled ? ' or FinPi' : '') + '.</p><button type="button" class="btn" data-x="aa">' + ic('card') + 'Add my wallet address</button>');
       $('[data-x="aa"]', w0).onclick = function () { addrSheet(true); }; return;
@@ -656,7 +669,7 @@
 
   /* ── receive: your @username and your wallet address ── */
   function receiveSheet() {
-    var a = get('addr', ''), sug = get('addrSug', ''), un = S.cfg.enabled && signedIn();
+    var a = get('addr', ''), sug = get('addrSug', ''), un = S.cfg.enabled && S.cfg.usernames && signedIn();
     var w = sheet('Receive Pi', '<p class="sh-sub">Share your ' + (un ? '@username or ' : '') + 'wallet address. People pay you from Pi Wallet' + (un ? ' or FinPi' : '') + '.</p>' +
       (!un ? '' : '<div class="card" style="margin-top:8px"><p class="small">Your FinPi username</p><div class="row"><div class="grow" style="font-size:24px;font-weight:700;overflow-wrap:anywhere">@' + esc(me()) + '</div><button type="button" class="tbtn" data-x="cu" aria-label="Copy username">' + ic('copy') + '</button></div><p class="small muted" style="margin-top:4px">FinPi users send to this in seconds.</p></div>') +
       '<div class="card"><p class="small">Your Pi wallet address</p>' + (a ? (window.FPQR ? '<div class="qr" style="border:0;padding:6px 0 10px">' + FPQR.svg(a, 200, '#0A1F55') + '</div>' : '') + '<div class="row"><div class="grow num" style="font-size:13.5px;overflow-wrap:anywhere">' + esc(a) + '</div><button type="button" class="tbtn" data-x="ca" aria-label="Copy address">' + ic('copy') + '</button></div><p class="small muted" style="margin-top:4px">Anyone can scan this code or send to the address from Pi Wallet or FinPi.</p>'
@@ -813,12 +826,12 @@
       var on = S.cfg.enabled, pl = get('payees', []);
       return '<div class="ph"><h1>Send &amp; receive</h1><p>Every payment is recorded on the Pi blockchain, with a professional receipt and the Pi rate in your currency.</p></div>' +
         '<div class="tiles" style="margin-top:14px">' +
-        '<button type="button" class="tile" data-act="send"><i>' + ic('send') + '</i><b>Send Pi</b><small>' + (on ? 'To a @username or a wallet address' : 'From your Pi Wallet to any address') + '</small></button>' +
+        '<button type="button" class="tile" data-act="send"><i>' + ic('send') + '</i><b>Send Pi</b><small>' + (on ? (S.cfg.usernames ? 'To a @username or a wallet address' : 'To any Pi wallet address, inside FinPi') : 'From your Pi Wallet to any address') + '</small></button>' +
         '<button type="button" class="tile" data-act="request"><i class="t">' + ic('req') + '</i><b>Request Pi</b><small>A payment code with the amount</small></button>' +
         '<button type="button" class="tile" data-act="scan"><i class="n">' + ic('qr') + '</i><b>Scan to pay</b><small>A payment code or wallet QR</small></button>' +
-        '<button type="button" class="tile" data-act="receive"><i class="a">' + ic('card') + '</i><b>Receive Pi</b><small>' + (on ? 'Your @username and wallet address' : 'Your wallet address and QR code') + '</small></button></div>' +
+        '<button type="button" class="tile" data-act="receive"><i class="a">' + ic('card') + '</i><b>Receive Pi</b><small>' + (on && S.cfg.usernames ? 'Your @username and wallet address' : 'Your wallet address and QR code') + '</small></button></div>' +
         (pl.length ? '<div class="sec"><h2>Recent people</h2></div><div class="chips">' + pl.slice(0, 8).map(function (p) { return '<button type="button" class="chip" data-act="send-to" data-u="' + esc(p) + '">' + esc(toLabel(p)) + '</button>'; }).join('') + '</div>' : '') +
-        '<div class="sec"><h2>How it works</h2></div><div class="card"><div class="note gray">' + ic('lock') + '<span>' + (on ? 'Pay inside FinPi (approved in Pi’s window, delivered in seconds, refunded automatically if it cannot be delivered), or pay from your own Pi Wallet.' : 'Fill in the payment in FinPi, pay it from your own Pi Wallet, and FinPi finds it on the Pi blockchain and makes your receipt with the Pi rate.') + ' FinPi never holds your Pi.</span></div></div>' +
+        '<div class="sec"><h2>How it works</h2></div><div class="card"><div class="note gray">' + ic('lock') + '<span>' + (on ? 'You approve in Pi’s window inside FinPi. FinPi delivers the Pi to the recipient within seconds, or refunds you automatically if it cannot, and every step is recorded on the Pi blockchain.' : 'Fill in the payment in FinPi, pay it from your own Pi Wallet, and FinPi finds it on the Pi blockchain and makes your receipt with the Pi rate.') + ' FinPi never holds your Pi.</span></div></div>' +
         '<div class="tiles" style="margin-top:12px"><button type="button" class="tile" data-act="get-rcpt"><i class="n">' + ic('rcpt') + '</i><b>Get a receipt</b><small>For any Pi payment, from its transaction ID</small></button><button type="button" class="tile" data-act="verify"><i class="a">' + ic('check') + '</i><b>Verify a payment</b><small>Check any transaction on the blockchain</small></button></div>';
     },
     wallet: function () {
@@ -976,11 +989,11 @@
     loadPrice(true); paintPrice(); initPi(); loadCfg();
     var u = get('user', null);
     if (u && u.username && window.Pi) { $('#signin-t').textContent = 'Signing in as @' + u.username + '…'; signIn(true).then(function (ok) { if (!ok) $('#signin-t').textContent = 'Sign in with Pi'; }); }
-    checkPendingWallet();
+    checkPendingWallet(); checkPendingInApp();
     var hc = readHash(); if (hc) { pendingCode = hc; var lm = $('#ld-msg'); if (lm) { lm.style.color = 'var(--blue)'; lm.textContent = 'You opened a payment request. Sign in with Pi or explore to pay it.'; } }
     addEventListener('hashchange', function () { var c = readHash(); if (c) { if ($('#app').hidden) { pendingCode = c; } else openCode(c); } });
-    setInterval(function () { if (!document.hidden) { loadPrice(); sync(); checkPendingWallet(); } }, 60000);
-    document.addEventListener('visibilitychange', function () { if (!document.hidden) { loadPrice(); sync(); checkPendingWallet(); } });
+    setInterval(function () { if (!document.hidden) { loadPrice(); sync(); checkPendingWallet(); checkPendingInApp(); } }, 60000);
+    document.addEventListener('visibilitychange', function () { if (!document.hidden) { loadPrice(); sync(); checkPendingWallet(); checkPendingInApp(); } });
     if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(function () {});
   }
   window.FinPi = { S: S, render: render, sync: sync, showRcpt: showRcpt, sendSheet: sendSheet };

@@ -5,7 +5,7 @@
 //   POST {a:'list', accessToken}            → the signed-in user's sent and received transfers
 //   POST {a:'check', accessToken, to, amt}  → would this transfer be accepted? (limits, holds, first-time payee) before the Pi pop-up opens
 import { keypairFromSeed } from './_lib/stellar.js';
-import { H, json, me, db, payout, pub, enabled, maxTransfer, FEE, isTest, limits, rateOk, checkTransferPayment, checkLimits, userByName, paidBefore, USER_RE, DBB, setup } from './_lib/transfers.js';
+import { H, json, me, db, payout, pub, enabled, maxTransfer, FEE, isTest, limits, rateOk, checkTransferPayment, checkLimits, userByName, paidBefore, USER_RE, DBB, setup, usernames } from './_lib/transfers.js';
 export async function onRequestGet({ request, env }) {
   const q = new URL(request.url).searchParams;
   if (q.get('a') === 'check-setup') {
@@ -17,10 +17,10 @@ export async function onRequestGet({ request, env }) {
     if (s.database) { try { await (await db(env)).prepare('SELECT 1 AS x').first(); r.database_works = true; } catch (e) { r.database_works = false; } }
     if (s.pi_api_key) { try { const t = await fetch('https://api.minepi.com/v2/payments/incomplete_server_payments', { headers: { Authorization: 'Key ' + String(env.PI_API_KEY).trim() } }); r.pi_api_key_accepted = t.ok; r.pi_api_key_status = t.status; } catch (e) { r.pi_api_key_accepted = false; } }
     if (s.app_wallet_seed) { try { const kp = await keypairFromSeed(String(env.APP_WALLET_SEED).trim()); const h = await fetch(horizon + '/accounts/' + kp.address); r.app_wallet_found = h.ok; r.app_wallet_address = kp.address; } catch (e) { r.app_wallet_found = false; } }
-    r.ready = enabled(env) && r.database_works !== false && r.pi_api_key_accepted !== false && r.app_wallet_found !== false;
+    r.ready = enabled(env) && r.pi_api_key_accepted !== false && r.app_wallet_found !== false;
     return json({ ok: true, check: r });
   }
-  return json({ ok: true, payments: setup(env).pi_api_key, setup: setup(env), enabled: enabled(env), addresses: enabled(env), max: maxTransfer(env), daily: limits(env).day, fee: FEE, net: isTest(request) ? 'Pi Testnet' : 'Pi Mainnet' });
+  return json({ ok: true, payments: setup(env).pi_api_key, setup: setup(env), enabled: enabled(env), addresses: enabled(env), usernames: usernames(env), max: maxTransfer(env), daily: limits(env).day, fee: FEE, net: isTest(request) ? 'Pi Testnet' : 'Pi Mainnet' });
 }
 export async function onRequestPost({ request, env }) {
   const b = await request.json().catch(() => ({}));

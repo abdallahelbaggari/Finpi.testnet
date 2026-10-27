@@ -23,7 +23,9 @@ const seedOk = (env) => /^S[A-Z2-7]{55}$/.test(String(env.APP_WALLET_SEED || '')
 export const piKey = (env) => String(env.PI_API_KEY || '').trim();
 /* What is set up (yes/no only, never any secret), so the developer can see why transfers are off. */
 export function setup(env) { return { pi_api_key: !!piKey(env), app_wallet_seed: seedOk(env), database: !!DBB(env), paused: String(env.TRANSFERS_ENABLED || '').trim() === '0' }; }
-export function enabled(env) { const s = setup(env); return !s.paused && s.pi_api_key && s.app_wallet_seed && s.database; }
+// In-app sending needs only the Pi API key and the app wallet secret key. The database is optional: it adds @username sends and daily limits.
+export function enabled(env) { const s = setup(env); return !s.paused && s.pi_api_key && s.app_wallet_seed; }
+export const usernames = (env) => enabled(env) && !!DBB(env);
 // Starts at 50 π per transfer for safety; raise it with MAX_TRANSFER (for example 500).
 export function maxTransfer(env) { const m = Number(env.MAX_TRANSFER); return m > 0 ? m : 50; }
 const numEnv = (v, d) => { const n = Number(v); return n > 0 ? n : d; };
@@ -34,6 +36,7 @@ const DAY = 86400000, LIVE = "(status IN ('received', 'paying', 'paid', 'failed'
 
 /* Per-sender and app-wide 24-hour limits. Returns '' if fine, or the reason to refuse. */
 export async function checkLimits(env, pay) {
+  if (!DBB(env)) return '';
   const L = limits(env), d = await db(env), now = Date.now(), amt = round7((pay.metadata || {}).amt), uid = String(pay.user_uid || ''), pid = String(pay.identifier || '');
   const mine = await d.prepare('SELECT COALESCE(SUM(CAST(amount AS REAL)), 0) AS s, COUNT(*) AS n FROM transfers WHERE from_uid = ? AND pid <> ? AND ts > ? AND ' + LIVE).bind(uid, pid, now - DAY, now - 3600000).first();
   if (mine.n >= L.count) return 'You have reached today’s limit of ' + L.count + (L.count === 1 ? ' transfer.' : ' transfers.') + ' Please try again tomorrow.';
@@ -44,12 +47,14 @@ export async function checkLimits(env, pay) {
 }
 /* Called when FinPi approves a transfer: records it at once so limits count it before it completes. */
 export async function reserve(env, pay) {
+  if (!DBB(env)) return;
   const d = await db(env), md = pay.metadata || {}, to = md.addr ? null : await userByName(d, md.to), fromU = await d.prepare('SELECT username FROM users WHERE uid = ?').bind(String(pay.user_uid)).first();
   await d.prepare('INSERT OR IGNORE INTO transfers (pid, from_uid, from_user, to_uid, to_user, amount, narr, status, ts, to_addr) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)')
     .bind(String(pay.identifier), String(pay.user_uid), fromU ? fromU.username : '', to ? to.uid : '', md.addr ? '' : (to ? to.username : String(md.to)), String(round7(md.amt)), String(md.narr || '').slice(0, 80), 'approved', Date.now(), md.addr || null).run();
 }
 /* Has this sender paid this recipient before? (to warn about first-time payees, a common scam pattern) */
 export async function paidBefore(env, fromUid, toUid, toAddr) {
+  if (!DBB(env)) return false;
   const d = await db(env);
   const r = toAddr ? await d.prepare("SELECT 1 AS x FROM transfers WHERE from_uid = ? AND to_addr = ? AND to_uid = '' AND status = 'paid' LIMIT 1").bind(String(fromUid), toAddr).first()
     : await d.prepare("SELECT 1 AS x FROM transfers WHERE from_uid = ? AND to_uid = ? AND status = 'paid' LIMIT 1").bind(String(fromUid), String(toUid)).first();
@@ -115,6 +120,7 @@ export async function checkTransferPayment(env, pay, request) {
     if (!ex) return 'This address has no Pi account on ' + netOf(pay, request).name + ' yet';
     return '';
   }
+  if (!DBB(env)) return 'Sending to a @username is not available yet. Send to a wallet address instead.';
   if (!USER_RE.test(String(md.to || ''))) return 'Bad recipient';
   const d = await db(env), to = await userByName(d, md.to);
   if (!to) return 'Recipient is not a FinPi user';
@@ -128,7 +134,47 @@ const STALE = 300000;            // a job left running this long is taken over (
 const WAIT_UNCERTAIN = 200000;   // after an attempt whose result is unknown, wait until its transaction can no longer land
 const REFUND_AFTER = { tries: 6, ms: 3600000 };   // delivery keeps failing: refund automatically
 export function configured(env) { const s = setup(env); return s.pi_api_key && s.app_wallet_seed && s.database; }
+
+/* Wallet-address transfers without a database. Every step is decided from the Pi payment record and the Pi blockchain itself:
+   - the payout and the refund each carry a unique memo derived from the sender's payment ID, so before paying FinPi looks
+     on the blockchain and never pays twice;
+   - concurrent attempts use the app wallet's sequence number, so only one of them can ever land;
+   - if the address cannot receive, or delivery keeps failing for an hour, the sender is refunded to the wallet they paid from. */
+async function payoutDirect(env, request, pid) {
+  if (!/^[A-Za-z0-9_-]{6,80}$/.test(String(pid || ''))) return { ok: false, error: 'Bad payment id' };
+  const net = NET(isTest(request));
+  const u = await piApi(env, '/payments/' + encodeURIComponent(pid));
+  if (!u.ok || !u.d) return { ok: false, error: 'Payment not found' };
+  const pay = u.d, md = pay.metadata || {}, st = pay.status || {};
+  if (md.type !== 'transfer') return { ok: false, error: 'Not a transfer' };
+  if (!md.addr) return { ok: false, error: 'Sending to a @username needs the FinPi database' };
+  if (!st.developer_completed || !st.transaction_verified || st.cancelled || st.user_cancelled) return { ok: false, error: 'The payment is not completed yet' };
+  const amt = round7(md.amt), paid = Number(pay.amount), now = Date.now();
+  const kp = await keypairFromSeed(String(env.APP_WALLET_SEED).trim());
+  const memo = await refMemo(pid), rmemo = await refMemo('refund|' + pid);
+  const row = (status, txid, addr) => ({ pid, from: '', to: '', to_kind: 'address', amount: amt, narr: String(md.narr || '').slice(0, 80), status,
+    txid: status === 'paid' ? txid : '', to_addr: md.addr, refund_txid: status === 'refunded' ? txid : '', refund_addr: status === 'refunded' ? addr : '', ts: now, done_ts: now, net: net.name });
+  let h = await findTx(net, kp.address, memo); if (h) return { ok: true, row: row('paid', h) };
+  h = await findTx(net, kp.address, rmemo); if (h) return { ok: false, refunded: true, row: row('refunded', h, pay.from_address) };
+  const refund = async () => {
+    const back = pay.from_address;
+    if (!isAddr(back)) return { ok: false, retry: true, error: 'The refund will be retried automatically.' };
+    const back_amt = Math.min(amt, round7(paid - FEE)); if (!(back_amt > 0)) return { ok: false, error: 'Nothing to refund' };
+    const hh = await submitPayment(env, net, kp, back, back_amt, rmemo);
+    const r0 = row('refunded', hh, back); r0.amount = back_amt; return { ok: false, refunded: true, row: r0 };
+  };
+  const age = now - (Date.parse((pay.status && pay.created_at) || pay.created_at || '') || now);
+  try {
+    if (!isAddr(md.addr) || !(amt >= 0.01) || paid + 1e-9 < round7(amt + FEE)) return await refund();
+    const hh = await submitPayment(env, net, kp, md.addr, amt, memo);
+    return { ok: true, row: row('paid', hh) };
+  } catch (e) {
+    try { if (/op_no_destination/.test(String(e && e.message)) || age > 3600000) return await refund(); } catch (x) {}
+    return { ok: false, retry: true, error: 'The payout did not go through yet. FinPi will try again automatically.' };
+  }
+}
 export async function payout(env, request, pid) {
+  if (!DBB(env) && setup(env).pi_api_key && setup(env).app_wallet_seed) return payoutDirect(env, request, pid);
   if (!/^[A-Za-z0-9_-]{6,80}$/.test(String(pid || ''))) return { ok: false, error: 'Bad payment id' };
   if (!configured(env)) return { ok: false, error: 'Transfers are not set up' };
   const d = await db(env), net = NET(isTest(request)), now = Date.now();
@@ -179,7 +225,7 @@ export async function payout(env, request, pid) {
     }
     if (refund) {
       if (row.a2u_id) await piApi(env, '/payments/' + encodeURIComponent(row.a2u_id) + '/cancel', 'POST', {});
-      const r = await sendA2U(env, net, kp, d, pid, row, { idCol: 'refund_id', addrCol: 'refund_addr', uid: row.from_uid, amount: round7(row.amount),
+      const r = await sendA2U(env, net, kp, d, pid, row, { idCol: 'refund_id', addrCol: 'refund_addr', uid: row.from_uid, amount: Math.max(0, Math.min(round7(row.amount), round7(paid - FEE))),
         memo: 'FinPi refund' + (row.to_user ? ' (to @' + row.to_user + ')' : ' (to a wallet address)'), metadata: { type: 'transfer_refund', u2a: pid } }, () => { sure = false; });
       await d.prepare('UPDATE transfers SET err = ? WHERE pid = ?').bind(invalid || 'Delivery failed repeatedly', pid).run();
       return await finish(d, pid, 'refunded', r.hash, r.addr, net);

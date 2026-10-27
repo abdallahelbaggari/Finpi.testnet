@@ -29,12 +29,12 @@ button{width:100%;min-height:48px;border:0;border-radius:14px;background:#1D4ED8
     fetch('/transfer?a=check-setup',{cache:'no-store'}).then(function(r){return r.json();}).then(function(d){
       if(!d.ok){document.getElementById('out').innerHTML='<div class="big bad">'+esc(d.error||'Check failed')+'</div>';return;}
       var c=d.check,h='';
-      h+='<div class="big '+(c.ready?'ok':'bad')+'">'+(c.ready?'✓ Payments are working on '+esc(c.net)+'.':'✕ Sending is not ready on '+esc(c.net)+'. For the app owner: fix the red items below.')+'</div><div class="card">';
+      h+='<div class="big '+(c.ready?'ok':'bad')+'">'+(c.ready?'✓ Paying inside FinPi is working on '+esc(c.net)+'.':'✕ Sending is not ready on '+esc(c.net)+'. For the app owner: fix the red items below.')+'</div><div class="card">';
       h+=row(c.pi_api_key,'Secret PI_API_KEY is set','Add a secret named <code>PI_API_KEY</code> with the API key from FinPi’s app in the Pi Developer Portal ('+esc(c.net)+' app).');
       if(c.pi_api_key) h+=row(c.pi_api_key_accepted,'Pi Network accepts the API key','Pi answered '+esc(c.pi_api_key_status||'no')+'. Copy the key again from the Developer Portal. Make sure it is the key of the '+esc(c.net)+' app (mainnet and testnet apps have different keys).');
       h+=row(c.app_wallet_seed,'Secret APP_WALLET_SEED is a wallet secret key',c.seed_looks_like_address?'This is the wallet <b>address</b> (starts with G). Use the wallet <b>secret key</b> instead: it starts with <b>S</b> and has 56 characters.':c.seed_raw_present?'The value is not a valid secret key. It must start with <b>S</b>, be 56 characters, with no spaces or quotes.':'Add a secret named <code>APP_WALLET_SEED</code> with the secret key (starts with S) of the app wallet shown in the Developer Portal for this app.');
       if(c.app_wallet_seed) h+=row(c.app_wallet_found,'App wallet exists on '+esc(c.net),'The wallet for this secret key was not found on '+esc(c.net)+'. Use the app wallet of the '+esc(c.net)+' app, and make sure it is activated (funded).'+(c.app_wallet_address?'<br>Wallet: <code>'+esc(c.app_wallet_address)+'</code>':''));
-      h+=row(c.database,'Database is bound','Settings → Bindings → Add → D1 database. Variable name <code>FP_DB</code>, then choose (or create) a database.');
+      h+=row(c.database?true:null,'Database (optional)','Not needed to send to wallet addresses. Add it to also send to @usernames and use daily limits: Settings → Bindings → Add → D1 database, variable name <code>FP_DB</code>.');
       if(c.database) h+=row(c.database_works,'Database answers','The database binding exists but did not answer. Remove the binding and add it again.');
       h+=row(!c.paused,'Transfers are not paused','Delete the variable <code>TRANSFERS_ENABLED</code> (it is set to 0).');
       h+='</div>'; if(c.app_wallet_address&&c.app_wallet_found) h+='<p class="muted">App wallet: <code>'+esc(c.app_wallet_address)+'</code></p>';
