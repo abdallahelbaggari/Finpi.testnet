@@ -245,7 +245,11 @@
   /* ── Pi SDK & sign-in ── */
   var piReady = false;
   function initPi() { if (piReady || !window.Pi) return !!window.Pi; try { Pi.init({ version: '2.0', sandbox: SANDBOX }); piReady = true; } catch (e) {} return piReady; }
-  function onIncomplete(p) { if (p && p.identifier) api('/recover', { paymentId: p.identifier }).then(function (d) { if (d && d.transfer) setTimeout(sync, 800); }).catch(function () {}); }
+  function onIncomplete(p) {
+    if (!p || !p.identifier) return;
+    if (p.metadata && p.metadata.type === 'transfer') { var pd = get('pend', {}); if (!pd[p.identifier]) { pd[p.identifier] = { ts: Date.now() }; put('pend', pd); } }
+    api('/recover', { paymentId: p.identifier }).then(function () { setTimeout(function () { sync(); checkPendingInApp(); }, 600); }).catch(function () {});
+  }
   function signIn(silent) {
     var btn = $('#signin'), msg = $('#ld-msg');
     if (!window.Pi || !initPi()) { if (!silent) { msg.textContent = 'Open FinPi in the Pi Browser to sign in with Pi.'; toast('Open FinPi in the Pi Browser'); } return Promise.resolve(false); }
@@ -461,7 +465,7 @@
     try {
       Pi.createPayment({ amount: r7(amt + S.cfg.fee), memo: ('FinPi transfer to ' + lab).slice(0, 60), metadata: A ? { type: 'transfer', addr: to, amt: amt, narr: narr } : { type: 'transfer', to: to, amt: amt, narr: narr } }, {
         onReadyForServerApproval: function (pid) {
-          var pend = get('pend', {}); pend[pid] = { cat: cat }; put('pend', pend);
+          var pend = get('pend', {}); pend[pid] = { cat: cat, to: to, amt: amt, narr: narr, ts: Date.now() }; put('pend', pend);
           api('/approve', { paymentId: pid }).then(function (d) { if (d && d.approved === false) { refused = true; step(1, '✕ ' + esc(d.error || 'This transfer was refused.') + ' You have not been charged.', 'err'); } }).catch(function () {});
         },
         onReadyForServerCompletion: function (pid, txid) {
@@ -510,15 +514,30 @@
     addNote('check', 'Payment confirmed', fpi(p.amt) + ' π to ' + short(p.to) + ' · ' + p.narr, 'wp-' + p.ref);
     return rcpts().filter(function (x) { return x.txid === r.transaction_hash; })[0];
   }
+  /* Payments started in FinPi are remembered from approval until their receipt exists, even if Pi's payment page
+     closed FinPi meanwhile. On return FinPi asks the server, which checks the Pi blockchain, and opens the receipt. */
+  var inAppBusy = {};
+  function dropPending(pid) { var pd = get('pend', {}); delete pd[pid]; put('pend', pd); put('ipend', get('ipend', []).filter(function (y) { return y.pid !== pid; })); }
   function checkPendingInApp() {
-    get('ipend', []).forEach(function (p) {
-      if (Date.now() - p.ts > 7 * 86400e3) { put('ipend', get('ipend', []).filter(function (x) { return x.pid !== p.pid; })); return; }
-      api('/transfer', { a: 'payout', paymentId: p.pid }).then(function (x) {
-        if (!x || !x.row || !(x.ok || x.refunded)) return;
-        put('ipend', get('ipend', []).filter(function (y) { return y.pid !== p.pid; }));
-        if (x.ok && saveTransfer(x.row, 'out')) { addNote('send', 'Payment delivered', fpi(x.row.amount) + ' π to ' + short(x.row.to_addr), 'out-' + p.pid); rerender(); }
-        else if (x.refunded && saveRefund(x.row)) rerender();
-      }).catch(function () {});
+    var pend = get('pend', {}), ids = Object.keys(pend).concat(get('ipend', []).map(function (x) { return x.pid; }));
+    ids = ids.filter(function (v, i) { return ids.indexOf(v) === i && /^[A-Za-z0-9_-]{6,80}$/.test(v); }).slice(0, 20);
+    var changed = false;
+    ids.forEach(function (pid) { if (pend[pid] && !pend[pid].ts) { pend[pid].ts = Date.now(); changed = true; } });
+    if (changed) put('pend', pend);
+    ids.forEach(function (pid) {
+      if (inAppBusy[pid]) return; var p = pend[pid] || {};
+      if (p.ts && Date.now() - p.ts > 7 * 86400e3) { dropPending(pid); return; }
+      inAppBusy[pid] = true;
+      api('/transfer', { a: 'payout', paymentId: pid }).then(function (x) {
+        if (!x) return;
+        if (!x.row || !(x.ok || x.refunded)) { if (/not found|Not a transfer/i.test(x.error || '') || (/not completed/i.test(x.error || '') && p.ts && Date.now() - p.ts > 3600e3)) dropPending(pid); return; }
+        var r = null;
+        if (x.ok) { if (saveTransfer(x.row, 'out')) addNote('send', 'Payment delivered', fpi(x.row.amount) + ' π to ' + (x.row.to ? '@' + x.row.to : short(x.row.to_addr)) + (x.row.narr ? ' · ' + x.row.narr : ''), 'out-' + pid); r = rcpts().filter(function (t) { return t.txid === x.row.txid; })[0]; }
+        else { saveRefund(x.row); r = rcpts().filter(function (t) { return t.txid === x.row.refund_txid; })[0]; }
+        dropPending(pid);
+        if (r) { var pl = get('payees', []), tg = x.row.to || x.row.to_addr; if (tg && x.ok) { pl = pl.filter(function (q) { return q !== tg; }); pl.unshift(tg); put('payees', pl.slice(0, 12)); }
+          if (!$('#app').hidden && !$('.sh-wrap')) { render(S.tab); toast(x.ok ? 'Payment delivered · receipt ready' : 'Refunded · receipt ready'); showRcpt(r); } else rerender(); }
+      }).catch(function () {}).then(function () { inAppBusy[pid] = false; });
     });
   }
   function checkPendingWallet() {
