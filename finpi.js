@@ -304,7 +304,13 @@
   /* ── send flow ── */
   function guardPay() {
     if (needSignIn('Sign in with Pi to send and receive Pi.')) return false;
-    if (!S.cfg.enabled) { loadCfg(); toast('Sending is being switched on. Please try again shortly.'); return false; }
+    if (!S.cfg.enabled) {
+      loadCfg();
+      sheet('Sending is not available yet', '<div class="note warn">' + ic('info') + '<span>FinPi is finishing its secure payment setup. Sending will open here automatically as soon as it is ready. Nothing has been charged.</span></div>' +
+        '<div class="card" style="margin-top:12px"><h3>Meanwhile you can</h3><p>• Receive Pi with your @username or wallet address<br>• Check the live Pi rate and convert<br>• See your wallet balance and receipts</p></div>' +
+        '<button type="button" class="btn" data-act="receive">' + ic('req') + 'Receive Pi</button><button type="button" class="btn ghost" data-act="status">' + ic('shield') + 'System status</button>');
+      return false;
+    }
     if (!window.Pi || !initPi()) { toast('Open FinPi in the Pi Browser to pay'); return false; }
     return true;
   }
@@ -500,9 +506,10 @@
     var a = get('addr', ''), W = S.wal;
     if (!a) {
       var sug = get('addrSug', '');
-      return '<div class="row"><div class="grow"><h3>Your Pi balance</h3><p>Add your Pi wallet address to see your balance and history in ' + esc(curr()) + '. Read-only: FinPi can never move your Pi.</p></div></div>' +
+      return '<h3>See your Pi balance here</h3><p>Paste your Pi wallet address once, and FinPi shows your balance in ' + esc(curr()) + ' and your payment history from the Pi blockchain.</p>' +
+        '<div class="note gray" style="margin-top:10px">' + ic('info') + '<span><b>Where to find it:</b> open Pi Wallet and copy your address (it starts with G). It is public and safe to share. FinPi can only view it: it can never move your Pi.</span></div>' +
         (sug ? '<button type="button" class="btn soft" data-act="addr-use">' + ic('check') + 'Use my address ' + esc(short(sug)) + '</button>' : '') +
-        '<button type="button" class="btn ghost" data-act="addr-set">' + ic('card') + 'Add wallet address</button>';
+        '<button type="button" class="btn" data-act="addr-set">' + ic('card') + 'Paste my wallet address</button>';
     }
     if (!W || W.addr !== a) return '<h3>Your Pi balance</h3><p class="num">' + esc(short(a)) + '</p><p style="margin-top:8px">Loading from the Pi blockchain…</p>';
     if (W.err) return '<h3>Your Pi balance</h3><p>The Pi blockchain could not be reached. <button type="button" class="lnk" data-act="wal-load">Try again</button></p>';
@@ -620,7 +627,7 @@
       var on = S.cfg.enabled, pl = get('payees', []);
       return '<div class="ph"><h1>Send &amp; receive</h1><p>Pay by @username or wallet address. Every payment is approved by you in Pi’s window and recorded on the Pi blockchain.</p></div>' +
         (!signedIn() ? '<div class="note">' + ic('info') + '<span>Sign in with Pi to send and receive Pi.</span></div><button type="button" class="btn" data-act="signin" style="margin-top:12px"><span class="pi-dot">π</span>Sign in with Pi</button>'
-          : !on ? '<div class="note warn">' + ic('info') + '<span>Sending is being switched on. You can still receive Pi to your wallet address, and use rates, receipts and wallet tools.</span></div>' : '') +
+          : !on ? '<div class="note warn">' + ic('info') + '<span>Sending opens here as soon as FinPi’s secure payment setup is complete. You can already receive Pi, check rates and see your receipts.</span></div>' : '') +
         '<div class="tiles" style="margin-top:14px">' +
         '<button type="button" class="tile" data-act="send"><i>' + ic('send') + '</i><b>Send Pi</b><small>To a @username or a wallet address</small></button>' +
         '<button type="button" class="tile" data-act="receive"><i class="t">' + ic('req') + '</i><b>Receive Pi</b><small>Your @username and wallet address</small></button></div>' +
@@ -659,7 +666,7 @@
         row('bell', 'Phone notifications', get('push', false) ? 'On' : 'Off', 'push') + row('pie', 'Monthly budget', get('budget', 0) ? fpi(get('budget', 0)) + ' π' : 'Not set', 'budget') + row('card', 'Wallet address', get('addr', '') ? short(get('addr', '')) : 'Not added', 'addr-set') + '</div>' +
         '<div class="sec"><h2>Security &amp; support</h2></div><div class="list">' +
         row('shield', 'Security center', 'Limits, safety and how FinPi works', 'security') + row('heart', sup ? 'You are a Supporter' : 'Become a Supporter', sup ? 'Thank you!' : '1 π · badge only, no reward', 'supporter') +
-        row('mail', 'Help & contact', SUPPORT, 'help') + '</div>' +
+        row('mail', 'Help & contact', SUPPORT, 'help') + row('act', 'System status', 'Check that payments are working', 'status') + '</div>' +
         '<div class="sec"><h2>Legal</h2></div><div class="list">' + lrow('Terms of Service', 'terms-of-service.html') + lrow('Privacy Policy', 'privacy-policy.html') + lrow('Risk Disclosure', 'risk-disclosure.html') + '</div>' +
         (signedIn() ? '<button type="button" class="btn danger" data-act="signout" style="margin-top:18px">' + ic('out') + 'Sign out</button>' : '') +
         '<p class="small muted" style="text-align:center;margin-top:16px">FinPi 1.0.0 · ' + NETN + ' · finpi.pi<br>Independent app, not operated by Pi Network.</p>';
@@ -744,6 +751,7 @@
       var w = sheet('Become a Supporter', '<div class="big"><div class="v">1 π</div><div class="c">' + esc(conv(1)) + '</div><div class="w">FinPi Supporter badge</div></div><p class="sh-sub" style="margin-top:12px">Support FinPi’s development and get a Supporter badge on your profile. Every feature stays free. The badge gives no reward or financial return.</p><button type="button" class="btn" id="sp-go">' + ic('heart') + 'Support with 1 π</button>');
       $('#sp-go', w).onclick = supporterPay;
     },
+    status: function () { location.href = 'setup.html'; },
     help: function () { sheet('Help & contact', '<p class="sh-sub">We reply within 30 days, usually much sooner.</p><a class="btn" href="mailto:' + SUPPORT + '?subject=FinPi%20help">' + ic('mail') + 'Email ' + SUPPORT + '</a><div class="card" style="margin-top:14px"><h3>Common questions</h3><p><b>Where is my Pi?</b> In your own Pi Wallet. FinPi never holds balances.<br><br><b>A transfer did not arrive.</b> FinPi keeps delivering automatically, or refunds you. You will be notified either way.<br><br><b>Can a transfer be reversed?</b> No. Delivered blockchain payments are final.</p></div>'); },
     signout: function () { S.user = null; S.token = null; registered = false; put('user', null); closeSheets(); $('#app').hidden = true; $('#landing').hidden = false; toast('Signed out'); }
   };

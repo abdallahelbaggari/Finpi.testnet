@@ -1,6 +1,6 @@
 <!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Setup check · FinPi</title><meta name="robots" content="noindex"><meta name="theme-color" content="#0A1F55">
+<title>System status · FinPi</title><meta name="robots" content="noindex"><meta name="theme-color" content="#0A1F55">
 <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self'; object-src 'none'; base-uri 'self'">
 <link rel="icon" href="icons/favicon-32.png">
 <style>
@@ -17,7 +17,7 @@ code{font-family:"JetBrains Mono",Menlo,monospace;font-size:12.5px;background:#E
 button{width:100%;min-height:48px;border:0;border-radius:14px;background:#1D4ED8;color:#fff;font:inherit;font-weight:600}
 .muted{color:#64748B;font-size:13px}
 </style></head><body>
-<header><b>FinPi setup check</b><p>Checks your live server for everything Send needs. Shows yes or no only, never a secret.</p></header>
+<header><a href="/" style="color:#fff;text-decoration:none;font-size:13.5px;font-weight:600">‹ Back to FinPi</a><br><b>FinPi system status</b><p>Checks everything sending Pi needs. Shows yes or no only, never a secret.</p></header>
 <main><div id="out"><p class="muted">Checking…</p></div><button id="again" type="button">Check again</button>
 <p class="muted">Cloudflare → Workers &amp; Pages → this project → Settings. After changing a secret or binding, open Deployments and choose <b>Retry deployment</b> on the latest one (or push any update), then check again.</p></main>
 <script>
@@ -29,7 +29,7 @@ button{width:100%;min-height:48px;border:0;border-radius:14px;background:#1D4ED8
     fetch('/transfer?a=check-setup',{cache:'no-store'}).then(function(r){return r.json();}).then(function(d){
       if(!d.ok){document.getElementById('out').innerHTML='<div class="big bad">'+esc(d.error||'Check failed')+'</div>';return;}
       var c=d.check,h='';
-      h+='<div class="big '+(c.ready?'ok':'bad')+'">'+(c.ready?'✓ Send is ready on '+esc(c.net)+'.':'✕ Send is not ready on '+esc(c.net)+'. Fix the red items below.')+'</div><div class="card">';
+      h+='<div class="big '+(c.ready?'ok':'bad')+'">'+(c.ready?'✓ Payments are working on '+esc(c.net)+'.':'✕ Sending is not ready on '+esc(c.net)+'. For the app owner: fix the red items below.')+'</div><div class="card">';
       h+=row(c.pi_api_key,'Secret PI_API_KEY is set','Add a secret named <code>PI_API_KEY</code> with the API key from FinPi’s app in the Pi Developer Portal ('+esc(c.net)+' app).');
       if(c.pi_api_key) h+=row(c.pi_api_key_accepted,'Pi Network accepts the API key','Pi answered '+esc(c.pi_api_key_status||'no')+'. Copy the key again from the Developer Portal. Make sure it is the key of the '+esc(c.net)+' app (mainnet and testnet apps have different keys).');
       h+=row(c.app_wallet_seed,'Secret APP_WALLET_SEED is a wallet secret key',c.seed_looks_like_address?'This is the wallet <b>address</b> (starts with G). Use the wallet <b>secret key</b> instead: it starts with <b>S</b> and has 56 characters.':c.seed_raw_present?'The value is not a valid secret key. It must start with <b>S</b>, be 56 characters, with no spaces or quotes.':'Add a secret named <code>APP_WALLET_SEED</code> with the secret key (starts with S) of the app wallet shown in the Developer Portal for this app.');
