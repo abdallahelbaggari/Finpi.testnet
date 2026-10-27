@@ -19,8 +19,16 @@ const round7 = (n) => Math.round(Number(n) * 1e7) / 1e7;
 // On automatically once the app wallet key is added; TRANSFERS_ENABLED = 0 pauses transfers at any time.
 // The database binding may be named FP_DB (recommended), DB or FINPI_DB.
 export function DBB(env) { return env.FP_DB || env.DB || env.FINPI_DB || null; }
-const seedOk = (env) => /^S[A-Z2-7]{55}$/.test(String(env.APP_WALLET_SEED || '').trim());
-export const piKey = (env) => String(env.PI_API_KEY || '').trim();
+// The app wallet secret key. APP_WALLET_SEED is the recommended name; common alternatives are accepted too.
+const SEED_NAMES = ['APP_WALLET_SEED', 'APP_WALLET_SECRET', 'APP_WALLET_SECRET_KEY', 'APP_WALLET_PRIVATE_KEY', 'WALLET_SEED', 'WALLET_SECRET', 'WALLET_SECRET_KEY', 'WALLET_PRIVATE_KEY', 'PI_WALLET_SEED', 'PI_WALLET_SECRET', 'SEED', 'SECRET_SEED', 'SECRET_KEY', 'PRIVATE_KEY'];
+const clean = (v) => String(v || '').trim().replace(/^["'`]+|["'`]+$/g, '').replace(/\s+/g, '');
+export function walletSeed(env) {
+  for (const n of SEED_NAMES) { const v = clean(env[n]).toUpperCase(); if (/^S[A-Z2-7]{55}$/.test(v)) return v; }
+  return clean(env.APP_WALLET_SEED);
+}
+export const seedName = (env) => SEED_NAMES.find((n) => /^S[A-Z2-7]{55}$/.test(clean(env[n]).toUpperCase())) || '';
+const seedOk = (env) => /^S[A-Z2-7]{55}$/.test(walletSeed(env));
+export const piKey = (env) => String(env.PI_API_KEY || '').trim().replace(/^["'`]+|["'`]+$/g, '');
 /* What is set up (yes/no only, never any secret), so the developer can see why transfers are off. */
 export function setup(env) { return { pi_api_key: !!piKey(env), app_wallet_seed: seedOk(env), database: !!DBB(env), paused: String(env.TRANSFERS_ENABLED || '').trim() === '0' }; }
 // In-app sending needs only the Pi API key and the app wallet secret key. The database is optional: it adds @username sends and daily limits.
@@ -105,7 +113,7 @@ const netOf = (pay, request) => request ? NET(isTest(request)) : NET(/test/i.tes
 /* the memo written on a direct payment: a short, unique reference derived from the sender's payment ID */
 export async function refMemo(pid) { const h = [...new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode('finpi|' + pid)))].map((b) => b.toString(16).padStart(2, '0')).join(''); return 'FinPi ' + h.slice(0, 20); }
 async function accountExists(net, a) { const r = await fetch(net.horizon + '/accounts/' + a); if (r.status === 404) return false; if (!r.ok) throw new Error('Could not check the address'); return true; }
-async function appAddress(env) { try { return (await keypairFromSeed(String(env.APP_WALLET_SEED).trim())).address; } catch (e) { return ''; } }
+async function appAddress(env) { try { return (await keypairFromSeed(walletSeed(env))).address; } catch (e) { return ''; } }
 
 export async function checkTransferPayment(env, pay, request) {
   if (!enabled(env)) return 'Transfers are not switched on';
@@ -150,7 +158,7 @@ async function payoutDirect(env, request, pid) {
   if (!md.addr) return { ok: false, error: 'Sending to a @username needs the FinPi database' };
   if (!st.developer_completed || !st.transaction_verified || st.cancelled || st.user_cancelled) return { ok: false, error: 'The payment is not completed yet' };
   const amt = round7(md.amt), paid = Number(pay.amount), now = Date.now();
-  const kp = await keypairFromSeed(String(env.APP_WALLET_SEED).trim());
+  const kp = await keypairFromSeed(walletSeed(env));
   const memo = await refMemo(pid), rmemo = await refMemo('refund|' + pid);
   const row = (status, txid, addr) => ({ pid, from: '', to: '', to_kind: 'address', amount: amt, narr: String(md.narr || '').slice(0, 80), status,
     txid: status === 'paid' ? txid : '', to_addr: md.addr, refund_txid: status === 'refunded' ? txid : '', refund_addr: status === 'refunded' ? addr : '', ts: now, done_ts: now, net: net.name });
@@ -209,7 +217,7 @@ export async function payout(env, request, pid) {
   if (!lock.meta || !lock.meta.changes) { row = await get(); return { ok: row.status === 'paid', refunded: row.status === 'refunded', pending: true, row: pub(row, net) }; }
   row = await get();
 
-  const kp = await keypairFromSeed(String(env.APP_WALLET_SEED).trim());
+  const kp = await keypairFromSeed(walletSeed(env));
   let sure = true;   // false once a transaction was sent and its result is unknown
   const memo = direct ? await refMemo(pid) : '';
   try {

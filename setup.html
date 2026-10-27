@@ -37,7 +37,7 @@ button{width:100%;min-height:48px;border:0;border-radius:14px;background:#1D4ED8
       h+=row(c.database?true:null,'Database (optional)','Not needed to send to wallet addresses. Add it to also send to @usernames and use daily limits: Settings → Bindings → Add → D1 database, variable name <code>FP_DB</code>.');
       if(c.database) h+=row(c.database_works,'Database answers','The database binding exists but did not answer. Remove the binding and add it again.');
       h+=row(!c.paused,'Transfers are not paused','Delete the variable <code>TRANSFERS_ENABLED</code> (it is set to 0).');
-      h+='</div>'; if(c.app_wallet_address&&c.app_wallet_found) h+='<p class="muted">App wallet: <code>'+esc(c.app_wallet_address)+'</code></p>';
+      h+='</div>'; if(c.variable_names) h+='<p class="muted">Variables this project has (names only): '+(c.variable_names.length?c.variable_names.map(function(n){return '<code>'+esc(n)+'</code>';}).join(' '):'none')+(c.seed_variable&&c.seed_variable!=='APP_WALLET_SEED'?'<br>Wallet key found in <code>'+esc(c.seed_variable)+'</code>.':'')+'</p>'; if(c.app_wallet_address&&c.app_wallet_found) h+='<p class="muted">App wallet: <code>'+esc(c.app_wallet_address)+'</code></p>';
       document.getElementById('out').innerHTML=h;
     }).catch(function(){document.getElementById('out').innerHTML='<div class="big bad">Could not reach the server. Check your connection and try again.</div>';});
   }
