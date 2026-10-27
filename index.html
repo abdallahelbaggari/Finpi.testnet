@@ -1,58 +1,65 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
 <head>
-<script>/* Pi sandbox: true only when the app is opened inside the Pi Sandbox (desktop testing at sandbox.minepi.com); false in the Pi Browser. The same code runs as the mainnet and the testnet app: the network comes from the Pi app and its API key. */
-window.PI_SANDBOX=(function(){try{var r=document.referrer||'',a=location.ancestorOrigins?[].slice.call(location.ancestorOrigins).join(' '):'';return /sandbox\.minepi\.com/.test(r+' '+a);}catch(e){return false;}})();</script>
-
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
-<title>FinPi</title>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>FinPi · Pi payments, clear and verified</title>
+<meta name="description" content="FinPi: live Pi rates in your currency, send and request Pi by @username, business payment links, budgets, and receipts anyone can verify on the Pi blockchain.">
+<meta name="theme-color" content="#0A1F55">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' https://sdk.minepi.com https://*.minepi.com https://*.pinet.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com data:; img-src 'self' data: blob: https:; connect-src 'self' https:; frame-src https:; object-src 'none'; base-uri 'self'; form-action 'self'">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icons/favicon-32.png" sizes="32x32">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@500;600;700&family=Poppins:wght@400;500;600;700&display=swap">
+<link rel="stylesheet" href="finpi.css?v=2">
 <script src="https://sdk.minepi.com/pi-sdk.js"></script>
-<style>
-body{margin:0;font-family:system-ui,sans-serif;background:#050A12;color:#F0F6FF;display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:100vh;padding:2rem;text-align:center}
-h1{font-size:2rem;font-weight:800;margin:.5rem 0 .3rem}
-h1 b{color:#0D9488}
-p{color:rgba(240,246,255,.45);font-size:.85rem;margin-bottom:2rem}
-.btn{display:block;width:100%;max-width:360px;margin:.5rem auto;padding:1rem;border:none;border-radius:14px;font-size:1rem;font-weight:700;cursor:pointer;min-height:56px}
-.pi{background:linear-gradient(135deg,#1E3A8A,#2563EB);color:#fff}
-.gu{background:rgba(255,255,255,.08);color:rgba(240,246,255,.8);border:1px solid rgba(255,255,255,.12)}
-#st{color:rgba(240,246,255,.4);font-size:.8rem;margin-top:.5rem;min-height:1.2rem}
-</style>
 </head>
 <body>
-<div style="font-size:3rem">💰</div>
-<h1>Fin<b>Pi</b></h1>
-<p>Pi Financial Platform · Sandbox</p>
 
-<button class="btn pi" onclick="signIn()">π Sign In with Pi</button>
-<button class="btn gu" onclick="guest()">👤 Guest Mode</button>
-<div id="st"></div>
+<div id="landing">
+  <section class="ld-hero">
+    <div class="ld-top"><div class="brand"><img src="icons/icon-192.png" alt="">FinPi</div><span class="ld-net" id="ld-net">Pi Mainnet</span></div>
+    <h1 class="ld-h">Your Pi, <em>clear</em> and <em>verified.</em></h1>
+    <p class="ld-p">Live Pi rates in your currency, send and request Pi by @username, and receipts anyone can check on the Pi blockchain.</p>
+    <div class="ld-rate" id="ld-rate"><span class="live off" id="ld-live"></span><span>1 π =</span><b id="ld-rate-v">…</b><span id="ld-rate-c"></span></div>
+  </section>
+  <section class="ld-card">
+    <div class="ld-feat">
+      <div><i><svg class="ic" viewBox="0 0 24 24"><line x1="7" y1="17" x2="17" y2="7"/><polyline points="7 7 17 7 17 17"/></svg></i><span><b>Send &amp; request by @username</b><small>You approve every payment in Pi’s own window.</small></span></div>
+      <div><i class="t"><svg class="ic" viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg></i><span><b>Payment links &amp; QR for business</b><small>Get paid in Pi for what you sell.</small></span></div>
+      <div><i><svg class="ic" viewBox="0 0 24 24"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg></i><span><b>Receipts verified on the blockchain</b><small>Anyone can scan and check them.</small></span></div>
+      <div><i class="t"><svg class="ic" viewBox="0 0 24 24"><path d="M21.21 15.89A10 10 0 1 1 8 2.83"/><path d="M22 12A10 10 0 0 0 12 2v10z"/></svg></i><span><b>Budgets &amp; insights</b><small>See where your Pi goes each month.</small></span></div>
+    </div>
+    <button class="btn" id="signin" type="button"><span class="pi-dot">π</span><span id="signin-t">Sign in with Pi</span></button>
+    <button class="btn ghost" id="explore" type="button">Explore without signing in</button>
+    <div class="ld-msg" id="ld-msg" role="status"></div>
+    <div class="ld-safe"><svg class="ic" viewBox="0 0 24 24" style="width:16px;height:16px"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>FinPi never asks for your passphrase and never holds your balance.</div>
+  </section>
+  <footer class="ld-foot"><a href="terms-of-service.html">Terms</a>·<a href="privacy-policy.html">Privacy</a>·<a href="risk-disclosure.html">Risk disclosure</a><div style="margin-top:6px">© FinPi 2026 · finpi.pi · Independent app, not operated by Pi Network</div></footer>
+</div>
 
-<script>
-function signIn(){
-  document.getElementById('st').textContent='Connecting...';
-  if(typeof Pi==='undefined'){
-    document.getElementById('st').textContent='Not in Pi Browser. Use guest mode.';
-    return;
-  }
-  Pi.init({version:'2.0',sandbox: window.PI_SANDBOX});
-  Pi.authenticate(['username','payments'],function(){})
-    .then(function(a){
-      localStorage.setItem('fp_user',JSON.stringify(a.user));
-      document.getElementById('st').textContent='Signed in as @'+a.user.username;
-      setTimeout(function(){window.location='/app.html';},800);
-    })
-    .catch(function(e){
-      document.getElementById('st').textContent='Failed: '+(e&&e.message?e.message:'try again');
-    });
-}
-function guest(){
-  localStorage.setItem('fp_user',JSON.stringify({username:'Guest'}));
-  window.location='/app.html';
-}
-// Auto-restore
-try{if(localStorage.getItem('fp_user')){window.location='/app.html';}}catch(e){}
-</script>
-<script>/* Testnet copy: same code, a clear label so nobody mistakes test Pi for real Pi */(function(){if(!/(^|[.-])testnet[.-]/i.test(location.hostname))return;document.title="[Testnet] "+document.title;var b=document.createElement("div");b.textContent="TESTNET";b.setAttribute("aria-label","Testnet: test Pi only");b.style.cssText="position:fixed;left:12px;bottom:calc(86px + env(safe-area-inset-bottom));z-index:99999;padding:3px 10px;border-radius:999px;background:#B45309;color:#fff;font:800 11px/1.4 system-ui,sans-serif;letter-spacing:.06em;pointer-events:none;opacity:.92";(document.body||document.documentElement).appendChild(b);})();</script>
+<div id="app" hidden>
+  <header id="top">
+    <div class="brand"><img src="icons/icon-192.png" alt="">FinPi</div>
+    <div class="top-r"><span class="netb" id="netb" hidden>Testnet</span>
+      <button class="tbtn" type="button" data-act="notifs" aria-label="Notifications"><svg class="ic" viewBox="0 0 24 24"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg><span class="dot" id="bell-dot" hidden></span></button>
+      <button class="avatar" type="button" data-tab="profile" id="av" aria-label="Profile">G</button>
+    </div>
+  </header>
+  <main id="view" tabindex="-1"></main>
+  <nav id="tabs" aria-label="Main">
+    <button type="button" data-tab="home" class="on"><span class="b"><svg class="ic" viewBox="0 0 24 24"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg></span>Home</button>
+    <button type="button" data-tab="pay"><span class="b"><svg class="ic" viewBox="0 0 24 24"><line x1="7" y1="17" x2="17" y2="7"/><polyline points="7 7 17 7 17 17"/></svg></span>Pay</button>
+    <button type="button" data-tab="wallet"><span class="b"><svg class="ic" viewBox="0 0 24 24"><rect x="1" y="4" width="22" height="16" rx="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg></span>Wallet</button>
+    <button type="button" data-tab="activity"><span class="b"><svg class="ic" viewBox="0 0 24 24"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg></span>Activity</button>
+    <button type="button" data-tab="profile"><span class="b"><svg class="ic" viewBox="0 0 24 24"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg></span>Profile</button>
+  </nav>
+</div>
+
+<div id="toast" role="status" aria-live="polite"></div>
+<script src="qr.js?v=1"></script>
+<script src="finpi-receipt.js?v=2"></script>
+<script src="finpi.js?v=2"></script>
 </body>
 </html>

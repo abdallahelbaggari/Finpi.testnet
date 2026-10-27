@@ -1,83 +1,39 @@
-/* FinPi Service Worker v7
-   - skipWaiting + clients.claim = auto-replaces old SW immediately
-   - /legal/ paths: never intercepted, always fetched fresh from server
-   - index.html: network-first (always fresh from Cloudflare)
-   - Static assets: cache-first for performance
-*/
-const CACHE = 'finpi-v7';
-const STATIC = ['/index.html', '/manifest.json', '/finpi-logo.svg'];
+/* FinPi offline support.
+   Pages: network first, cached copy only when offline (so a new deploy is always picked up).
+   Versioned files (?v=), icons, logo and onboarding photos: cache first.
+   Server functions (payments, prices, live location, AI…) are never cached. */
+var CACHE = 'finpi-v1';
+var SHELL = ['/', '/index.html', '/manifest.webmanifest', '/icons/icon-192.png', '/icons/icon-512.png'];
+var LIVE = /^\/(approve|complete|recover|transfer|users|pi-price|fx|verify|validation-key\.txt)(\/|$|\?)/;
 
-self.addEventListener('install', e => {
-  /* Skip waiting immediately — replace old SW right away, no user action needed */
-  self.skipWaiting();
-  e.waitUntil(
-    caches.open(CACHE).then(c => c.addAll(STATIC)).catch(() => {})
-  );
+self.addEventListener('install', function (e) {
+  e.waitUntil(caches.open(CACHE).then(function (c) { return c.addAll(SHELL).catch(function () {}); }).then(function () { return self.skipWaiting(); }));
 });
-
-self.addEventListener('activate', e => {
-  e.waitUntil(
-    Promise.all([
-      /* Delete ALL previous caches (finpi-v1 through finpi-v6) */
-      caches.keys().then(keys =>
-        Promise.all(keys.filter(k => k !== CACHE).map(k => {
-          console.log('[FinPi SW v7] Deleting old cache:', k);
-          return caches.delete(k);
-        }))
-      ),
-      /* Claim all clients immediately without waiting for reload */
-      self.clients.claim()
-    ])
-  );
+self.addEventListener('activate', function (e) {
+  e.waitUntil(caches.keys().then(function (ks) { return Promise.all(ks.filter(function (k) { return k !== CACHE; }).map(function (k) { return caches.delete(k); })); }).then(function () { return self.clients.claim(); }));
 });
-
-self.addEventListener('fetch', e => {
-  const url = e.request.url;
-  let path;
-  try { path = new URL(url).pathname; } catch(err) { return; }
-
-  /* ── NEVER intercept — pass straight through to server ── */
-  if (
-    path.startsWith('/legal/') ||        /* legal pages — serve from server always */
-    path.startsWith('/approve') ||
-    path.startsWith('/complete') ||
-    path.startsWith('/payment-recovery') ||
-    path.includes('.well-known') ||
-    url.includes('coingecko') ||
-    url.includes('okx.com') ||
-    url.includes('gateio') ||
-    url.includes('anthropic') ||
-    url.includes('qrserver') ||
-    e.request.method !== 'GET'
-  ) return;
-
-  /* ── index.html — network first, cache fallback ── */
-  if (path === '/' || path === '/index.html') {
-    e.respondWith(
-      fetch(e.request, { cache: 'no-cache' })
-        .then(res => {
-          if (res && res.status === 200) {
-            const clone = res.clone();
-            caches.open(CACHE).then(c => c.put(e.request, clone));
-          }
-          return res;
-        })
-        .catch(() => caches.match('/index.html'))
-    );
+self.addEventListener('fetch', function (e) {
+  var r = e.request; if (r.method !== 'GET') return;
+  var u = new URL(r.url); if (u.origin !== self.location.origin) return;
+  if (LIVE.test(u.pathname)) return;
+  var stat = /[?&]v=/.test(u.search) || /^\/icons\//.test(u.pathname);
+  if (stat) {
+    e.respondWith(caches.match(r).then(function (hit) {
+      return hit || fetch(r).then(function (res) { if (res && res.ok) { var cp = res.clone(); caches.open(CACHE).then(function (c) { c.put(r, cp); }); } return res; });
+    }));
     return;
   }
-
-  /* ── Static assets — cache first, network fallback ── */
-  e.respondWith(
-    caches.match(e.request).then(cached => {
-      if (cached) return cached;
-      return fetch(e.request).then(res => {
-        if (res && res.status === 200 && res.type === 'basic') {
-          const clone = res.clone();
-          caches.open(CACHE).then(c => c.put(e.request, clone));
-        }
-        return res;
-      });
-    }).catch(() => null)
-  );
+  e.respondWith(fetch(r).then(function (res) {
+    if (res && res.ok) { var cp = res.clone(); caches.open(CACHE).then(function (c) { c.put(r, cp); }); }
+    return res;
+  }).catch(function () {
+    return caches.match(r).then(function (hit) { return hit || (r.mode === 'navigate' ? caches.match('/index.html').then(function (h) { return h || caches.match('/'); }) : Response.error()); });
+  }));
+});
+self.addEventListener('notificationclick', function (e) {
+  e.notification.close();
+  e.waitUntil(self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then(function (cs) {
+    for (var i = 0; i < cs.length; i++) { if ('focus' in cs[i]) return cs[i].focus(); }
+    return self.clients.openWindow ? self.clients.openWindow('/') : null;
+  }));
 });

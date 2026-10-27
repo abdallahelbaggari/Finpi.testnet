@@ -1,115 +1,28 @@
-/* ================================================================
-   FinPi · functions/complete.js · Cloudflare Pages Function
-   Route: /complete (POST)
-   Pi Network (mainnet or testnet, set by PI_API_KEY)
-   ALWAYS return HTTP 200 — non-200 = Payment Expired on Pi side
-================================================================ */
+/* FINPI · /complete — completes a Pi payment after the user signed it in Pi's window.
+   For a transfer, it then runs the automatic delivery (or automatic refund) at once. Always answers HTTP 200 for the Pi SDK. */
+import { payout, piApi, rateOk } from './_lib/transfers.js';
+const cors = { 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Methods': 'POST, GET, OPTIONS', 'Access-Control-Allow-Headers': 'Content-Type', 'Content-Type': 'application/json', 'Cache-Control': 'no-store' };
+const out = (o) => new Response(JSON.stringify(o), { status: 200, headers: cors });
 
-export async function onRequestGet(context) {
-  const key = context.env.PI_API_KEY;
-  return new Response(JSON.stringify({
-    success: true,
-    message: "FinPi /complete endpoint is live",
-    app: "FinPi",
-    route: "/complete",
-    network: "set by PI_API_KEY",
-    pi_api_key_present: !!key,
-    pi_api_key_length: key ? key.length : 0,
-    timestamp: new Date().toISOString()
-  }), {
-    status: 200,
-    headers: {
-      "Content-Type": "application/json",
-      "Access-Control-Allow-Origin": "*"
-    }
-  });
-}
-
-export async function onRequestPost(context) {
-  const CORS = {
-    "Access-Control-Allow-Origin": "*",
-    "Access-Control-Allow-Methods": "POST, GET, OPTIONS",
-    "Access-Control-Allow-Headers": "Content-Type",
-    "Content-Type": "application/json"
-  };
-
-  console.log("[FinPi] /complete POST received");
-
+export async function onRequestGet({ env }) { return out({ success: true, ready: !!env.PI_API_KEY }); }
+export async function onRequestPost({ request, env }) {
+  const b = await request.json().catch(() => ({}));
+  const pid = String(b.paymentId || ''), txid = String(b.txid || '');
+  if (!/^[A-Za-z0-9_-]{6,80}$/.test(pid) || !/^[A-Fa-f0-9]{64}$/.test(txid)) return out({ completed: false, error: 'Invalid payment details' });
+  if (!env.PI_API_KEY) return out({ completed: false, error: 'Payments are not switched on yet' });
+  if (!(await rateOk(env, request, 'complete', 120))) return out({ completed: false, error: 'Too many attempts. Please wait a while.' });
   try {
-    const body = await context.request.json();
-    const paymentId = body.paymentId;
-    const txid      = body.txid;
-
-    console.log("[FinPi] /complete paymentId:", paymentId, "txid:", txid);
-
-    if (!paymentId) {
-      return new Response(
-        JSON.stringify({ completed: false, error: "missing paymentId" }),
-        { status: 200, headers: CORS }
-      );
+    const r = await piApi(env, '/payments/' + encodeURIComponent(pid) + '/complete', 'POST', { txid });
+    let transfer = null;
+    const g = await piApi(env, '/payments/' + encodeURIComponent(pid));
+    const done = r.ok || (g.ok && g.d && g.d.status && g.d.status.developer_completed);
+    if (done && g.d && g.d.metadata && g.d.metadata.type === 'transfer') {
+      try { transfer = await payout(env, request, pid); } catch (e) { transfer = { ok: false, retry: true, error: 'Delivery will be retried automatically' }; }
     }
-
-    if (!txid) {
-      console.log("[FinPi] /complete — no txid yet, returning completed:true to avoid expiry");
-      return new Response(
-        JSON.stringify({ completed: true, note: "waiting_for_txid" }),
-        { status: 200, headers: CORS }
-      );
-    }
-
-    const PI_API_KEY = context.env.PI_API_KEY;
-    if (!PI_API_KEY) {
-      console.error("[FinPi] PI_API_KEY not configured");
-      return new Response(
-        JSON.stringify({ completed: true, note: "no_api_key — set PI_API_KEY in Cloudflare Pages env" }),
-        { status: 200, headers: CORS }
-      );
-    }
-
-    /* Call Pi API — complete */
-    console.log("[FinPi] Calling Pi API complete for:", paymentId, "txid:", txid);
-    const piRes = await fetch(
-      `https://api.minepi.com/v2/payments/${paymentId}/complete`,
-      {
-        method: "POST",
-        headers: {
-          "Authorization": `Key ${PI_API_KEY}`,
-          "Content-Type": "application/json"
-        },
-        body: JSON.stringify({ txid })
-      }
-    );
-
-    const piRaw = await piRes.text();
-    console.log("[FinPi] Pi complete response:", piRes.status, piRaw.substring(0, 300));
-
-    return new Response(
-      JSON.stringify({
-        completed: piRes.ok,
-        pi_status: piRes.status,
-        pi_ok: piRes.ok,
-        paymentId,
-        txid
-      }),
-      { status: 200, headers: CORS }
-    );
-
-  } catch (err) {
-    console.error("[FinPi] /complete error:", err.message);
-    return new Response(
-      JSON.stringify({ completed: false, error: err.message }),
-      { status: 200, headers: CORS }
-    );
+    return out({ completed: !!done, pi_status: r.status, transfer });
+  } catch (e) {
+    console.error('complete failed', pid, e && e.message);
+    return out({ completed: false, error: 'Could not complete right now. FinPi will finish it automatically when you reopen the app.' });
   }
 }
-
-export async function onRequestOptions() {
-  return new Response(null, {
-    status: 200,
-    headers: {
-      "Access-Control-Allow-Origin": "*",
-      "Access-Control-Allow-Methods": "POST, GET, OPTIONS",
-      "Access-Control-Allow-Headers": "Content-Type"
-    }
-  });
-}
+export async function onRequestOptions() { return new Response(null, { status: 204, headers: cors }); }
