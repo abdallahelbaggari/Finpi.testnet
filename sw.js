@@ -2,8 +2,8 @@
    Pages: network first, cached copy only when offline (so a new deploy is always picked up).
    Versioned files (?v=), icons, logo and onboarding photos: cache first.
    Server functions (payments, prices, live location, AI…) are never cached. */
-var CACHE = 'finpi-v1';
-var SHELL = ['/', '/index.html', '/manifest.webmanifest', '/icons/icon-192.png', '/icons/icon-512.png'];
+var CACHE = 'finpi-v2';
+var SHELL = ['/', '/index.html', '/manifest.webmanifest', '/icons/icon-192.png', '/icons/icon-512.png', '/icons/logo-256.png'];
 var LIVE = /^\/(approve|complete|recover|transfer|users|pi-price|fx|verify|validation-key\.txt)(\/|$|\?)/;
 
 self.addEventListener('install', function (e) {
