@@ -115,8 +115,24 @@ export async function refMemo(pid) { const h = [...new Uint8Array(await crypto.s
 async function accountExists(net, a) { const r = await fetch(net.horizon + '/accounts/' + a); if (r.status === 404) return false; if (!r.ok) throw new Error('Could not check the address'); return true; }
 async function appAddress(env) { try { return (await keypairFromSeed(walletSeed(env))).address; } catch (e) { return ''; } }
 
+/* Is the app wallet for this key real on this network? (cached for 5 minutes) */
+const WCACHE = globalThis.__fpWallet || (globalThis.__fpWallet = {});
+export async function walletReady(env, request) {
+  if (!seedOk(env)) return { ok: false };
+  const net = NET(isTest(request)), seed = walletSeed(env), k = net.name + '|' + seed.slice(-8), c = WCACHE[k];
+  if (c && Date.now() - c.t < 300000) return c;
+  let kp; try { kp = await keypairFromSeed(seed); } catch (e) { return { ok: false }; }
+  let ok = false; try { ok = (await fetch(net.horizon + '/accounts/' + kp.address)).ok; } catch (e) { ok = c ? c.ok : false; }
+  return (WCACHE[k] = { ok, address: kp.address, t: Date.now() });
+}
+const UNAVAILABLE = 'Sending is temporarily unavailable. Nothing was charged.';
 export async function checkTransferPayment(env, pay, request) {
   if (!enabled(env)) return 'Transfers are not switched on';
+  if (request) {
+    const w = await walletReady(env, request);
+    if (!w.ok) return UNAVAILABLE;
+    if (pay && pay.to_address && pay.to_address !== w.address) return UNAVAILABLE;   // the payment would go to a wallet FinPi cannot pay from
+  }
   const md = (pay && pay.metadata) || {}, amt = round7(md.amt), paid = Number(pay && pay.amount);
   if (!(amt >= 0.01)) return 'The smallest transfer is 0.01 π';
   if (amt > maxTransfer(env)) return 'The most you can send at once is ' + maxTransfer(env) + ' π';
@@ -159,6 +175,7 @@ async function payoutDirect(env, request, pid) {
   if (!st.developer_completed || !st.transaction_verified || st.cancelled || st.user_cancelled) return { ok: false, error: 'The payment is not completed yet' };
   const amt = round7(md.amt), paid = Number(pay.amount), now = Date.now();
   const kp = await keypairFromSeed(walletSeed(env));
+  if (pay.to_address && pay.to_address !== kp.address) return { ok: false, retry: true, error: 'Delivery is delayed' };
   const memo = await refMemo(pid), rmemo = await refMemo('refund|' + pid);
   const row = (status, txid, addr) => ({ pid, from: '', to: '', to_kind: 'address', amount: amt, narr: String(md.narr || '').slice(0, 80), status,
     txid: status === 'paid' ? txid : '', to_addr: md.addr, refund_txid: status === 'refunded' ? txid : '', refund_addr: status === 'refunded' ? addr : '', ts: now, done_ts: now, net: net.name });
@@ -211,6 +228,7 @@ export async function payout(env, request, pid) {
   const refund = !!invalid || /^refund/.test(row.status) || ((row.tries || 0) >= REFUND_AFTER.tries && row.fail_ts && now - row.fail_ts > REFUND_AFTER.ms);
   const job = refund ? 'refunding' : 'paying';
 
+  { const kp0 = await keypairFromSeed(walletSeed(env)); if (pay.to_address && pay.to_address !== kp0.address) return { ok: false, retry: true, error: 'Delivery is delayed' }; }
   // 3. Take the job: one worker at a time, and never while an earlier attempt could still land on the blockchain
   const lock = await d.prepare("UPDATE transfers SET status = ?, ts = ?, err = NULL WHERE pid = ? AND (status IN ('received', 'refund_needed') OR (status IN ('failed', 'refund_failed') AND ts < ?) OR (status IN ('paying', 'refunding') AND ts < ?))")
     .bind(job, now, pid, now - WAIT_UNCERTAIN, now - STALE).run();

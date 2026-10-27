@@ -339,7 +339,7 @@
     var payees = get('payees', []).filter(function (p) { return addrOn || !isG(p); }).slice(0, 6);
     var w = sheet('Send Pi',
       (pre.link || pre.x && pre.a ? '<div class="note gray" style="margin-bottom:8px">' + ic('qr') + '<span>Payment request from ' + esc(isG(pre.u) ? short(pre.u) : '@' + pre.u) + (pre.a ? ' for <b>' + fpi(pre.a) + ' π</b>' : '') + (pre.x ? ' · “' + esc(pre.x) + '”' : '') + '. Check it is someone you know.</span></div>' : '') +
-      (userOn ? '<div class="seg" role="tablist" style="margin-bottom:4px"><button type="button" data-k="user">Username</button><button type="button" data-k="addr">Wallet address</button></div>' : (S.cfg.enabled ? '<p class="sh-sub">Send Pi to any Pi wallet address. You approve in Pi’s window right here in FinPi.</p>' : '<p class="sh-sub">Fill in the payment, pay it from your own Pi Wallet, and FinPi makes the receipt automatically.</p>')) +
+      (userOn ? '<div class="seg" role="tablist" style="margin-bottom:4px"><button type="button" data-k="user">Username</button><button type="button" data-k="addr">Wallet address</button></div>' : (S.cfg.enabled ? '' : '<p class="sh-sub">Fill in the payment, then pay it from your Pi Wallet. Your receipt appears automatically.</p>')) +
       '<div id="k-user"><label class="l" for="s-u">To</label><div class="to"><span>@</span><input id="s-u" autocomplete="off" autocapitalize="none" spellcheck="false" placeholder="username" maxlength="60"></div></div>' +
       '<div id="k-addr" hidden><label class="l" for="s-g">Pi wallet address</label><textarea class="in num" id="s-g" rows="2" maxlength="60" autocapitalize="characters" spellcheck="false" placeholder="G…" style="font-size:14px;resize:none"></textarea></div>' +
       '<div class="hint" id="s-uh"></div>' +
@@ -349,7 +349,7 @@
       '<label class="l" for="s-x">Narration</label><input class="in" id="s-x" maxlength="80" placeholder="What is it for? e.g. Rent, groceries, gift">' +
       '<div class="sum" id="s-sum" hidden></div>' +
       '<button type="button" class="btn" id="s-go">Continue</button>' +
-      '<p class="small muted" style="margin-top:12px;text-align:center">' + ic('lock', 'width:14px;height:14px;vertical-align:-2px') + (S.cfg.enabled ? ' You approve in Pi’s own window, inside FinPi. Up to ' + S.cfg.max + ' π per payment.' : ' You approve the payment in your own Pi Wallet. FinPi never holds your Pi.') + '</p>');
+      '<p class="small muted" style="margin-top:12px;text-align:center">' + ic('lock', 'width:14px;height:14px;vertical-align:-2px') + (S.cfg.enabled ? ' Secured by Pi Network. Up to ' + S.cfg.max + ' π per payment.' : ' Secured by Pi Network.') + '</p>');
     var u = $('#s-u', w), g = $('#s-g', w), a = $('#s-a', w), h = $('#s-uh', w), ok = null, tm = null, cat = pre.cat || '';
     function setKind(k) {
       kind = k; ok = null; h.innerHTML = '';
@@ -427,7 +427,7 @@
     var A = isG(to), warn = [];
     if (A) warn.push('<div class="note warn">' + ic('warn') + '<span>You are sending to a <b>wallet address</b>. Check every character with the person. Pi sent to a wrong address cannot be recovered.</span></div>');
     if (o.first) warn.push('<div class="note warn">' + ic('warn') + '<span>First time paying ' + (A ? 'this address' : '<b>@' + esc(to) + '</b>') + '. Only send to people and businesses you know and trust. FinPi staff will never ask you to send Pi.</span></div>');
-    warn.push('<div class="note gray">' + ic('info') + '<span>' + (o.wallet ? 'You pay from your own Pi Wallet. FinPi then finds the payment on the Pi blockchain and makes your receipt. Blockchain payments cannot be reversed.' : 'Delivered automatically in seconds. If it cannot be delivered, you are refunded automatically. Delivered transfers cannot be reversed.') + '</span></div>');
+    warn.push('<div class="note gray">' + ic('info') + '<span>Blockchain payments cannot be reversed.</span></div>');
     var w = sheet('Check before you send',
       '<div class="big"><div class="v">' + fpi(amt) + ' π</div><div class="c">' + esc(conv(amt)) + '</div><div class="w">To ' + esc(toLabel(to)) + '</div></div>' +
       '<div class="sum">' + (A ? '<div style="display:block"><span>To wallet address</span><b class="num" style="display:block;text-align:left;margin-top:4px;font-size:13px;overflow-wrap:anywhere">' + esc(to) + '</b></div>' : '<div><span>To</span><b class="t">@' + esc(to) + '</b></div>') +
@@ -447,7 +447,7 @@
     var w = sheet('Paying ' + lab,
       '<div class="big"><div class="v">' + fpi(amt) + ' π</div><div class="c">' + esc(conv(amt)) + '</div><div class="w">To ' + esc(lab) + ' · ' + esc(narr) + '</div></div>' +
       '<div class="steps"><div id="st1" class="on">Approve in Pi’s window</div><div id="st2">Confirming your payment</div><div id="st3">Delivering to ' + esc(lab) + '</div></div><div class="status" id="st-m">Waiting for your approval…</div>');
-    var refused = false, tries = 0;
+    var refused = false, tries = 0, curPid = '';
     function step(n, m, cls) { for (var i = 1; i <= 3; i++) { var e = $('#st' + i); if (e) e.className = i < n ? 'done' : i === n ? 'on' : ''; } var s = $('#st-m'); if (s) { s.className = 'status' + (cls ? ' ' + cls : ''); s.innerHTML = m; } }
     function finish(row) {
       put('ipend', get('ipend', []).filter(function (x) { return x.pid !== row.pid; }));
@@ -466,7 +466,8 @@
       Pi.createPayment({ amount: r7(amt + S.cfg.fee), memo: ('FinPi transfer to ' + lab).slice(0, 60), metadata: A ? { type: 'transfer', addr: to, amt: amt, narr: narr } : { type: 'transfer', to: to, amt: amt, narr: narr } }, {
         onReadyForServerApproval: function (pid) {
           var pend = get('pend', {}); pend[pid] = { cat: cat, to: to, amt: amt, narr: narr, ts: Date.now() }; put('pend', pend);
-          api('/approve', { paymentId: pid }).then(function (d) { if (d && d.approved === false) { refused = true; step(1, '✕ ' + esc(d.error || 'This transfer was refused.') + ' You have not been charged.', 'err'); } }).catch(function () {});
+          curPid = pid;
+          api('/approve', { paymentId: pid }).then(function (d) { if (d && d.approved === false) { refused = true; dropPending(pid); step(1, '✕ ' + esc(d.error || 'This payment could not be sent.') + (/Nothing was charged/.test(d.error || '') ? '' : ' Nothing was charged.'), 'err'); } }).catch(function () {});
         },
         onReadyForServerCompletion: function (pid, txid) {
           var ip = get('ipend', []).filter(function (x) { return x.pid !== pid; }); ip.unshift({ pid: pid, ts: Date.now() }); put('ipend', ip.slice(0, 20));
@@ -480,13 +481,13 @@
               api('/transfer', { a: 'payout', paymentId: pid }).then(function (x) {
                 if (x && x.ok && x.row && x.row.txid) return finish(x.row);
                 if (x && x.refunded && x.row) return refunded(x.row);
-                if (++tries < 40) { step(3, 'Delivering to ' + esc(lab) + '… the Pi blockchain is busy, retrying automatically.'); setTimeout(retry, 8000); }
-                else step(3, 'Your payment is safe and recorded on the Pi blockchain. FinPi keeps going automatically: ' + esc(lab) + ' is paid, or you are refunded, and you will be notified.');
+                if (++tries < 40) { step(3, 'Delivering to ' + esc(lab) + '… You can close this screen: your receipt will appear in Activity.'); setTimeout(retry, 8000); }
+                else step(3, 'Your payment is processing. Your receipt will appear in Activity as soon as it is delivered.');
               }).catch(function () { if (++tries < 40) setTimeout(retry, 8000); });
             })();
           }).catch(function () { step(2, 'Connection problem. Your payment is recorded; FinPi finishes it automatically when you reopen the app.', 'err'); });
         },
-        onCancel: function () { if (!refused) step(1, 'You cancelled. Nothing was paid.', 'err'); },
+        onCancel: function (cp) { dropPending(cp || curPid); if (!refused) step(1, 'You cancelled. Nothing was paid.', 'err'); },
         onError: function (e) { if (!refused) step(1, '✕ ' + esc((e && e.message) || 'Payment error') + '. Nothing was paid.', 'err'); }
       });
     } catch (e) { step(1, '✕ ' + esc(e.message || e), 'err'); }
@@ -829,6 +830,21 @@
     var inn = r.dir === 'in', cls = r.kind === 'refund' ? 'rf' : r.kind === 'supporter' ? 'sp' : inn ? 'in' : '';
     return '<button type="button" class="li" data-rc="' + i + '"><span class="ico ' + cls + '">' + ic(r.kind === 'refund' ? 'undo' : r.kind === 'supporter' ? 'heart' : inn ? 'req' : 'send') + '</span><span class="grow"><b>' + esc(rcptTitle(r)) + '</b><small>' + esc((r.narr ? r.narr + ' · ' : '') + new Date(r.ts).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })) + '</small></span><span class="amt-r"><b class="' + (inn ? 'pos' : '') + '">' + (inn ? '+' : '−') + fpi(r.amount) + ' π</b><small>' + (r.cat && !inn ? esc(r.cat) : 'Verified') + '</small></span></button>';
   }
+  function pendingList() {
+    var pd = get('pend', {}), R = rcpts();
+    return Object.keys(pd).filter(function (k) { var p = pd[k]; return p && p.amt && !R.some(function (r) { return r.pid === k; }); })
+      .map(function (k) { var p = pd[k]; return { pid: k, to: p.to, amt: p.amt, narr: p.narr, cat: p.cat, ts: p.ts || Date.now() }; }).sort(function (a, b) { return b.ts - a.ts; });
+  }
+  function pendRow(p) {
+    return '<button type="button" class="li" data-pend="' + esc(p.pid) + '"><span class="ico rf">' + ic('refresh') + '</span><span class="grow"><b>To ' + esc(isG(p.to) ? short(p.to) : '@' + p.to) + '</b><small>' + esc((p.narr ? p.narr + ' · ' : '') + new Date(p.ts).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })) + '</small></span><span class="amt-r"><b>−' + fpi(p.amt) + ' π</b><small>Processing</small></span></button>';
+  }
+  function pendSheet(pid) {
+    var p = pendingList().filter(function (x) { return x.pid === pid; })[0]; if (!p) return;
+    var w = sheet('Payment processing', '<div class="big"><div class="v">' + fpi(p.amt) + ' π</div><div class="c">' + esc(conv(p.amt)) + '</div><div class="w">To ' + esc(isG(p.to) ? short(p.to) : '@' + p.to) + (p.narr ? ' · ' + esc(p.narr) : '') + '</div></div>' +
+      '<div class="note" style="margin-top:12px">' + ic('refresh') + '<span>Your payment is being delivered. The receipt will appear here as soon as it is done.</span></div>' +
+      '<button type="button" class="btn" data-x="chk">' + ic('refresh') + 'Check now</button>');
+    $('[data-x="chk"]', w).onclick = function () { closeSheets(); toast('Checking…'); checkPendingInApp(); };
+  }
   var TIPS = ['FinPi staff will never ask you to send Pi or share your passphrase.', 'Check the @username and amount on the final screen before you approve.', 'A receipt is genuine only if its QR code checks out on the Pi blockchain.', 'Your passphrase and secret key (starting with S) are for you alone. Never type them into any app.'];
   var T = {
     home: function () {
@@ -838,20 +854,21 @@
         '<div class="qa"><button type="button" data-act="send"><i>' + ic('send') + '</i>Send</button><button type="button" data-act="request"><i class="t">' + ic('req') + '</i>Request</button><button type="button" data-act="scan"><i class="n">' + ic('qr') + '</i>Scan</button><button type="button" data-act="receive"><i class="a">' + ic('card') + '</i>Receive</button></div>' +
         '<div class="sec"><h2>Overview</h2></div><div class="card" data-p="month">' + monthHTML() + '</div>' +
         '<div class="sec"><h2>Recent activity</h2>' + (R.length ? '<button type="button" data-tab="activity">See all</button>' : '') + '</div>' +
-        (R.length ? '<div class="list">' + R.slice(0, 4).map(txRow).join('') + '</div>' : '<div class="list"><div class="empty">' + ic('act') + '<div>No payments yet. Your receipts appear here.</div></div></div>') +
+        (pendingList().length ? '<div class="list" style="margin-bottom:10px">' + pendingList().slice(0, 3).map(pendRow).join('') + '</div>' : '') +
+        (R.length ? '<div class="list">' + R.slice(0, 4).map(txRow).join('') + '</div>' : pendingList().length ? '' : '<div class="list"><div class="empty">' + ic('act') + '<div>No payments yet. Your receipts appear here.</div></div></div>') +
         '<div class="note" style="margin-top:16px">' + ic('shield') + '<span>' + TIPS[new Date().getDate() % TIPS.length] + '</span></div>';
     },
     pay: function () {
       var on = S.cfg.enabled, pl = get('payees', []);
-      return '<div class="ph"><h1>Send &amp; receive</h1><p>Every payment is recorded on the Pi blockchain, with a professional receipt and the Pi rate in your currency.</p></div>' +
+      return '<div class="ph"><h1>Send &amp; receive</h1><p>Send, request and receive Pi, with a receipt for every payment.</p></div>' +
         '<div class="tiles" style="margin-top:14px">' +
-        '<button type="button" class="tile" data-act="send"><i>' + ic('send') + '</i><b>Send Pi</b><small>' + (on ? (S.cfg.usernames ? 'To a @username or a wallet address' : 'To any Pi wallet address, inside FinPi') : 'From your Pi Wallet to any address') + '</small></button>' +
+        '<button type="button" class="tile" data-act="send"><i>' + ic('send') + '</i><b>Send Pi</b><small>' + (on ? (S.cfg.usernames ? 'To a @username or a wallet address' : 'To any Pi wallet address') : 'From your Pi Wallet to any address') + '</small></button>' +
         '<button type="button" class="tile" data-act="request"><i class="t">' + ic('req') + '</i><b>Request Pi</b><small>A payment code with the amount</small></button>' +
         '<button type="button" class="tile" data-act="scan"><i class="n">' + ic('qr') + '</i><b>Scan to pay</b><small>A payment code or wallet QR</small></button>' +
         '<button type="button" class="tile" data-act="receive"><i class="a">' + ic('card') + '</i><b>Receive Pi</b><small>' + (on && S.cfg.usernames ? 'Your @username and wallet address' : 'Your wallet address and QR code') + '</small></button></div>' +
         (pl.length ? '<div class="sec"><h2>Recent people</h2></div><div class="chips">' + pl.slice(0, 8).map(function (p) { return '<button type="button" class="chip" data-act="send-to" data-u="' + esc(p) + '">' + esc(toLabel(p)) + '</button>'; }).join('') + '</div>' : '') +
-        '<div class="sec"><h2>How it works</h2></div><div class="card"><div class="note gray">' + ic('lock') + '<span>' + (on ? 'You approve in Pi’s window inside FinPi. FinPi delivers the Pi to the recipient within seconds, or refunds you automatically if it cannot, and every step is recorded on the Pi blockchain.' : 'Fill in the payment in FinPi, pay it from your own Pi Wallet, and FinPi finds it on the Pi blockchain and makes your receipt with the Pi rate.') + ' FinPi never holds your Pi.</span></div></div>' +
-        '<div class="tiles" style="margin-top:12px"><button type="button" class="tile" data-act="get-rcpt"><i class="n">' + ic('rcpt') + '</i><b>Get a receipt</b><small>For any Pi payment, from its transaction ID</small></button><button type="button" class="tile" data-act="verify"><i class="a">' + ic('check') + '</i><b>Verify a payment</b><small>Check any transaction on the blockchain</small></button></div>';
+        '<div class="sec"><h2>Tools</h2></div>' +
+        '<div class="tiles"><button type="button" class="tile" data-act="get-rcpt"><i class="n">' + ic('rcpt') + '</i><b>Get a receipt</b><small>For any Pi payment, from its transaction ID</small></button><button type="button" class="tile" data-act="verify"><i class="a">' + ic('check') + '</i><b>Verify a payment</b><small>Check any transaction on the blockchain</small></button></div>';
     },
     wallet: function () {
       var c = curr();
@@ -864,14 +881,15 @@
     },
     activity: function () {
       var R = rcpts();
-      var head = '<div class="ph"><h1>Activity</h1><p>Your FinPi receipts, all verifiable on the Pi blockchain.</p></div><div class="seg" role="tablist"><button type="button" data-seg="tx" class="' + (S.seg === 'tx' ? 'on' : '') + '">Transactions</button><button type="button" data-seg="ins" class="' + (S.seg === 'ins' ? 'on' : '') + '">Insights</button></div>';
+      var head = '<div class="ph"><h1>Activity</h1><p>All your payments and receipts.</p></div><div class="seg" role="tablist"><button type="button" data-seg="tx" class="' + (S.seg === 'tx' ? 'on' : '') + '">Transactions</button><button type="button" data-seg="ins" class="' + (S.seg === 'ins' ? 'on' : '') + '">Insights</button></div>';
       if (S.seg === 'ins') return head + insightsHTML();
       var f = S.filter, F = R.map(function (r, i) { return [r, i]; }).filter(function (x) { var r = x[0]; return f === 'all' || (f === 'out' && r.dir === 'out') || (f === 'in' && r.dir === 'in' && r.kind !== 'refund') || (f === 'ref' && r.kind === 'refund'); });
       var out = '', day = '';
       F.forEach(function (x) { var d = new Date(x[0].ts).toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' }); if (d !== day) { if (day) out += '</div>'; out += '<div class="day">' + d + '</div><div class="list">'; day = d; } out += txRow(x[0], x[1]); });
       if (day) out += '</div>';
       return head + '<div class="chips" style="margin-top:12px">' + [['all', 'All'], ['out', 'Sent'], ['in', 'Received'], ['ref', 'Refunds']].map(function (x) { return '<button type="button" class="chip' + (f === x[0] ? ' on' : '') + '" data-flt="' + x[0] + '">' + x[1] + '</button>'; }).join('') + '</div>' +
-        (out || '<div class="list" style="margin-top:14px"><div class="empty">' + ic('rcpt') + '<div>Nothing here yet.</div></div></div>') +
+        (pendingList().length && (f === 'all' || f === 'out') ? '<div class="day">Processing</div><div class="list">' + pendingList().map(pendRow).join('') + '</div>' : '') +
+        (out || (pendingList().length && (f === 'all' || f === 'out') ? '' : '<div class="list" style="margin-top:14px"><div class="empty">' + ic('rcpt') + '<div>Nothing here yet.</div></div></div>')) +
         (R.length ? '<button type="button" class="btn ghost" data-act="csv" style="margin-top:16px">' + ic('down') + 'Export CSV</button>' : '');
     },
     profile: function () {
@@ -883,7 +901,7 @@
         row('bell', 'Phone notifications', get('push', false) ? 'On' : 'Off', 'push') + row('pie', 'Monthly budget', get('budget', 0) ? fpi(get('budget', 0)) + ' π' : 'Not set', 'budget') + row('card', 'Wallet address', get('addr', '') ? short(get('addr', '')) : 'Not added', 'addr-set') + '</div>' +
         '<div class="sec"><h2>Security &amp; support</h2></div><div class="list">' +
         row('shield', 'Security center', 'Limits, safety and how FinPi works', 'security') + row('heart', sup ? 'You are a Supporter' : 'Become a Supporter', sup ? 'Thank you!' : '1 π · badge only, no reward', 'supporter') +
-        row('mail', 'Help & contact', SUPPORT, 'help') + row('act', 'System status', 'Check that payments are working', 'status') + '</div>' +
+        row('mail', 'Help & contact', SUPPORT, 'help') + '</div>' +
         '<div class="sec"><h2>Legal</h2></div><div class="list">' + lrow('Terms of Service', 'terms-of-service.html') + lrow('Privacy Policy', 'privacy-policy.html') + lrow('Risk Disclosure', 'risk-disclosure.html') + '</div>' +
         (signedIn() ? '<button type="button" class="btn danger" data-act="signout" style="margin-top:18px">' + ic('out') + 'Sign out</button>' : '') +
         '<p class="small muted" style="text-align:center;margin-top:16px">FinPi 1.0.0 · ' + NETN + ' · finpi.pi<br>Independent app, not operated by Pi Network.</p>';
@@ -996,6 +1014,7 @@
     var f = e.target.closest('[data-flt]'); if (f) { S.filter = f.dataset.flt; render('activity'); return; }
     var mo = e.target.closest('[data-mon]'); if (mo) { S.month = Math.min(0, S.month + Number(mo.dataset.mon)); render('activity'); return; }
     var rc = e.target.closest('[data-rc]'); if (rc) { showRcpt(rcpts()[+rc.dataset.rc]); return; }
+    var pe = e.target.closest('[data-pend]'); if (pe) { pendSheet(pe.dataset.pend); return; }
     var a = e.target.closest('[data-act]'); if (a && A[a.dataset.act]) { A[a.dataset.act](a, e); }
   });
   document.addEventListener('keydown', function (e) { if ((e.key === 'Enter' || e.key === ' ') && e.target.matches('[role="button"][data-act]')) { e.preventDefault(); e.target.click(); } });

@@ -5,7 +5,7 @@
 //   POST {a:'list', accessToken}            → the signed-in user's sent and received transfers
 //   POST {a:'check', accessToken, to, amt}  → would this transfer be accepted? (limits, holds, first-time payee) before the Pi pop-up opens
 import { keypairFromSeed } from './_lib/stellar.js';
-import { H, json, me, db, payout, pub, enabled, maxTransfer, FEE, isTest, limits, rateOk, checkTransferPayment, checkLimits, userByName, paidBefore, USER_RE, DBB, setup, usernames, walletSeed, seedName } from './_lib/transfers.js';
+import { H, json, me, db, payout, pub, enabled, maxTransfer, FEE, isTest, limits, rateOk, checkTransferPayment, checkLimits, userByName, paidBefore, USER_RE, DBB, setup, usernames, walletSeed, seedName, walletReady } from './_lib/transfers.js';
 export async function onRequestGet({ request, env }) {
   const q = new URL(request.url).searchParams;
   if (q.get('a') === 'check-setup') {
@@ -22,7 +22,8 @@ export async function onRequestGet({ request, env }) {
     r.ready = enabled(env) && r.pi_api_key_accepted !== false && r.app_wallet_found !== false;
     return json({ ok: true, check: r });
   }
-  return json({ ok: true, payments: setup(env).pi_api_key, setup: setup(env), enabled: enabled(env), addresses: enabled(env), usernames: usernames(env), max: maxTransfer(env), daily: limits(env).day, fee: FEE, net: isTest(request) ? 'Pi Testnet' : 'Pi Mainnet' });
+  const live = enabled(env) && (await walletReady(env, request)).ok;
+  return json({ ok: true, payments: setup(env).pi_api_key, setup: setup(env), enabled: live, addresses: live, usernames: live && usernames(env), max: maxTransfer(env), daily: limits(env).day, fee: FEE, net: isTest(request) ? 'Pi Testnet' : 'Pi Mainnet' });
 }
 export async function onRequestPost({ request, env }) {
   const b = await request.json().catch(() => ({}));
