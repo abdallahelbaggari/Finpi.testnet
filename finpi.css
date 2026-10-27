@@ -249,3 +249,4 @@ input,select,textarea{max-width:100%}
 .txr .cp .ic{width:16px;height:16px}
 .sh .two .btn{margin-top:16px}
 .sh a.btn{text-decoration:none}
+.steps.plain div{background:var(--bg);color:var(--ink2);font-weight:500}.steps.plain div:before{background:var(--blue)}
