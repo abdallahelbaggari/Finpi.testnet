@@ -142,27 +142,64 @@
     var base = { amount: fpi(r.amount), sub: sub, verify: verifyUrl(r), status: { text: '✓  Verified on the Pi blockchain', ok: true } };
     if (r.kind === 'refund') return Object.assign(base, { title: 'Automatic refund', rows: [['From', 'FinPi app wallet (automatic)'], ['To', mine], ['Reason', 'Your transfer to ' + r.other + ' could not be delivered'], ['Narration', r.narr || '—'], ['Reference', r.pid]].concat(when, [['Network', r.net], ['Your address', r.addr, 1], ['Transaction ID', r.txid, 1]]), thanks: 'Refunded by FinPi', note: 'Refunded automatically under FinPi’s published rules, with no manual decision.' });
     if (r.kind === 'supporter') return Object.assign(base, { title: 'Payment receipt', status: { text: '✓  Completed', ok: true }, rows: [['Paid by', mine], ['For', 'FinPi Supporter badge'], ['Payment ID', r.pid, 1]].concat(when, [['Network', r.net], ['Transaction ID', r.txid, 1]]), thanks: 'Thank you for supporting FinPi', note: 'The badge supports the app. It gives no reward or financial return.' });
-    var inn = r.dir === 'in';
+    var inn = r.dir === 'in', fee = inn ? 0 : (r.fee || 0.01), A = r.tk === 'address';
     return Object.assign(base, { title: inn ? 'Transfer received' : 'Transfer receipt',
-      rows: [['From', inn ? r.other : mine], ['To', inn ? mine : r.other], ['Narration', r.narr || '—'], ['Category', inn ? '' : r.cat], ['Reference', r.pid]].concat(when, [['Network', r.net], [inn ? 'Your address' : 'Recipient address', r.addr, 1], ['Transaction ID', r.txid, 1]]),
-      thanks: inn ? 'Received with FinPi' : 'Sent with FinPi', note: 'Paid in FinPi and delivered automatically through Pi Network’s official payments. Scan the code to check it on the Pi blockchain.' });
+      rows: [['From', inn ? r.other : mine], ['To', inn ? mine : (A ? 'Pi wallet address' : r.other)], ['Narration', r.narr || '—'], ['Category', inn ? '' : r.cat]].concat(fee ? [['Blockchain fee', fpi(fee) + ' π'], ['Total paid', fpi(r7(Number(r.amount) + fee)) + ' π']] : [], [['Reference', r.pid]], when, [['Network', r.net], [inn ? 'Your address' : 'Recipient address', r.addr, 1], ['Transaction ID', r.txid, 1]]),
+      thanks: inn ? 'Received with FinPi' : 'Sent with FinPi', note: (A ? 'Paid in FinPi and delivered automatically to the wallet address on the Pi blockchain.' : 'Paid in FinPi and delivered automatically through Pi Network’s official payments.') + ' Scan the code to check it on the Pi blockchain.' });
   }
+  function fontsReady() { try { return document.fonts && document.fonts.ready ? Promise.race([document.fonts.ready, new Promise(function (r) { setTimeout(r, 1500); })]) : Promise.resolve(); } catch (e) { return Promise.resolve(); } }
+  function rcName(r) { var d = new Date(r.ts); return 'FinPi-receipt-' + d.getFullYear() + String(d.getMonth() + 1).padStart(2, '0') + String(d.getDate()).padStart(2, '0') + '-' + String(r.txid || r.pid || Date.now()).slice(0, 8) + '.jpg'; }
+  function rcType(r) { return r.kind === 'refund' ? 'Automatic refund' : r.kind === 'supporter' ? 'Supporter payment' : r.dir === 'in' ? 'Transfer received' : 'Transfer sent'; }
+  /* Transaction details: every fact about the payment, then share or download the receipt image */
   function showRcpt(r) {
-    if (!r || !window.FPReceipt) return;
-    toast('Preparing receipt…');
-    FPReceipt.canvas(spec(r)).then(function (cv) {
-      var url = cv.toDataURL('image/png'), v = verifyUrl(r), name = 'FinPi-receipt-' + (r.txid || r.pid || Date.now()).toString().slice(0, 10) + '.png';
-      var w = sheet('Receipt', '<img class="rc-img" src="' + url + '" alt="Receipt image">' +
-        '<button type="button" class="btn" data-x="share">' + ic('share') + 'Share receipt</button>' +
-        '<div class="two"><a class="btn ghost" href="' + url + '" download="' + name + '">' + ic('down') + 'Save</a>' + (v ? '<a class="btn ghost" href="' + esc(v) + '">' + ic('check') + 'Verify</a>' : '<span></span>') + '</div>' +
-        '<p class="small muted" style="text-align:center;margin-top:10px">You can also press and hold the image to save it.</p>');
-      $('[data-x="share"]', w).onclick = function () {
+    if (!r) return;
+    var inn = r.dir === 'in', v = verifyUrl(r), fee = !inn && r.kind === 'transfer' ? (r.fee || 0.01) : 0, d = new Date(r.ts);
+    var mine = (get('name', '') ? get('name', '') + ' · ' : '') + '@' + (r.me || me());
+    var rows = [];
+    if (r.kind === 'refund') rows.push(['From', 'FinPi app wallet (automatic)'], ['To', mine], ['Reason', 'Your transfer to ' + r.other + ' could not be delivered']);
+    else if (r.kind === 'supporter') rows.push(['Paid by', mine], ['For', 'FinPi Supporter badge']);
+    else rows.push(['From', inn ? r.other : mine], ['To', inn ? mine : (r.tk === 'address' ? 'Pi wallet address' : r.other)]);
+    if (r.narr && r.kind !== 'supporter') rows.push(['Narration', r.narr]);
+    if (r.cat && !inn) rows.push(['Category', r.cat]);
+    if (fee) rows.push(['Amount', fpi(r.amount) + ' π'], ['Blockchain fee', fpi(fee) + ' π'], ['Total paid', fpi(r7(Number(r.amount) + fee)) + ' π']);
+    rows.push(['Date', d.toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'long', year: 'numeric' })], ['Time', d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })], ['Network', r.net || NETN], ['Status', 'Completed']);
+    if (r.pid) rows.push([r.kind === 'supporter' ? 'Payment ID' : 'Reference', r.pid, 1]);
+    if (r.addr) rows.push([inn || r.kind === 'refund' ? 'Your address' : 'Recipient address', r.addr, 1]);
+    if (r.txid) rows.push(['Transaction ID', r.txid, 1]);
+    var cls = r.kind === 'refund' ? 'rf' : r.kind === 'supporter' ? 'sp' : inn ? 'in' : '';
+    var w = sheet('Transaction details',
+      '<div class="txd"><span class="ico ' + cls + '">' + ic(r.kind === 'refund' ? 'undo' : r.kind === 'supporter' ? 'heart' : inn ? 'req' : 'send') + '</span><p class="small">' + esc(rcType(r)) + '</p>' +
+      '<div class="txd-v num' + (inn ? ' pos' : '') + '">' + (inn ? '+' : '−') + fpi(r.amount) + ' π</div>' +
+      (r.usd ? '<p class="small muted num">≈ ' + money(r.amount * r.usd, 'USD') + (r.lr && r.lc && r.lc !== 'USD' ? ' · ' + money(r.amount * r.lr, r.lc) : '') + ' at payment time</p>' : '') +
+      '<span class="txd-ok">' + ic('check', 'width:15px;height:15px') + 'Verified on the Pi blockchain</span></div>' +
+      '<div class="list txd-rows">' + rows.map(function (x, i) { return '<div class="txr"><span>' + esc(x[0]) + '</span><b class="' + (x[2] ? 'num mono' : '') + '">' + esc(x[1]) + '</b>' + (x[2] ? '<button type="button" class="cp" data-cp="' + i + '" aria-label="Copy ' + esc(x[0]) + '">' + ic('copy') + '</button>' : '') + '</div>'; }).join('') + '</div>' +
+      '<div class="two"><button type="button" class="btn" data-x="share">' + ic('share') + 'Share</button><button type="button" class="btn ghost" data-x="dl">' + ic('down') + 'Download</button></div>' +
+      (v ? '<a class="btn soft" href="' + esc(v) + '">' + ic('ext') + 'View on the Pi blockchain</a>' : '') +
+      '<div class="sec" style="margin-top:20px"><h2>Receipt</h2></div><div id="rc-prev" class="empty">Preparing receipt…</div>' +
+      '<p class="small muted" style="text-align:center;margin-top:8px">Tip: press and hold the receipt image to save it to your gallery.</p>');
+    $$('[data-cp]', w).forEach(function (b) { b.onclick = function () { copy(rows[+b.dataset.cp][1]); }; });
+    var cvP = fontsReady().then(function () { return window.FPReceipt ? FPReceipt.canvas(spec(r)) : null; });
+    cvP.then(function (cv) { var p = $('#rc-prev', w); if (!p) return; if (!cv) { p.textContent = 'Receipt image unavailable.'; return; } p.className = ''; p.innerHTML = '<img class="rc-img" alt="FinPi receipt" src="' + cv.toDataURL('image/png') + '">'; });
+    var name = rcName(r), text = 'FinPi receipt · ' + rcType(r) + ' · ' + fpi(r.amount) + ' π · ' + d.toLocaleDateString('en-GB') + (v ? '\nVerify on the Pi blockchain: ' + v : '');
+    $('[data-x="share"]', w).onclick = function () {
+      cvP.then(function (cv) {
+        if (!cv) return shareText('FinPi receipt', text);
         cv.toBlob(function (b) {
-          try { var f = new File([b], name, { type: 'image/png' }); if (navigator.canShare && navigator.canShare({ files: [f] })) return navigator.share({ files: [f], title: 'FinPi receipt' }).catch(function () {}); } catch (e) {}
-          shareText('FinPi receipt', 'FinPi receipt · ' + fpi(r.amount) + ' π' + (v ? '\nVerify: ' + v : ''));
-        }, 'image/png');
-      };
-    });
+          try { var f = new File([b], name, { type: 'image/jpeg' }); if (navigator.canShare && navigator.canShare({ files: [f] })) return navigator.share({ files: [f], title: 'FinPi receipt', text: text }).catch(function () {}); } catch (e) {}
+          shareText('FinPi receipt', text);
+        }, 'image/jpeg', 0.92);
+      });
+    };
+    $('[data-x="dl"]', w).onclick = function () {
+      cvP.then(function (cv) {
+        if (!cv) return toast('Receipt image unavailable');
+        cv.toBlob(function (b) {
+          var u = URL.createObjectURL(b), a = document.createElement('a'); a.href = u; a.download = name; a.rel = 'noopener';
+          document.body.appendChild(a); a.click(); a.remove(); setTimeout(function () { URL.revokeObjectURL(u); }, 8000);
+          toast('Receipt saved to Downloads. If it does not appear, press and hold the image to save it.');
+        }, 'image/jpeg', 0.92);
+      });
+    };
   }
 
   /* ── live Pi price ── */
@@ -235,7 +272,7 @@
   function learnAddr(a) { if (a && /^G[A-Z2-7]{55}$/.test(a) && !get('addr', '')) put('addrSug', a); }
   function saveTransfer(t, dir) {
     var pend = get('pend', {}), pd = pend[t.pid] || {};
-    var ok = saveRcpt({ kind: 'transfer', dir: dir, amount: t.amount, other: dir === 'in' ? '@' + t.from : (t.to_kind === 'address' || !t.to ? short(t.to_addr) : '@' + t.to), narr: t.narr, cat: pd.cat || '', pid: t.pid, txid: t.txid, addr: t.to_addr, ts: t.done_ts || Date.now(), me: me() });
+    var ok = saveRcpt({ kind: 'transfer', dir: dir, tk: dir === 'out' && (t.to_kind === 'address' || !t.to) ? 'address' : 'user', fee: dir === 'out' ? 0.01 : 0, amount: t.amount, other: dir === 'in' ? '@' + t.from : (t.to_kind === 'address' || !t.to ? short(t.to_addr) : '@' + t.to), narr: t.narr, cat: pd.cat || '', pid: t.pid, txid: t.txid, addr: t.to_addr, ts: t.done_ts || Date.now(), me: me() });
     if (dir === 'in') learnAddr(t.to_addr);
     if (pend[t.pid]) { delete pend[t.pid]; put('pend', pend); }
     return ok;

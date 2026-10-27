@@ -94,8 +94,7 @@ export async function userByName(d, name) { return d.prepare('SELECT uid, userna
 /* Checks a transfer payment before FinPi approves it. Returns '' if fine, or the reason to refuse. */
 /* ── sending to a Pi wallet address ──
    Address sends are paid straight from the app wallet to the address (a signed Pi blockchain payment), because Pi's
-   app-to-user API needs a Pi user ID, which an address alone does not give. ADDRESS_SENDS = 0 switches them off. */
-export const addrSends = (env) => String(env.ADDRESS_SENDS || '').trim() !== '0';
+   app-to-user API needs a Pi user ID, which an address alone does not give. Every step is recorded on the Pi blockchain. */
 export const isAddr = (a) => { if (!/^G[A-Z2-7]{55}$/.test(String(a || ''))) return false; try { accountToBytes(a); return true; } catch (e) { return false; } };
 const netOf = (pay, request) => request ? NET(isTest(request)) : NET(/test/i.test(String((pay && pay.network) || '')));
 /* the memo written on a direct payment: a short, unique reference derived from the sender's payment ID */
@@ -110,7 +109,6 @@ export async function checkTransferPayment(env, pay, request) {
   if (amt > maxTransfer(env)) return 'The most you can send at once is ' + maxTransfer(env) + ' π';
   if (!(paid + 1e-9 >= round7(amt + FEE))) return 'Payment does not cover the amount and fee';
   if (md.addr) {
-    if (!addrSends(env)) return 'Sending to wallet addresses is not available right now. Send to a FinPi @username instead.';
     if (!isAddr(md.addr)) return 'This wallet address is not valid';
     if (md.addr === (await appAddress(env))) return 'You cannot send to the FinPi app wallet';
     let ex; try { ex = await accountExists(netOf(pay, request), md.addr); } catch (e) { return 'Could not check the address right now. Please try again.'; }
@@ -154,7 +152,7 @@ export async function payout(env, request, pid) {
 
   // 2. Fixed rule: deliver if the transfer is still valid, otherwise (or if delivery keeps failing) refund
   const amt = round7(md.amt), paid = Number(pay.amount);
-  const invalid = direct ? (!isAddr(md.addr) || !addrSends(env) ? 'The wallet address cannot receive this transfer' : !(amt >= 0.01) || paid + 1e-9 < round7(amt + FEE) ? 'Amounts do not match' : '')
+  const invalid = direct ? (!isAddr(md.addr) ? 'The wallet address cannot receive this transfer' : !(amt >= 0.01) || paid + 1e-9 < round7(amt + FEE) ? 'Amounts do not match' : '')
     : !to ? 'The recipient is no longer a FinPi user' : to.uid === String(pay.user_uid) ? 'Sender and recipient are the same' : !(amt >= 0.01) || paid + 1e-9 < round7(amt + FEE) ? 'Amounts do not match' : '';
   const refund = !!invalid || /^refund/.test(row.status) || ((row.tries || 0) >= REFUND_AFTER.tries && row.fail_ts && now - row.fail_ts > REFUND_AFTER.ms);
   const job = refund ? 'refunding' : 'paying';

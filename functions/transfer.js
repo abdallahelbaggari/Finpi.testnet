@@ -3,9 +3,9 @@
 //   POST {a:'payout', paymentId}            → pays the recipient for a completed transfer (idempotent; also run by /complete)
 //   POST {a:'list', accessToken}            → the signed-in user's sent and received transfers
 //   POST {a:'check', accessToken, to, amt}  → would this transfer be accepted? (limits, holds, first-time payee) before the Pi pop-up opens
-import { H, json, me, db, payout, pub, enabled, maxTransfer, FEE, isTest, limits, rateOk, checkTransferPayment, checkLimits, userByName, paidBefore, USER_RE, DBB, setup, addrSends } from './_lib/transfers.js';
+import { H, json, me, db, payout, pub, enabled, maxTransfer, FEE, isTest, limits, rateOk, checkTransferPayment, checkLimits, userByName, paidBefore, USER_RE, DBB, setup } from './_lib/transfers.js';
 export async function onRequestGet({ request, env }) {
-  return json({ ok: true, payments: setup(env).pi_api_key, setup: setup(env), enabled: enabled(env), addresses: enabled(env) && addrSends(env), max: maxTransfer(env), daily: limits(env).day, fee: FEE, net: isTest(request) ? 'Pi Testnet' : 'Pi Mainnet' });
+  return json({ ok: true, payments: setup(env).pi_api_key, setup: setup(env), enabled: enabled(env), addresses: enabled(env), max: maxTransfer(env), daily: limits(env).day, fee: FEE, net: isTest(request) ? 'Pi Testnet' : 'Pi Mainnet' });
 }
 export async function onRequestPost({ request, env }) {
   const b = await request.json().catch(() => ({}));

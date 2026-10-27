@@ -231,3 +231,21 @@ a.li{color:inherit;font-weight:inherit}
 input,select,textarea{max-width:100%}
 .card,.list,.hero,.tile,.li .grow{min-width:0}
 #view{width:100%;overflow-x:hidden}
+
+/* transaction details */
+.txd{text-align:center;padding:6px 0 14px}
+.txd .ico{width:56px;height:56px;border-radius:18px;display:inline-flex;align-items:center;justify-content:center;background:var(--sky);color:var(--blue);margin-bottom:8px}
+.txd .ico.in{background:var(--mint);color:var(--ok)}.txd .ico.rf{background:#FFF4E5;color:#B45309}.txd .ico.sp{background:#FDF2F8;color:#BE185D}
+.txd-v{font-size:36px;font-weight:700;letter-spacing:-.03em;line-height:1.15;margin:2px 0}
+.txd-v.pos{color:var(--ok)}
+.txd-ok{display:inline-flex;align-items:center;gap:6px;margin-top:10px;padding:6px 12px;border-radius:999px;background:var(--mint);color:var(--ok);font-size:12.5px;font-weight:600}
+.txd-rows{margin-top:4px}
+.txr{display:flex;align-items:flex-start;gap:10px;padding:12px 14px;border-bottom:1px solid var(--line);font-size:14px}
+.txr:last-child{border-bottom:0}
+.txr span{color:var(--mute);flex:none;width:118px}
+.txr b{flex:1;min-width:0;text-align:right;font-weight:600;overflow-wrap:anywhere}
+.txr b.mono{font-family:var(--m);font-size:12.5px;font-weight:500;line-height:1.5}
+.txr .cp{flex:none;width:32px;height:32px;margin:-6px -6px -6px 0;border-radius:10px;display:flex;align-items:center;justify-content:center;color:var(--blue);background:var(--sky)}
+.txr .cp .ic{width:16px;height:16px}
+.sh .two .btn{margin-top:16px}
+.sh a.btn{text-decoration:none}
