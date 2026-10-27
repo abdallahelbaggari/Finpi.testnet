@@ -227,7 +227,7 @@
   /* ── transfers: server status, registration, sync ── */
   function loadCfg() {
     return api('/transfer?a=status').then(function (d) {
-      if (d && d.ok) { S.cfg = { enabled: !!d.enabled, payments: d.payments !== false, fee: d.fee || 0.01, max: d.max || 50, daily: d.daily || 200 }; if (!$('.sh-wrap')) render(S.tab); }
+      if (d && d.ok) { S.cfg = { enabled: !!d.enabled, payments: d.payments !== false, addresses: d.addresses !== false, fee: d.fee || 0.01, max: d.max || 50, daily: d.daily || 200 }; if (!$('.sh-wrap')) render(S.tab); }
     }).catch(function () {});
   }
   var registered = false;
@@ -235,15 +235,16 @@
   function learnAddr(a) { if (a && /^G[A-Z2-7]{55}$/.test(a) && !get('addr', '')) put('addrSug', a); }
   function saveTransfer(t, dir) {
     var pend = get('pend', {}), pd = pend[t.pid] || {};
-    var ok = saveRcpt({ kind: 'transfer', dir: dir, amount: t.amount, other: '@' + (dir === 'in' ? t.from : t.to), narr: t.narr, cat: pd.cat || '', pid: t.pid, txid: t.txid, addr: t.to_addr, ts: t.done_ts || Date.now(), me: me() });
+    var ok = saveRcpt({ kind: 'transfer', dir: dir, amount: t.amount, other: dir === 'in' ? '@' + t.from : (t.to_kind === 'address' || !t.to ? short(t.to_addr) : '@' + t.to), narr: t.narr, cat: pd.cat || '', pid: t.pid, txid: t.txid, addr: t.to_addr, ts: t.done_ts || Date.now(), me: me() });
     if (dir === 'in') learnAddr(t.to_addr);
     if (pend[t.pid]) { delete pend[t.pid]; put('pend', pend); }
     return ok;
   }
   function saveRefund(t) {
     if (!t.refund_txid) return false; learnAddr(t.refund_addr);
-    var ok = saveRcpt({ kind: 'refund', dir: 'in', amount: t.amount, other: '@' + t.to, narr: t.narr, pid: t.pid, txid: t.refund_txid, addr: t.refund_addr, ts: t.done_ts || Date.now(), me: me() });
-    if (ok) addNote('undo', 'Refunded automatically', fpi(t.amount) + ' π returned to you: your transfer to @' + t.to + ' could not be delivered.', 'ref-' + t.pid);
+    var tl = t.to_kind === 'address' || !t.to ? short(t.to_addr) : '@' + t.to;
+    var ok = saveRcpt({ kind: 'refund', dir: 'in', amount: t.amount, other: tl, narr: t.narr, pid: t.pid, txid: t.refund_txid, addr: t.refund_addr, ts: t.done_ts || Date.now(), me: me() });
+    if (ok) addNote('undo', 'Refunded automatically', fpi(t.amount) + ' π returned to you: your transfer to ' + tl + ' could not be delivered.', 'ref-' + t.pid);
     return ok;
   }
   function sync() {
@@ -270,20 +271,31 @@
     if (!window.Pi || !initPi()) { toast('Open FinPi in the Pi Browser to pay'); return false; }
     return true;
   }
+  var isG = function (v) { return /^G[A-Z2-7]{55}$/.test(v); };
+  function toLabel(t) { return isG(t) ? short(t) : '@' + t; }
   function sendSheet(pre) {
     pre = pre || {}; if (!guardPay()) return;
-    var payees = get('payees', []).slice(0, 6);
+    var addrOn = S.cfg.addresses !== false, kind = pre.u && isG(pre.u) ? 'addr' : 'user';
+    var payees = get('payees', []).filter(function (p) { return addrOn || !isG(p); }).slice(0, 6);
     var w = sheet('Send Pi',
-      '<p class="sh-sub">Send Pi to any FinPi user by their Pi username.</p>' +
-      '<label class="l" for="s-u">To</label><div class="to"><span>@</span><input id="s-u" autocomplete="off" autocapitalize="none" spellcheck="false" placeholder="username" maxlength="60"></div><div class="hint" id="s-uh"></div>' +
-      (payees.length && !pre.u ? '<div class="chips" style="margin-top:2px">' + payees.map(function (p) { return '<button type="button" class="chip" data-pu="' + esc(p) + '">@' + esc(p) + '</button>'; }).join('') + '</div>' : '') +
+      (addrOn ? '<div class="seg" role="tablist" style="margin-bottom:4px"><button type="button" data-k="user">Username</button><button type="button" data-k="addr">Wallet address</button></div>' : '') +
+      '<div id="k-user"><label class="l" for="s-u">To</label><div class="to"><span>@</span><input id="s-u" autocomplete="off" autocapitalize="none" spellcheck="false" placeholder="username" maxlength="60"></div></div>' +
+      '<div id="k-addr" hidden><label class="l" for="s-g">Pi wallet address</label><textarea class="in num" id="s-g" rows="2" maxlength="60" autocapitalize="characters" spellcheck="false" placeholder="G…" style="font-size:14px;resize:none"></textarea></div>' +
+      '<div class="hint" id="s-uh"></div>' +
+      (payees.length && !pre.u ? '<div class="chips" style="margin-top:2px">' + payees.map(function (p) { return '<button type="button" class="chip" data-pu="' + esc(p) + '">' + (isG(p) ? ic('card', 'width:15px;height:15px;vertical-align:-3px') + ' ' : '') + esc(toLabel(p)) + '</button>'; }).join('') + '</div>' : '') +
       '<label class="l" for="s-a">Amount</label><div class="amt"><input id="s-a" type="number" inputmode="decimal" min="0" step="any" placeholder="0.00"><span>π</span></div><div class="hint num" id="s-c"></div>' +
       '<label class="l">Category</label><div class="chips" id="s-cat">' + CATS.map(function (c) { return '<button type="button" class="chip" data-c="' + c + '">' + c + '</button>'; }).join('') + '</div>' +
       '<label class="l" for="s-x">Narration</label><input class="in" id="s-x" maxlength="80" placeholder="What is it for? e.g. Rent, groceries, gift">' +
       '<div class="sum" id="s-sum" hidden></div>' +
       '<button type="button" class="btn" id="s-go">Continue</button>' +
       '<p class="small muted" style="margin-top:12px;text-align:center">' + ic('lock', 'width:14px;height:14px;vertical-align:-2px') + ' You approve in Pi’s own window. Limits: ' + S.cfg.max + ' π per transfer, ' + S.cfg.daily + ' π a day.</p>');
-    var u = $('#s-u', w), a = $('#s-a', w), ok = null, tm = null, cat = pre.cat || '';
+    var u = $('#s-u', w), g = $('#s-g', w), a = $('#s-a', w), h = $('#s-uh', w), ok = null, tm = null, cat = pre.cat || '';
+    function setKind(k) {
+      kind = k; ok = null; h.innerHTML = '';
+      $$('[data-k]', w).forEach(function (b) { b.classList.toggle('on', b.dataset.k === k); });
+      $('#k-user', w).hidden = k !== 'user'; $('#k-addr', w).hidden = k !== 'addr';
+      (k === 'user' ? u : g).oninput();
+    }
     function sum() {
       var v = r7(a.value); $('#s-c', w).textContent = conv(v);
       var s = $('#s-sum', w); s.hidden = !(v > 0);
@@ -291,50 +303,71 @@
     }
     function setCat(c) { cat = c; $$('#s-cat .chip', w).forEach(function (b) { b.classList.toggle('on', b.dataset.c === c); }); }
     $$('#s-cat .chip', w).forEach(function (b) { b.onclick = function () { setCat(cat === b.dataset.c ? '' : b.dataset.c); }; });
-    $$('[data-pu]', w).forEach(function (b) { b.onclick = function () { u.value = b.dataset.pu; u.oninput(); a.focus(); }; });
+    $$('[data-k]', w).forEach(function (b) { b.onclick = function () { setKind(b.dataset.k); }; });
+    $$('[data-pu]', w).forEach(function (b) { b.onclick = function () { var p = b.dataset.pu; if (isG(p)) { setKind('addr'); g.value = p; g.oninput(); } else { setKind('user'); u.value = p; u.oninput(); } a.focus(); }; });
     a.oninput = sum;
     u.oninput = function () {
-      var name = u.value.trim().replace(/^@/, ''); ok = null; clearTimeout(tm); var h = $('#s-uh', w);
-      if (/^G[A-Z2-7]{40,}$/.test(name) || /^G[A-Z2-7]{55}$/.test(name.toUpperCase())) { h.innerHTML = '<span class="bad">That is a wallet address. FinPi sends to a FinPi @username; to pay a wallet address, use Pi Wallet.</span>'; return; }
+      var name = u.value.trim().replace(/^@/, ''); ok = null; clearTimeout(tm);
+      if (/^G[A-Z2-7]{40,}$/.test(name.toUpperCase()) && name.length > 40) { if (addrOn) { setKind('addr'); g.value = name.toUpperCase(); g.oninput(); u.value = ''; } else h.innerHTML = '<span class="bad">That is a wallet address. Send to a FinPi @username instead.</span>'; return; }
       if (!USER_RE.test(name)) { h.textContent = ''; return; }
       h.textContent = 'Checking…';
       tm = setTimeout(function () {
         api('/users?u=' + encodeURIComponent(name)).then(function (d) {
-          if (u.value.trim().replace(/^@/, '') !== name) return;
+          if (kind !== 'user' || u.value.trim().replace(/^@/, '') !== name) return;
           if (!d.ok) { h.innerHTML = '<span class="bad">' + esc(d.error || 'Could not check right now.') + '</span>'; return; }
           if (d.exists && d.username.toLowerCase() === me().toLowerCase()) { h.innerHTML = '<span class="bad">That is you.</span>'; return; }
           if (d.exists) { ok = d.username; h.innerHTML = '<span class="ok">✓ @' + esc(d.username) + ' is on FinPi</span>'; }
-          else h.innerHTML = '<span class="bad">@' + esc(name) + ' has not used FinPi yet. Ask them to open FinPi and sign in with Pi once.</span>';
+          else h.innerHTML = '<span class="bad">@' + esc(name) + ' has not used FinPi yet.' + (addrOn ? ' You can send to their wallet address instead.' : ' Ask them to open FinPi and sign in with Pi once.') + '</span>';
         }).catch(function () { h.textContent = 'No connection. Try again.'; });
       }, 400);
     };
-    if (pre.u) { u.value = pre.u; u.oninput(); }
-    if (pre.a > 0) { a.value = pre.a; }
+    g.oninput = function () {
+      var v = g.value.replace(/\s/g, '').toUpperCase(); ok = null; clearTimeout(tm);
+      if (g.value !== v && !/^S/.test(v)) g.value = v;
+      if (!v) { h.textContent = ''; return; }
+      if (/^S/.test(v)) { g.value = ''; h.innerHTML = '<span class="bad">That looks like a SECRET key. Never share it with anyone. Enter the address that starts with G.</span>'; return; }
+      if (v.length < 56) { h.textContent = v.length + ' of 56 characters'; return; }
+      if (!validG(v)) { h.innerHTML = '<span class="bad">This address is not valid. Check every character.</span>'; return; }
+      if (v === get('addr', '')) { h.innerHTML = '<span class="bad">That is your own wallet address.</span>'; return; }
+      h.textContent = 'Checking the Pi blockchain…';
+      tm = setTimeout(function () {
+        hz('/accounts/' + v).then(function (acc) {
+          if (kind !== 'addr' || g.value.replace(/\s/g, '').toUpperCase() !== v) return;
+          if (!acc) { h.innerHTML = '<span class="bad">This address has no Pi account on ' + NETN + ' yet. Check it with the person.</span>'; return; }
+          ok = v; h.innerHTML = '<span class="ok">✓ Valid Pi wallet address · ' + esc(short(v)) + '</span>';
+        }).catch(function () { h.textContent = 'Could not reach the Pi blockchain. Try again.'; });
+      }, 300);
+    };
+    if (pre.u) { if (isG(pre.u)) g.value = pre.u; else u.value = pre.u; }
+    if (pre.a > 0) a.value = pre.a;
     if (pre.x) $('#s-x', w).value = pre.x;
     if (cat) setCat(cat);
+    if (addrOn) setKind(kind); else (pre.u ? u.oninput() : 0);
     sum();
     $('#s-go', w).onclick = function () {
-      var v = r7(a.value), x = $('#s-x', w).value.trim(), btn = this;
-      if (!ok) return toast('Enter a FinPi user’s @username');
+      var v = r7(a.value), x = $('#s-x', w).value.trim(), btn = this, to = ok;
+      if (!to) return toast(kind === 'addr' ? 'Enter a valid Pi wallet address' : 'Enter a FinPi user’s @username');
       if (!(v >= 0.01)) return toast('The smallest transfer is 0.01 π');
       if (v > S.cfg.max) return toast('The most you can send at once is ' + S.cfg.max + ' π');
       if (!x) return toast('Add a narration: what is this payment for?');
       btn.disabled = true; btn.textContent = 'Checking…';
-      api('/transfer', { a: 'check', accessToken: S.token, to: ok, amt: v }).then(function (d) {
+      api('/transfer', isG(to) ? { a: 'check', accessToken: S.token, addr: to, amt: v } : { a: 'check', accessToken: S.token, to: to, amt: v }).then(function (d) {
         btn.disabled = false; btn.textContent = 'Continue';
         if (!d || !d.ok) return toast((d && d.error) || 'This transfer cannot be sent right now');
-        review(d.to || ok, v, x, cat, { first: d.first });
+        review(d.addr || d.to || to, v, x, cat, { first: d.first });
       }).catch(function () { btn.disabled = false; btn.textContent = 'Continue'; toast('No connection. Check your internet and try again.'); });
     };
-    if (!pre.u) setTimeout(function () { u.focus(); }, 120);
+    if (!pre.u) setTimeout(function () { (kind === 'addr' ? g : u).focus(); }, 120);
   }
   function review(to, amt, narr, cat, o) {
-    var warn = [];
-    if (o.first) warn.push('<div class="note warn">' + ic('warn') + '<span>First time paying <b>@' + esc(to) + '</b>. Only send to people and businesses you know and trust. FinPi staff will never ask you to send Pi.</span></div>');
+    var A = isG(to), warn = [];
+    if (A) warn.push('<div class="note warn">' + ic('warn') + '<span>You are sending to a <b>wallet address</b>. Check every character with the person. Pi sent to a wrong address cannot be recovered.</span></div>');
+    if (o.first) warn.push('<div class="note warn">' + ic('warn') + '<span>First time paying ' + (A ? 'this address' : '<b>@' + esc(to) + '</b>') + '. Only send to people and businesses you know and trust. FinPi staff will never ask you to send Pi.</span></div>');
     warn.push('<div class="note gray">' + ic('info') + '<span>Delivered automatically in seconds. If it cannot be delivered, you are refunded automatically. Delivered transfers cannot be reversed.</span></div>');
     var w = sheet('Check before you send',
-      '<div class="big"><div class="v">' + fpi(amt) + ' π</div><div class="c">' + esc(conv(amt)) + '</div><div class="w">To @' + esc(to) + '</div></div>' +
-      '<div class="sum"><div><span>To</span><b class="t">@' + esc(to) + '</b></div>' + '<div><span>For</span><b class="t">' + esc(narr) + '</b></div>' + (cat ? '<div><span>Category</span><b class="t">' + esc(cat) + '</b></div>' : '') +
+      '<div class="big"><div class="v">' + fpi(amt) + ' π</div><div class="c">' + esc(conv(amt)) + '</div><div class="w">To ' + esc(toLabel(to)) + '</div></div>' +
+      '<div class="sum">' + (A ? '<div style="display:block"><span>To wallet address</span><b class="num" style="display:block;text-align:left;margin-top:4px;font-size:13px;overflow-wrap:anywhere">' + esc(to) + '</b></div>' : '<div><span>To</span><b class="t">@' + esc(to) + '</b></div>') +
+      '<div><span>For</span><b class="t">' + esc(narr) + '</b></div>' + (cat ? '<div><span>Category</span><b class="t">' + esc(cat) + '</b></div>' : '') +
       '<div><span>They receive</span><b>' + fpi(amt) + ' π</b></div><div><span>Blockchain fee</span><b>' + S.cfg.fee + ' π</b></div><div class="tot"><span>You pay</span><b>' + fpi(r7(amt + S.cfg.fee)) + ' π</b></div></div>' +
       '<div style="margin-top:12px">' + warn.join('') + '</div>' +
       '<button type="button" class="btn" id="rv-ok">' + ic('lock') + 'Confirm and pay</button><button type="button" class="btn ghost" id="rv-ed">Edit</button>');
@@ -343,17 +376,18 @@
   }
   function pay(to, amt, narr, cat) {
     if (S.cfg.payments === false) { closeSheets(); return toast('Pi payments open soon. Nothing was charged.'); }
-    var w = sheet('Paying @' + to,
-      '<div class="big"><div class="v">' + fpi(amt) + ' π</div><div class="c">' + esc(conv(amt)) + '</div><div class="w">To @' + esc(to) + ' · ' + esc(narr) + '</div></div>' +
-      '<div class="steps"><div id="st1" class="on">Approve in Pi’s window</div><div id="st2">Confirming your payment</div><div id="st3">Delivering to @' + esc(to) + '</div></div><div class="status" id="st-m">Waiting for your approval…</div>');
+    var A = isG(to), lab = toLabel(to);
+    var w = sheet('Paying ' + lab,
+      '<div class="big"><div class="v">' + fpi(amt) + ' π</div><div class="c">' + esc(conv(amt)) + '</div><div class="w">To ' + esc(lab) + ' · ' + esc(narr) + '</div></div>' +
+      '<div class="steps"><div id="st1" class="on">Approve in Pi’s window</div><div id="st2">Confirming your payment</div><div id="st3">Delivering to ' + esc(lab) + '</div></div><div class="status" id="st-m">Waiting for your approval…</div>');
     var refused = false, tries = 0;
     function step(n, m, cls) { for (var i = 1; i <= 3; i++) { var e = $('#st' + i); if (e) e.className = i < n ? 'done' : i === n ? 'on' : ''; } var s = $('#st-m'); if (s) { s.className = 'status' + (cls ? ' ' + cls : ''); s.innerHTML = m; } }
     function finish(row) {
       var pend = get('pend', {}); pend[row.pid] = { cat: cat }; put('pend', pend);
       saveTransfer(row, 'out');
       var pl = get('payees', []).filter(function (x) { return x.toLowerCase() !== to.toLowerCase(); }); pl.unshift(to); put('payees', pl.slice(0, 12));
-      addNote('send', 'Transfer delivered', fpi(amt) + ' π to @' + to + ' · ' + narr, 'out-' + row.pid);
-      step(4, '✓ Delivered to @' + esc(to) + ' and recorded on the Pi blockchain.', 'ok');
+      addNote('send', 'Transfer delivered', fpi(amt) + ' π to ' + lab + ' · ' + narr, 'out-' + row.pid);
+      step(4, '✓ Delivered to ' + esc(lab) + ' and recorded on the Pi blockchain.', 'ok');
       var b = document.createElement('button'); b.type = 'button'; b.className = 'btn'; b.innerHTML = ic('rcpt') + 'View receipt';
       b.onclick = function () { var r = rcpts().filter(function (x) { return x.txid === row.txid; })[0]; showRcpt(r); };
       var d2 = document.createElement('button'); d2.type = 'button'; d2.className = 'btn ghost'; d2.textContent = 'Done'; d2.onclick = function () { closeSheets(); render(S.tab); };
@@ -361,7 +395,7 @@
     }
     function refunded(row) { saveRefund(row); step(3, '↩ This transfer could not be delivered, so ' + fpi(amt) + ' π was refunded to you automatically on the Pi blockchain.', 'err'); }
     try {
-      Pi.createPayment({ amount: r7(amt + S.cfg.fee), memo: ('FinPi transfer to @' + to).slice(0, 60), metadata: { type: 'transfer', to: to, amt: amt, narr: narr } }, {
+      Pi.createPayment({ amount: r7(amt + S.cfg.fee), memo: ('FinPi transfer to ' + lab).slice(0, 60), metadata: A ? { type: 'transfer', addr: to, amt: amt, narr: narr } : { type: 'transfer', to: to, amt: amt, narr: narr } }, {
         onReadyForServerApproval: function (pid) {
           var pend = get('pend', {}); pend[pid] = { cat: cat }; put('pend', pend);
           api('/approve', { paymentId: pid }).then(function (d) { if (d && d.approved === false) { refused = true; step(1, '✕ ' + esc(d.error || 'This transfer was refused.') + ' You have not been charged.', 'err'); } }).catch(function () {});
@@ -369,7 +403,7 @@
         onReadyForServerCompletion: function (pid, txid) {
           step(2, 'Confirming your payment on the Pi blockchain…');
           api('/complete', { paymentId: pid, txid: txid }).then(function (d) {
-            step(3, 'Delivering to @' + esc(to) + '…');
+            step(3, 'Delivering to ' + esc(lab) + '…');
             var t = d && d.transfer;
             if (t && t.ok && t.row) return finish(t.row);
             if (t && t.refunded && t.row) return refunded(t.row);
@@ -377,8 +411,8 @@
               api('/transfer', { a: 'payout', paymentId: pid }).then(function (x) {
                 if (x && x.ok && x.row && x.row.txid) return finish(x.row);
                 if (x && x.refunded && x.row) return refunded(x.row);
-                if (++tries < 40) { step(3, 'Delivering to @' + esc(to) + '… the Pi blockchain is busy, retrying automatically.'); setTimeout(retry, 8000); }
-                else step(3, 'Your payment is safe and recorded on the Pi blockchain. FinPi keeps going automatically: @' + esc(to) + ' is paid, or you are refunded, and you will be notified.');
+                if (++tries < 40) { step(3, 'Delivering to ' + esc(lab) + '… the Pi blockchain is busy, retrying automatically.'); setTimeout(retry, 8000); }
+                else step(3, 'Your payment is safe and recorded on the Pi blockchain. FinPi keeps going automatically: ' + esc(lab) + ' is paid, or you are refunded, and you will be notified.');
               }).catch(function () { if (++tries < 40) setTimeout(retry, 8000); });
             })();
           }).catch(function () { step(2, 'Connection problem. Your payment is recorded; FinPi finishes it automatically when you reopen the app.', 'err'); });
@@ -395,7 +429,7 @@
     var a = get('addr', ''), sug = get('addrSug', '');
     var w = sheet('Receive Pi', '<p class="sh-sub">Share your @username or your wallet address. Nothing is paid until the sender approves in Pi’s window.</p>' +
       '<div class="card" style="margin-top:8px"><p class="small">Your FinPi username</p><div class="row"><div class="grow" style="font-size:24px;font-weight:700;overflow-wrap:anywhere">@' + esc(me()) + '</div><button type="button" class="tbtn" data-x="cu" aria-label="Copy username">' + ic('copy') + '</button></div><p class="small muted" style="margin-top:4px">FinPi users send to this in seconds.</p></div>' +
-      '<div class="card"><p class="small">Your Pi wallet address</p>' + (a ? '<div class="row"><div class="grow num" style="font-size:13.5px;overflow-wrap:anywhere">' + esc(a) + '</div><button type="button" class="tbtn" data-x="ca" aria-label="Copy address">' + ic('copy') + '</button></div><p class="small muted" style="margin-top:4px">Anyone can send to it from Pi Wallet.</p>'
+      '<div class="card"><p class="small">Your Pi wallet address</p>' + (a ? (window.FPQR ? '<div class="qr" style="border:0;padding:6px 0 10px">' + FPQR.svg(a, 200, '#0A1F55') + '</div>' : '') + '<div class="row"><div class="grow num" style="font-size:13.5px;overflow-wrap:anywhere">' + esc(a) + '</div><button type="button" class="tbtn" data-x="ca" aria-label="Copy address">' + ic('copy') + '</button></div><p class="small muted" style="margin-top:4px">Anyone can scan this code or send to the address from Pi Wallet or FinPi.</p>'
         : (sug ? '<button type="button" class="btn soft" data-x="ua">' + ic('check') + 'Use my address ' + esc(short(sug)) + '</button>' : '') + '<button type="button" class="btn ghost" data-x="aa">' + ic('card') + 'Add wallet address</button>') + '</div>' +
       '<button type="button" class="btn" data-x="sh">' + ic('share') + 'Share my details</button>');
     var t = function () { return 'Send me Pi on FinPi: @' + me() + (get('addr', '') ? '\nPi wallet address: ' + get('addr', '') : ''); };
@@ -547,13 +581,13 @@
     },
     pay: function () {
       var on = S.cfg.enabled, pl = get('payees', []);
-      return '<div class="ph"><h1>Send &amp; receive</h1><p>Pay by @username. Every payment is approved by you in Pi’s window and recorded on the Pi blockchain.</p></div>' +
+      return '<div class="ph"><h1>Send &amp; receive</h1><p>Pay by @username or wallet address. Every payment is approved by you in Pi’s window and recorded on the Pi blockchain.</p></div>' +
         (!signedIn() ? '<div class="note">' + ic('info') + '<span>Sign in with Pi to send and receive Pi.</span></div><button type="button" class="btn" data-act="signin" style="margin-top:12px"><span class="pi-dot">π</span>Sign in with Pi</button>'
           : !on ? '<div class="note warn">' + ic('info') + '<span>Sending is being switched on. You can still receive Pi to your wallet address, and use rates, receipts and wallet tools.</span></div>' : '') +
         '<div class="tiles" style="margin-top:14px">' +
-        '<button type="button" class="tile" data-act="send"><i>' + ic('send') + '</i><b>Send Pi</b><small>To any FinPi user by @username</small></button>' +
+        '<button type="button" class="tile" data-act="send"><i>' + ic('send') + '</i><b>Send Pi</b><small>To a @username or a wallet address</small></button>' +
         '<button type="button" class="tile" data-act="receive"><i class="t">' + ic('req') + '</i><b>Receive Pi</b><small>Your @username and wallet address</small></button></div>' +
-        (pl.length && on ? '<div class="sec"><h2>Recent people</h2></div><div class="chips">' + pl.slice(0, 8).map(function (p) { return '<button type="button" class="chip" data-act="send-to" data-u="' + esc(p) + '">@' + esc(p) + '</button>'; }).join('') + '</div>' : '') +
+        (pl.length && on ? '<div class="sec"><h2>Recent people</h2></div><div class="chips">' + pl.slice(0, 8).map(function (p) { return '<button type="button" class="chip" data-act="send-to" data-u="' + esc(p) + '">' + esc(toLabel(p)) + '</button>'; }).join('') + '</div>' : '') +
         '<div class="sec"><h2>How it works</h2></div><div class="card"><div class="note gray">' + ic('lock') + '<span>You pay the amount plus a ' + S.cfg.fee + ' π blockchain fee in Pi’s window. FinPi delivers it to the recipient within seconds through Pi Network’s official payments, or refunds you automatically if it cannot. No person reviews or holds your payment.</span></div><p class="small" style="margin-top:10px">Limits for everyone’s safety: up to ' + S.cfg.max + ' π per transfer and ' + S.cfg.daily + ' π per day.</p></div>';
     },
     wallet: function () {

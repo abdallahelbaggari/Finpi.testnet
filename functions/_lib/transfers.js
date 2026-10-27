@@ -44,13 +44,15 @@ export async function checkLimits(env, pay) {
 }
 /* Called when FinPi approves a transfer: records it at once so limits count it before it completes. */
 export async function reserve(env, pay) {
-  const d = await db(env), md = pay.metadata || {}, to = await userByName(d, md.to), fromU = await d.prepare('SELECT username FROM users WHERE uid = ?').bind(String(pay.user_uid)).first();
-  await d.prepare('INSERT OR IGNORE INTO transfers (pid, from_uid, from_user, to_uid, to_user, amount, narr, status, ts) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)')
-    .bind(String(pay.identifier), String(pay.user_uid), fromU ? fromU.username : '', to ? to.uid : '', to ? to.username : String(md.to), String(round7(md.amt)), String(md.narr || '').slice(0, 80), 'approved', Date.now()).run();
+  const d = await db(env), md = pay.metadata || {}, to = md.addr ? null : await userByName(d, md.to), fromU = await d.prepare('SELECT username FROM users WHERE uid = ?').bind(String(pay.user_uid)).first();
+  await d.prepare('INSERT OR IGNORE INTO transfers (pid, from_uid, from_user, to_uid, to_user, amount, narr, status, ts, to_addr) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)')
+    .bind(String(pay.identifier), String(pay.user_uid), fromU ? fromU.username : '', to ? to.uid : '', md.addr ? '' : (to ? to.username : String(md.to)), String(round7(md.amt)), String(md.narr || '').slice(0, 80), 'approved', Date.now(), md.addr || null).run();
 }
 /* Has this sender paid this recipient before? (to warn about first-time payees, a common scam pattern) */
-export async function paidBefore(env, fromUid, toUid) {
-  const r = await (await db(env)).prepare("SELECT 1 AS x FROM transfers WHERE from_uid = ? AND to_uid = ? AND status = 'paid' LIMIT 1").bind(String(fromUid), String(toUid)).first();
+export async function paidBefore(env, fromUid, toUid, toAddr) {
+  const d = await db(env);
+  const r = toAddr ? await d.prepare("SELECT 1 AS x FROM transfers WHERE from_uid = ? AND to_addr = ? AND to_uid = '' AND status = 'paid' LIMIT 1").bind(String(fromUid), toAddr).first()
+    : await d.prepare("SELECT 1 AS x FROM transfers WHERE from_uid = ? AND to_uid = ? AND status = 'paid' LIMIT 1").bind(String(fromUid), String(toUid)).first();
   return !!r;
 }
 /* Light abuse protection: at most `max` calls per hour per bucket from one network. The IP is never stored, only a salted one-way hash. */
@@ -90,12 +92,31 @@ export async function db(env) {
 export async function userByName(d, name) { return d.prepare('SELECT uid, username FROM users WHERE username = ? COLLATE NOCASE').bind(String(name || '').replace(/^@/, '')).first(); }
 
 /* Checks a transfer payment before FinPi approves it. Returns '' if fine, or the reason to refuse. */
-export async function checkTransferPayment(env, pay) {
+/* ── sending to a Pi wallet address ──
+   Address sends are paid straight from the app wallet to the address (a signed Pi blockchain payment), because Pi's
+   app-to-user API needs a Pi user ID, which an address alone does not give. ADDRESS_SENDS = 0 switches them off. */
+export const addrSends = (env) => String(env.ADDRESS_SENDS || '').trim() !== '0';
+export const isAddr = (a) => { if (!/^G[A-Z2-7]{55}$/.test(String(a || ''))) return false; try { accountToBytes(a); return true; } catch (e) { return false; } };
+const netOf = (pay, request) => request ? NET(isTest(request)) : NET(/test/i.test(String((pay && pay.network) || '')));
+/* the memo written on a direct payment: a short, unique reference derived from the sender's payment ID */
+export async function refMemo(pid) { const h = [...new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode('finpi|' + pid)))].map((b) => b.toString(16).padStart(2, '0')).join(''); return 'FinPi ' + h.slice(0, 20); }
+async function accountExists(net, a) { const r = await fetch(net.horizon + '/accounts/' + a); if (r.status === 404) return false; if (!r.ok) throw new Error('Could not check the address'); return true; }
+async function appAddress(env) { try { return (await keypairFromSeed(String(env.APP_WALLET_SEED).trim())).address; } catch (e) { return ''; } }
+
+export async function checkTransferPayment(env, pay, request) {
   if (!enabled(env)) return 'Transfers are not switched on';
   const md = (pay && pay.metadata) || {}, amt = round7(md.amt), paid = Number(pay && pay.amount);
   if (!(amt >= 0.01)) return 'The smallest transfer is 0.01 π';
   if (amt > maxTransfer(env)) return 'The most you can send at once is ' + maxTransfer(env) + ' π';
   if (!(paid + 1e-9 >= round7(amt + FEE))) return 'Payment does not cover the amount and fee';
+  if (md.addr) {
+    if (!addrSends(env)) return 'Sending to wallet addresses is not available right now. Send to a FinPi @username instead.';
+    if (!isAddr(md.addr)) return 'This wallet address is not valid';
+    if (md.addr === (await appAddress(env))) return 'You cannot send to the FinPi app wallet';
+    let ex; try { ex = await accountExists(netOf(pay, request), md.addr); } catch (e) { return 'Could not check the address right now. Please try again.'; }
+    if (!ex) return 'This address has no Pi account on ' + netOf(pay, request).name + ' yet';
+    return '';
+  }
   if (!USER_RE.test(String(md.to || ''))) return 'Bad recipient';
   const d = await db(env), to = await userByName(d, md.to);
   if (!to) return 'Recipient is not a FinPi user';
@@ -123,17 +144,18 @@ export async function payout(env, request, pid) {
   const pay = u.d, md = pay.metadata || {}, st = pay.status || {};
   if (md.type !== 'transfer') return { ok: false, error: 'Not a transfer' };
   if (!st.developer_completed || !st.transaction_verified || st.cancelled || st.user_cancelled) return { ok: false, error: 'The payment is not completed yet' };
-  const to = await userByName(d, md.to), fromU = await d.prepare('SELECT username FROM users WHERE uid = ?').bind(String(pay.user_uid)).first();
+  const direct = !!md.addr, to = direct ? null : await userByName(d, md.to), fromU = await d.prepare('SELECT username FROM users WHERE uid = ?').bind(String(pay.user_uid)).first();
   if (!row) {
-    await d.prepare('INSERT OR IGNORE INTO transfers (pid, from_uid, from_user, to_uid, to_user, amount, narr, status, ts) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)')
-      .bind(pid, String(pay.user_uid), fromU ? fromU.username : '', to ? to.uid : '', to ? to.username : String(md.to), String(round7(md.amt)), String(md.narr || '').slice(0, 80), 'received', now - STALE).run();
+    await d.prepare('INSERT OR IGNORE INTO transfers (pid, from_uid, from_user, to_uid, to_user, amount, narr, status, ts, to_addr) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)')
+      .bind(pid, String(pay.user_uid), fromU ? fromU.username : '', to ? to.uid : '', direct ? '' : (to ? to.username : String(md.to)), String(round7(md.amt)), String(md.narr || '').slice(0, 80), 'received', now - STALE, direct ? md.addr : null).run();
     row = await get();
   }
   if (row.status === 'approved') { await d.prepare("UPDATE transfers SET status = 'received', ts = ? WHERE pid = ? AND status = 'approved'").bind(now - STALE, pid).run(); row = await get(); }
 
   // 2. Fixed rule: deliver if the transfer is still valid, otherwise (or if delivery keeps failing) refund
   const amt = round7(md.amt), paid = Number(pay.amount);
-  const invalid = !to ? 'The recipient is no longer a FinPi user' : to.uid === String(pay.user_uid) ? 'Sender and recipient are the same' : !(amt >= 0.01) || paid + 1e-9 < round7(amt + FEE) ? 'Amounts do not match' : '';
+  const invalid = direct ? (!isAddr(md.addr) || !addrSends(env) ? 'The wallet address cannot receive this transfer' : !(amt >= 0.01) || paid + 1e-9 < round7(amt + FEE) ? 'Amounts do not match' : '')
+    : !to ? 'The recipient is no longer a FinPi user' : to.uid === String(pay.user_uid) ? 'Sender and recipient are the same' : !(amt >= 0.01) || paid + 1e-9 < round7(amt + FEE) ? 'Amounts do not match' : '';
   const refund = !!invalid || /^refund/.test(row.status) || ((row.tries || 0) >= REFUND_AFTER.tries && row.fail_ts && now - row.fail_ts > REFUND_AFTER.ms);
   const job = refund ? 'refunding' : 'paying';
 
@@ -145,7 +167,13 @@ export async function payout(env, request, pid) {
 
   const kp = await keypairFromSeed(String(env.APP_WALLET_SEED).trim());
   let sure = true;   // false once a transaction was sent and its result is unknown
+  const memo = direct ? await refMemo(pid) : '';
   try {
+    // Address sends: if the direct payment already reached the blockchain, it counts as paid
+    if (direct) {
+      const hash = await findTx(net, kp.address, memo);
+      if (hash) return await finish(d, pid, 'paid', hash, md.addr, net);
+    }
     // Safety first: if an earlier payout reached the blockchain, it counts as paid — never pay twice, never refund a delivered transfer
     if (row.a2u_id) {
       const hash = await findTx(net, kp.address, row.a2u_id);
@@ -154,9 +182,13 @@ export async function payout(env, request, pid) {
     if (refund) {
       if (row.a2u_id) await piApi(env, '/payments/' + encodeURIComponent(row.a2u_id) + '/cancel', 'POST', {});
       const r = await sendA2U(env, net, kp, d, pid, row, { idCol: 'refund_id', addrCol: 'refund_addr', uid: row.from_uid, amount: round7(row.amount),
-        memo: 'FinPi refund' + (row.to_user ? ' (to @' + row.to_user + ')' : ''), metadata: { type: 'transfer_refund', u2a: pid } }, () => { sure = false; });
+        memo: 'FinPi refund' + (row.to_user ? ' (to @' + row.to_user + ')' : ' (to a wallet address)'), metadata: { type: 'transfer_refund', u2a: pid } }, () => { sure = false; });
       await d.prepare('UPDATE transfers SET err = ? WHERE pid = ?').bind(invalid || 'Delivery failed repeatedly', pid).run();
       return await finish(d, pid, 'refunded', r.hash, r.addr, net);
+    }
+    if (direct) {
+      const hash = await submitPayment(env, net, kp, md.addr, amt, memo, () => { sure = false; });
+      return await finish(d, pid, 'paid', hash, md.addr, net);
     }
     const r = await sendA2U(env, net, kp, d, pid, row, { idCol: 'a2u_id', addrCol: 'to_addr', uid: to.uid, amount: amt,
       memo: 'FinPi transfer' + (fromU ? ' from @' + fromU.username : ''), metadata: { type: 'transfer_out', u2a: pid } }, () => { sure = false; });
@@ -164,6 +196,10 @@ export async function payout(env, request, pid) {
   } catch (e) {
     // a clear refusal (nothing reached the blockchain) can be retried at once; an unknown result waits until it can no longer land
     const definite = sure || (e && e.definite);
+    if (direct && !refund && /op_no_destination/.test(String(e && e.message))) {
+      await d.prepare("UPDATE transfers SET status = 'refund_needed', err = ?, ts = ? WHERE pid = ?").bind('The address has no Pi account', now - WAIT_UNCERTAIN - 1, pid).run();
+      return { ok: false, retry: true, error: 'This address cannot receive Pi. You will be refunded automatically.' };
+    }
     await d.prepare('UPDATE transfers SET status = ?, err = ?, tries = COALESCE(tries, 0) + 1, fail_ts = COALESCE(fail_ts, ?), ts = ? WHERE pid = ?')
       .bind(refund ? 'refund_failed' : 'failed', String(e && e.message || e).slice(0, 300), now, definite ? now - WAIT_UNCERTAIN - 1 : now, pid).run();
     return { ok: false, retry: true, error: refund ? 'The refund did not go through yet. FinPi will try again automatically.' : 'The payout did not go through yet. FinPi will try again automatically.' };
@@ -238,5 +274,5 @@ async function finish(d, pid, status, txid, addr, net) {
   return { ok: status === 'paid', refunded: status === 'refunded', row: pub(row, net) };
 }
 export function pub(r, net) {
-  return r && { pid: r.pid, from: r.from_user, to: r.to_user, amount: Number(r.amount), narr: r.narr, status: r.status, txid: r.a2u_txid || '', to_addr: r.to_addr || '', refund_txid: r.refund_txid || '', refund_addr: r.refund_addr || '', ts: r.ts, done_ts: r.done_ts, net: net ? net.name : '' };
+  return r && { pid: r.pid, from: r.from_user, to: r.to_user, to_kind: r.to_uid ? 'user' : 'address', amount: Number(r.amount), narr: r.narr, status: r.status, txid: r.a2u_txid || '', to_addr: r.to_addr || '', refund_txid: r.refund_txid || '', refund_addr: r.refund_addr || '', ts: r.ts, done_ts: r.done_ts, net: net ? net.name : '' };
 }
