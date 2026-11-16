@@ -250,18 +250,32 @@
     if (p.metadata && p.metadata.type === 'transfer') { var pd = get('pend', {}); if (!pd[p.identifier]) { pd[p.identifier] = { ts: Date.now() }; put('pend', pd); } }
     api('/recover', { paymentId: p.identifier }).then(function () { setTimeout(function () { sync(); checkPendingInApp(); }, 600); }).catch(function () {});
   }
+  // One sign-in at a time: a second tap (or the automatic sign-in on opening) reuses the request already
+  // waiting for Pi. A slow answer is not treated as a failure: FinPi signs in as soon as Pi replies.
+  var authP = null, authAt = 0;
   function signIn(silent) {
     var btn = $('#signin'), msg = $('#ld-msg');
     if (!window.Pi || !initPi()) { if (!silent) { msg.textContent = 'Open FinPi in the Pi Browser to sign in with Pi.'; toast('Open FinPi in the Pi Browser'); } return Promise.resolve(false); }
     if (btn && !silent) { btn.disabled = true; $('#signin-t').textContent = 'Signing in…'; }
-    var done = false;
-    return new Promise(function (ok) {
-      var t = setTimeout(function () { if (done) return; done = true; if (!silent) msg.textContent = 'Pi did not answer. Check your connection and try again.'; reset(); ok(false); }, 45000);
-      Pi.authenticate(['username', 'payments'], onIncomplete).then(function (a) {
-        if (done) return; done = true; clearTimeout(t);
+    if (!authP || Date.now() - authAt >= 20000) {
+      authAt = Date.now();
+      var attempt = Pi.authenticate(['username', 'payments'], onIncomplete).then(function (a) {
+        if (authP === attempt) authP = null;
+        if (S.token && !S.guest) return true; // already signed in by an earlier attempt
         S.user = { username: a.user.username, uid: a.user.uid }; S.token = a.accessToken; S.guest = false;
-        put('user', { username: a.user.username }); reset(); showApp(); afterSignIn(); ok(true);
-      }).catch(function () { if (done) return; done = true; clearTimeout(t); if (!silent) msg.textContent = 'Sign-in was cancelled or failed. Please try again.'; reset(); ok(false); });
+        put('user', { username: a.user.username }); showApp(); afterSignIn();
+        return true;
+      }, function () { if (authP === attempt) authP = null; return false; });
+      authP = attempt;
+    }
+    var p = authP;
+    return new Promise(function (ok) {
+      var slow = setTimeout(function () { if (!silent) msg.textContent = 'Still connecting to Pi… you will be signed in as soon as Pi answers. If nothing happens, tap Sign in again.'; reset(); }, 15000);
+      p.then(function (res) {
+        clearTimeout(slow);
+        if (res) msg.textContent = ''; else if (!silent) msg.textContent = 'Sign-in was cancelled or failed. Please try again.';
+        reset(); ok(res);
+      });
     });
     function reset() { if (btn) { btn.disabled = false; $('#signin-t').textContent = 'Sign in with Pi'; } }
   }
