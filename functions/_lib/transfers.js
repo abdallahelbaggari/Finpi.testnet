@@ -35,11 +35,12 @@ export function setup(env) { return { pi_api_key: !!piKey(env), app_wallet_seed:
 export function enabled(env) { const s = setup(env); return !s.paused && s.pi_api_key && s.app_wallet_seed; }
 export const usernames = (env) => enabled(env) && !!DBB(env);
 // Starts at 50 π per transfer for safety; raise it with MAX_TRANSFER (for example 500).
-export function maxTransfer(env) { const m = Number(env.MAX_TRANSFER); return m > 0 ? m : 50; }
+// No limits by default (0 = no limit): built for businesses, malls and merchants. Optional caps can be set in Cloudflare.
+export function maxTransfer(env) { const m = Number(env.MAX_TRANSFER); return m > 0 ? m : 0; }
 const numEnv = (v, d) => { const n = Number(v); return n > 0 ? n : d; };
 // Safety limits, all adjustable in Cloudflare without code: DAILY_LIMIT (π per sender per 24 h), DAILY_COUNT (transfers per sender per 24 h),
 // GLOBAL_DAILY_LIMIT (π paid out by FinPi per 24 h, caps any loss from a bug or abuse).
-export function limits(env) { return { max: maxTransfer(env), day: numEnv(env.DAILY_LIMIT, 200), count: numEnv(env.DAILY_COUNT, 20), global: numEnv(env.GLOBAL_DAILY_LIMIT, 2000) }; }
+export function limits(env) { return { max: maxTransfer(env), day: numEnv(env.DAILY_LIMIT, 0), count: numEnv(env.DAILY_COUNT, 0), global: numEnv(env.GLOBAL_DAILY_LIMIT, 0) }; }
 const DAY = 86400000, LIVE = "(status IN ('received', 'paying', 'paid', 'failed') OR (status = 'approved' AND ts > ?))";
 
 /* Per-sender and app-wide 24-hour limits. Returns '' if fine, or the reason to refuse. */
@@ -47,10 +48,10 @@ export async function checkLimits(env, pay) {
   if (!DBB(env)) return '';
   const L = limits(env), d = await db(env), now = Date.now(), amt = round7((pay.metadata || {}).amt), uid = String(pay.user_uid || ''), pid = String(pay.identifier || '');
   const mine = await d.prepare('SELECT COALESCE(SUM(CAST(amount AS REAL)), 0) AS s, COUNT(*) AS n FROM transfers WHERE from_uid = ? AND pid <> ? AND ts > ? AND ' + LIVE).bind(uid, pid, now - DAY, now - 3600000).first();
-  if (mine.n >= L.count) return 'You have reached today’s limit of ' + L.count + (L.count === 1 ? ' transfer.' : ' transfers.') + ' Please try again tomorrow.';
-  if (mine.s + amt > L.day + 1e-9) { const left = Math.max(0, round7(L.day - mine.s)); return 'The daily limit is ' + L.day + ' π per person. You can still send ' + left + ' π today.'; }
+  if (L.count && mine.n >= L.count) return 'You have reached today’s limit of ' + L.count + (L.count === 1 ? ' transfer.' : ' transfers.') + ' Please try again tomorrow.';
+  if (L.day && mine.s + amt > L.day + 1e-9) { const left = Math.max(0, round7(L.day - mine.s)); return 'The daily limit is ' + L.day + ' π per person. You can still send ' + left + ' π today.'; }
   const all = await d.prepare('SELECT COALESCE(SUM(CAST(amount AS REAL)), 0) AS s FROM transfers WHERE pid <> ? AND ts > ? AND ' + LIVE).bind(pid, now - DAY, now - 3600000).first();
-  if (all.s + amt > L.global + 1e-9) return 'FinPi has reached today’s transfer capacity. Please try again tomorrow.';
+  if (L.global && all.s + amt > L.global + 1e-9) return 'FinPi has reached today’s transfer capacity. Please try again tomorrow.';
   return '';
 }
 /* Called when FinPi approves a transfer: records it at once so limits count it before it completes. */
@@ -135,7 +136,7 @@ export async function checkTransferPayment(env, pay, request) {
   }
   const md = (pay && pay.metadata) || {}, amt = round7(md.amt), paid = Number(pay && pay.amount);
   if (!(amt >= 0.01)) return 'The smallest transfer is 0.01 π';
-  if (amt > maxTransfer(env)) return 'The most you can send at once is ' + maxTransfer(env) + ' π';
+  if (maxTransfer(env) && amt > maxTransfer(env)) return 'The most you can send at once is ' + maxTransfer(env) + ' π';
   if (!(paid + 1e-9 >= round7(amt + FEE))) return 'Payment does not cover the amount and fee';
   if (md.addr) {
     if (!isAddr(md.addr)) return 'This wallet address is not valid';

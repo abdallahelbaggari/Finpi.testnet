@@ -295,7 +295,7 @@
   /* ── transfers: server status, registration, sync ── */
   function loadCfg() {
     return api('/transfer?a=status').then(function (d) {
-      if (d && d.ok) { S.cfg = { enabled: !!d.enabled, usernames: !!d.usernames, payments: d.payments !== false, addresses: d.addresses !== false, fee: d.fee || 0.01, max: d.max || 50, daily: d.daily || 200 }; if (!$('.sh-wrap')) render(S.tab); }
+      if (d && d.ok) { S.cfg = { enabled: !!d.enabled, usernames: !!d.usernames, payments: d.payments !== false, addresses: d.addresses !== false, fee: d.fee || 0.01, max: d.max || 0, daily: d.daily || 0 }; if (!$('.sh-wrap')) render(S.tab); }
     }).catch(function () {});
   }
   var registered = false;
@@ -1353,7 +1353,7 @@
     security: function () {
       sheet('Security center', '<div class="note ok">' + ic('shield') + '<span>FinPi never asks for your passphrase, never holds a balance for you and cannot move Pi from your wallet.</span></div>' +
         '<div class="card" style="margin-top:12px"><h3>How transfers work</h3><p>You approve each payment in Pi’s own window. FinPi’s software then delivers it within seconds through Pi Network’s official payments, or refunds you automatically if delivery is impossible. Before any retry it checks the Pi blockchain, so nothing is ever paid twice. No person reviews, holds or reverses transfers.</p></div>' +
-        '<div class="card"><h3>Limits for everyone</h3><p>Up to ' + S.cfg.max + ' π per transfer and ' + S.cfg.daily + ' π per person per day, plus a blockchain fee of ' + S.cfg.fee + ' π per transfer.</p></div>' +
+        '<div class="card"><h3>Limits for everyone</h3><p>' + (S.cfg.max || S.cfg.daily ? (S.cfg.max ? 'Up to ' + S.cfg.max + ' π per transfer. ' : '') + (S.cfg.daily ? 'Up to ' + S.cfg.daily + ' π per person per day. ' : '') : 'No transfer limits: send any amount, any number of times. ') + 'Each transfer has a blockchain fee of ' + S.cfg.fee + ' π.</p></div>' +
         '<div class="card"><h3>Stay safe</h3><p>• Only pay people and businesses you know.<br>• Check the @username and amount on the final screen.<br>• FinPi staff will never ask you to send Pi.<br>• A genuine receipt’s QR code checks out on the Pi blockchain.<br>• Never share your passphrase or secret key (it starts with S).</p></div>' +
         '<p class="small muted" style="margin-top:12px">Found a security problem? Email ' + SUPPORT + '.</p>');
     },
