@@ -16,16 +16,17 @@ footer{margin:36px 0 10px;font-size:14px;color:#64748B}</style></head>
 <h2 id="who">1. Who we are</h2>
 <p>FinPi (finpi.pi) is an app for the Pi Browser, provided by its developer. Contact: <a href="mailto:finpi.app@gmail.com">finpi.app@gmail.com</a>.</p>
 <h2 id="phone">2. Kept only on your phone</h2>
-<p>These stay in your browser's storage on your device and are not sent to us (unless you save or share a receipt, statement or export, see section 3): your receipts, budget and categories, notifications, recent payees, contacts, payment links, bill splits, payment reminders, price alerts, the name you add for receipts, your chosen currency, and the Pi wallet address you add to see your balance. Clearing FinPi's data in the Pi Browser deletes them. Anyone who can unlock your phone may see them, so keep it locked.</p>
+<p>These stay in your browser's storage on your device and are not sent to us (unless you save or share a receipt, statement or export, see section 3): budget and categories, notifications, recent payees, contacts, payment links, bill splits, payment reminders, price alerts, the name you add for receipts, your chosen currency, and the Pi wallet address you add to see your balance. Clearing FinPi's data in the Pi Browser deletes them. Anyone who can unlock your phone may see them, so keep it locked.</p>
 <h2 id="server">3. What our server processes</h2>
 <table><tr><th>Feature</th><th>What we process</th><th>Why</th></tr>
 <tr><td>Pi sign-in</td><td>Pi username and Pi user ID</td><td>To recognise you and let other FinPi users send Pi to your @username</td></tr>
 <tr><td>Payments</td><td>Pi payment ID, amount, memo, status, blockchain transaction ID</td><td>To approve and complete payments with Pi Network</td></tr>
 <tr><td>Transfers</td><td>Sender and recipient usernames and IDs, or the recipient wallet address you entered, amount, narration, payment, payout and refund IDs, wallet addresses, status</td><td>To deliver a transfer or refund it automatically, apply the published daily limits, warn you about first-time recipients and show your receipts</td></tr>
 <tr><td>Abuse protection</td><td>A one-way salted code made from your IP address, kept for about an hour (the IP itself is not stored)</td><td>To limit how often look-ups and payments can be attempted</td></tr>
+<tr><td>Payment history backup</td><td>Your receipts (amount, date, counterparty, narration, category, network, transaction and payment IDs, rates at payment time), linked to your Pi user ID</td><td>So your full history is never lost, has no size limit on your phone, and is restored when you sign in on another phone. Only you can see it, after signing in with Pi.</td></tr>
 <tr><td>Saving and sharing receipts, statements and exports</td><td>A copy of the receipt image, statement PDF or CSV file you chose to save or share, its file name and the time</td><td>The Pi Browser cannot save or share files directly, so we keep the copy at a private, hard-to-guess link: saving downloads it from that link, and sharing sends the link. Anyone you give the link to can open it.</td></tr>
 <tr><td>Rates and checks</td><td>Nothing personal</td><td>Prices, currency rates and blockchain look-ups are public data</td></tr></table>
-<p>The category you choose for a payment and your budgets are not sent to us.</p>
+<p>Your budgets, contacts, reminders and price alerts are not sent to us.</p>
 <h2 id="pi">4. Pi sign-in and payments</h2>
 <p>When you sign in with Pi, the Pi app shares your Pi username and a user ID with FinPi. Payments happen in Pi's own payment window. We never see your passphrase, seed phrase, secret key or the balance in your Pi Wallet.</p>
 <h2 id="transfers">5. Transfers and the blockchain</h2>
@@ -51,6 +52,7 @@ footer{margin:36px 0 10px;font-size:14px;color:#64748B}</style></head>
 <h2 id="keep">9. How long we keep data</h2>
 <table><tr><th>Data</th><th>Kept</th></tr>
 <tr><td>Abuse-protection codes</td><td>About one hour</td></tr>
+<tr><td>Payment history backup</td><td>For as long as you use FinPi. Ask us at finpi.app@gmail.com to delete it.</td></tr>
 <tr><td>Saved or shared receipts, statements and exports</td><td>30 days, then deleted automatically</td></tr>
 <tr><td>Payment and transfer records, Pi username and user ID</td><td>As long as needed to provide the service, answer questions about payments, prevent fraud and meet legal obligations, then deleted</td></tr></table>
 <h2 id="rights">10. Your choices and rights</h2>

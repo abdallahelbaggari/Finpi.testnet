@@ -278,3 +278,70 @@ input[type=date].in{min-height:50px}
 .onb-dots i{width:8px;height:8px;border-radius:99px;background:#CBD5E1;transition:width .2s}
 .onb-dots i.on{width:26px;background:var(--blue)}
 .onb-b{max-width:420px;width:100%;margin:0 auto}
+
+/* ══ FinPi 1.1 — stronger colour, higher contrast (deep navy · royal blue · teal) ══ */
+:root{
+  --bg:#EDF2FA;--ink:#071631;--ink2:#1E293B;--mute:#475569;--line:rgba(7,22,49,.11);--line2:rgba(7,22,49,.2);
+  --navy:#061A4F;--blue:#1543E0;--blue2:#2F6BFF;--sky:#E3ECFF;--teal:#0A9488;--teal2:#14C2AE;--mint:#DDF6F1;
+  --ok:#047857;--bad:#C0262D;
+  --g-brand:linear-gradient(135deg,#061A4F 0%,#0F36B8 55%,#1543E0 78%,#0A9488 130%);
+  --g-btn:linear-gradient(135deg,#1543E0 0%,#2F6BFF 100%);
+  --sh:0 1px 2px rgba(7,22,49,.06),0 14px 30px -16px rgba(7,22,49,.32);
+  --sh2:0 18px 40px -18px rgba(21,67,224,.55)
+}
+body{color:var(--ink)}
+.ph h1,.hello h1,.hello b{font-weight:800;letter-spacing:-.025em;color:var(--ink)}
+.ph p,.hello p,.muted,.sh-sub{color:var(--mute)}
+.sec h2{font-weight:800;letter-spacing:-.01em;color:var(--ink)}
+.card,.list,.tile,.qa button{border:1px solid var(--line);box-shadow:var(--sh)}
+/* buttons */
+.btn{background:var(--g-btn);color:#fff;font-weight:700;box-shadow:var(--sh2)}
+.btn.teal{background:linear-gradient(135deg,#0A9488,#14C2AE);box-shadow:0 18px 40px -18px rgba(10,148,136,.6)}
+.btn.ghost{background:#fff;color:var(--navy);border:1.5px solid var(--line2);box-shadow:none}
+.btn.soft{background:var(--sky);color:var(--blue);box-shadow:none}
+.btn.danger{box-shadow:none}
+/* price card */
+.hero{background:radial-gradient(90% 120% at 100% 0%,rgba(20,194,174,.45),transparent 55%),var(--g-brand);box-shadow:0 24px 50px -22px rgba(6,26,79,.75)}
+.ld-hero{background:radial-gradient(120% 80% at 100% 0%,rgba(20,194,174,.55),transparent 60%),linear-gradient(160deg,#061A4F 0%,#0F36B8 60%,#1543E0 100%)}
+.ld-h em{color:#5EEAD4}
+/* quick actions and tiles: solid colour icons */
+.qa button{font-weight:700;color:var(--ink)}
+.qa i,.tile i{background:linear-gradient(135deg,#1543E0,#2F6BFF);color:#fff;box-shadow:0 10px 20px -10px rgba(21,67,224,.7)}
+.qa i.t,.tile i.t{background:linear-gradient(135deg,#0A9488,#14C2AE);color:#fff;box-shadow:0 10px 20px -10px rgba(10,148,136,.7)}
+.qa i.n,.tile i.n{background:linear-gradient(135deg,#4338CA,#6366F1);color:#fff;box-shadow:0 10px 20px -10px rgba(67,56,202,.7)}
+.qa i.a,.tile i.a{background:linear-gradient(135deg,#D97706,#F59E0B);color:#fff;box-shadow:0 10px 20px -10px rgba(217,119,6,.7)}
+.tile b{font-weight:800;color:var(--ink)}
+/* transactions */
+.ico{background:#DCE6FF;color:var(--blue)}
+.ico.in{background:#CFF3E8;color:#047857}
+.ico.rf{background:#FFE8C7;color:#B45309}
+.ico.sp{background:#FCE0EE;color:#BE185D}
+.li b{color:var(--ink);font-weight:700}
+.li .amt-r b{font-weight:700;color:var(--ink)}
+.li .ico.in~.amt-r b,.li .amt-r b.pos,.pos{color:#047857!important}
+.day{color:#334155;font-weight:800;letter-spacing:.08em}
+.stats div{background:#F1F5FD;border:1px solid var(--line)}
+.stats small{color:var(--mute);font-weight:600}
+.stats b{color:var(--ink)}
+.stats b.pos{color:#047857}
+.bar{background:#DCE3EF}
+/* chips, segments, sort */
+.chip{background:#fff;border:1.5px solid var(--line2);color:var(--ink2);font-weight:600}
+.chip.on{background:var(--navy);border-color:var(--navy);color:#fff}
+.seg{background:#DCE4F2}
+.seg button{color:#475569;font-weight:700}
+.seg button.on{background:#fff;color:var(--navy);box-shadow:0 4px 12px -6px rgba(7,22,49,.35)}
+.sortbar{display:flex;align-items:center;justify-content:space-between;gap:10px;margin:12px 2px 2px;font-size:13px;color:var(--mute);font-weight:600}
+.sortbar button{padding:7px 12px;border-radius:999px;background:#fff;border:1.5px solid var(--line2);color:var(--navy);font-weight:700;font-size:13px}
+/* top bar and tab bar */
+#top .brand{color:var(--navy)}
+#tabs{box-shadow:0 -10px 30px -18px rgba(7,22,49,.35)}
+#tabs button{color:#64748B;font-weight:600}
+#tabs button.on{color:var(--blue);font-weight:800}
+#tabs button.on span.b{background:var(--g-btn);color:#fff;box-shadow:0 10px 20px -10px rgba(21,67,224,.75)}
+/* receipts */
+.txd-ok{background:#CFF3E8;color:#047857;font-weight:700}
+.txr span{color:var(--mute)}
+.txr b{color:var(--ink)}
+.note{border:1px solid var(--line)}
+a{color:var(--blue)}

@@ -14,7 +14,7 @@
   var SANDBOX = (function () { try { var r = document.referrer || '', a = location.ancestorOrigins ? [].slice.call(location.ancestorOrigins).join(' ') : ''; return /sandbox\.minepi\.com/.test(r + ' ' + a); } catch (e) { return false; } })();
   var SUPPORT = 'finpi.app@gmail.com', USER_RE = /^[A-Za-z0-9_.-]{2,40}$/;
   var CATS = ['Food', 'Transport', 'Shopping', 'Bills', 'Family', 'Business', 'Gifts', 'Charity', 'Other'];
-  var S = { user: null, token: null, guest: false, tab: 'home', p: null, fx: null, cfg: { enabled: false, payments: null, fee: 0.01, max: 50, daily: 200 }, filter: 'all', seg: 'tx', month: 0, wal: null };
+  var S = { user: null, token: null, guest: false, tab: 'home', p: null, fx: null, cfg: { enabled: false, payments: null, fee: 0.01, max: 0, daily: 0 }, filter: 'all', seg: 'tx', sort: 'new', extra: [], hMore: false, month: 0, wal: null };
   var r7 = function (n) { return Math.round(Number(n) * 1e7) / 1e7; };
   var me = function () { return S.user && S.user.username || ''; };
   var signedIn = function () { return !!(S.user && S.token); };
@@ -163,11 +163,50 @@
   function bellDot() { var d = $('#bell-dot'); if (d) d.hidden = !notes().some(function (x) { return !x.read; }); }
 
   /* ── receipts ── */
+  var LCAP = 2500; // receipts kept on the phone (within the browser storage limit); the full history is kept on the server with no limit (see /history)
   function rcpts() { return get('rcpts', []); }
   function saveRcpt(r) {
     var R = rcpts(); if (r.txid && R.some(function (x) { return x.txid === r.txid; })) return false;
     var c = curr(); r.usd = r.usd || rateIn('USD'); r.lc = c; r.lr = rateIn(c); r.net = r.net || NETN; r.ts = r.ts || Date.now(); r.saved = Date.now();
-    R.unshift(r); put('rcpts', R.slice(0, 400)); try { remMatch(r); } catch (e) {} return true;
+    R.unshift(r); R.sort(function (a, b) { return (b.ts || 0) - (a.ts || 0); }); put('rcpts', R.slice(0, LCAP)); try { remMatch(r); } catch (e) {} hSoon(); return true;
+  }
+  /* ── full history, backed up on the server for this Pi account (never lost, no size limit) ── */
+  function hKey(r) { var t = String(r.txid || '').toLowerCase(); if (/^[a-f0-9]{64}$/.test(t)) return 'tx:' + t + (r.kind === 'refund' ? ':r' : '') + (r.dir ? ':' + r.dir : ''); var f = String(r.ref || r.pid || ''); return f ? 'ref:' + f : ''; }
+  var hBusy = false, hTimer = null;
+  function hPush() {
+    if (!signedIn() || !S.token) return Promise.resolve();
+    var todo = rcpts().filter(function (r) { return !r.hs && hKey(r); }).slice(0, 200);
+    if (!todo.length) return Promise.resolve();
+    var items = todo.map(function (r) { var o = {}; for (var k in r) if (k !== 'hs') o[k] = r[k]; return o; });
+    return api('/history', { a: 'push', accessToken: S.token, items: items }).then(function (d) {
+      if (!d || !d.ok) return;
+      var done = {}; todo.forEach(function (r) { done[hKey(r)] = 1; });
+      var L = rcpts(); L.forEach(function (r) { if (done[hKey(r)]) r.hs = 1; }); put('rcpts', L);
+      if (todo.length === 200) return hPush();
+    });
+  }
+  function hMerge(items) {
+    var L = rcpts(), have = {}, n = 0; L.concat(S.extra).forEach(function (r) { have[hKey(r)] = 1; });
+    items.forEach(function (r) { var k = hKey(r); if (k && !have[k]) { r.hs = 1; L.push(r); have[k] = 1; n++; } });
+    if (n) { L.sort(function (a, b) { return (b.ts || 0) - (a.ts || 0); }); put('rcpts', L.slice(0, LCAP)); if (L.length > LCAP) S.extra = S.extra.concat(L.slice(LCAP)); }
+    return n;
+  }
+  function historySync() {
+    if (hBusy || !signedIn() || !S.token) return; hBusy = true;
+    hPush().then(function () { return api('/history', { a: 'pull', accessToken: S.token, limit: 500 }); }).then(function (d) {
+      if (!d || !d.ok) return; S.hMore = !!d.more;
+      if (hMerge(d.items || []) && (S.tab === 'activity' || S.tab === 'home')) render(S.tab);
+    }).catch(function () {}).then(function () { hBusy = false; });
+  }
+  function hSoon() { clearTimeout(hTimer); hTimer = setTimeout(historySync, 1500); }
+  function hOlder(btn) {
+    if (!signedIn() || !S.token) return toast('Sign in with Pi to load your full history');
+    var all = rcpts().concat(S.extra), oldest = all.reduce(function (m, r) { return Math.min(m, r.ts || m); }, Date.now() + 864e5);
+    if (btn) { btn.disabled = true; btn.textContent = 'Loading…'; }
+    api('/history', { a: 'pull', accessToken: S.token, before: oldest, limit: 500 }).then(function (d) {
+      if (!d || !d.ok) { toast((d && d.error) || 'Could not load older history'); return; }
+      S.hMore = !!d.more; var n = hMerge(d.items || []); toast(n ? n + ' older payments loaded' : 'You have reached the start of your history'); render('activity');
+    }).catch(function () { toast('No connection. Try again.'); render('activity'); });
   }
   function verifyUrl(r) { return r && /^[a-f0-9]{64}$/i.test(r.txid || '') ? location.origin + '/receipt.html#tx=' + r.txid.toLowerCase() + '&net=' + (/Testnet/.test(r.net || '') ? 'test' : 'main') : ''; }
   function rcptTitle(r) { return r.kind === 'refund' ? 'Refund · transfer to ' + r.other : r.kind === 'supporter' ? 'FinPi Supporter' : r.dir === 'in' ? 'From ' + r.other : 'To ' + r.other; }
@@ -310,7 +349,7 @@
     $('#av').textContent = signedIn() ? me().charAt(0) : 'G';
     $('#netb').hidden = !TEST; bellDot(); render(S.tab);
   }
-  function afterSignIn() { register(); loadCfg().then(function () { sync(); if (pendingCode) { var c = pendingCode; pendingCode = null; openCode(c); } }); }
+  function afterSignIn() { register(); historySync(); loadCfg().then(function () { sync(); if (pendingCode) { var c = pendingCode; pendingCode = null; openCode(c); } }); }
 
   /* ── transfers: server status, registration, sync ── */
   function loadCfg() {
@@ -907,19 +946,22 @@
         '<div class="sec"><h2>Converter</h2><button type="button" data-act="currency">' + esc(c) + ' ▾</button></div>' +
         '<div class="card conv"><label><span>π</span><input id="cv-pi" type="number" inputmode="decimal" value="1" aria-label="Pi"></label><label><span>USD</span><input id="cv-usd" type="number" inputmode="decimal" aria-label="US dollars"></label>' + (c !== 'USD' ? '<label><span>' + esc(c) + '</span><input id="cv-loc" type="number" inputmode="decimal" aria-label="' + esc(cname(c)) + '"></label>' : '') + '</div>' +
         '<div class="sec"><h2>Tools</h2></div><div class="tiles"><button type="button" class="tile" data-act="get-rcpt"><i class="n">' + ic('rcpt') + '</i><b>Get a receipt</b><small>For any Pi payment, from its transaction ID</small></button><button type="button" class="tile" data-act="verify"><i>' + ic('check') + '</i><b>Verify a payment</b><small>Check a transaction on the blockchain</small></button><button type="button" class="tile" data-act="check-addr"><i class="t">' + ic('search') + '</i><b>Check an address</b><small>Balance and payments of any Pi address</small></button><button type="button" class="tile" data-act="receive"><i class="a">' + ic('qr') + '</i><b>My QR code</b><small>Your wallet address to get paid</small></button><button type="button" class="tile" data-act="alerts"><i class="t">' + ic('bell') + '</i><b>Price alerts</b><small>Know when Pi reaches your price</small></button><button type="button" class="tile" data-act="statement"><i>' + ic('rcpt') + '</i><b>Statement</b><small>Monthly PDF of your payments</small></button></div>' +
-        '<div class="note gray" style="margin-top:14px">' + ic('info') + '<span>FinPi never holds your Pi. Your Pi stays in your own Pi Wallet.</span></div>';
+        '<div class="note gray" style="margin-top:14px">' + ic('info') + '<span>FinPi never sees your passphrase. You approve every payment yourself, and every payment is recorded on the Pi blockchain.</span></div>';
     },
     activity: function () {
       var R = rcpts();
       var head = '<div class="ph"><h1>Activity</h1><p>All your payments and receipts.</p></div><div class="seg" role="tablist"><button type="button" data-seg="tx" class="' + (S.seg === 'tx' ? 'on' : '') + '">Transactions</button><button type="button" data-seg="ins" class="' + (S.seg === 'ins' ? 'on' : '') + '">Insights</button></div>';
       if (S.seg === 'ins') return head + insightsHTML();
-      var f = S.filter, F = R.map(function (r, i) { return [r, i]; }).filter(function (x) { var r = x[0]; return f === 'all' || (f === 'out' && r.dir === 'out') || (f === 'in' && r.dir === 'in' && r.kind !== 'refund') || (f === 'ref' && r.kind === 'refund'); });
+      var f = S.filter, F = R.map(function (r, i) { return [r, i]; }).concat(S.extra.map(function (r, i) { return [r, 'x' + i]; })).filter(function (x) { var r = x[0]; return f === 'all' || (f === 'out' && r.dir === 'out') || (f === 'in' && r.dir === 'in' && r.kind !== 'refund') || (f === 'ref' && r.kind === 'refund'); });
+      F.sort(function (a, b) { return S.sort === 'old' ? (a[0].ts || 0) - (b[0].ts || 0) : (b[0].ts || 0) - (a[0].ts || 0); });
       var out = '', day = '';
       F.forEach(function (x) { var d = new Date(x[0].ts).toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' }); if (d !== day) { if (day) out += '</div>'; out += '<div class="day">' + d + '</div><div class="list">'; day = d; } out += txRow(x[0], x[1]); });
       if (day) out += '</div>';
       return head + '<div class="chips" style="margin-top:12px">' + [['all', 'All'], ['out', 'Sent'], ['in', 'Received'], ['ref', 'Refunds']].map(function (x) { return '<button type="button" class="chip' + (f === x[0] ? ' on' : '') + '" data-flt="' + x[0] + '">' + x[1] + '</button>'; }).join('') + '</div>' +
+        '<div class="sortbar"><span>' + F.length + ' payment' + (F.length === 1 ? '' : 's') + (signedIn() ? ' · backed up' : '') + '</span><button type="button" data-sort="1">' + (S.sort === 'old' ? 'Oldest first ▴' : 'Newest first ▾') + '</button></div>' +
         (pendingList().length && (f === 'all' || f === 'out') ? '<div class="day">Processing</div><div class="list">' + pendingList().map(pendRow).join('') + '</div>' : '') +
         (out || (pendingList().length && (f === 'all' || f === 'out') ? '' : '<div class="list" style="margin-top:14px"><div class="empty">' + ic('rcpt') + '<div>Nothing here yet.</div></div></div>')) +
+        (S.hMore && signedIn() ? '<button type="button" class="btn ghost" data-older="1" style="margin-top:4px">Load older history</button>' : '') +
         (R.length ? '<div class="two" style="margin-top:4px"><button type="button" class="btn" data-act="statement">' + ic('rcpt') + 'Statement PDF</button><button type="button" class="btn ghost" data-act="csv">' + ic('down') + 'Export CSV</button></div>' : '');
     },
     profile: function () {
@@ -1409,8 +1451,10 @@
     var t = e.target.closest('[data-tab]'); if (t && !t.closest('.sh-wrap')) { if (t.dataset.seg) S.seg = t.dataset.seg; go(t.dataset.tab); return; }
     var s = e.target.closest('#view [data-seg]'); if (s) { S.seg = s.dataset.seg; render('activity'); return; }
     var f = e.target.closest('[data-flt]'); if (f) { S.filter = f.dataset.flt; render('activity'); return; }
+    if (e.target.closest('[data-sort]')) { S.sort = S.sort === 'old' ? 'new' : 'old'; render('activity'); return; }
+    var ol = e.target.closest('[data-older]'); if (ol) { hOlder(ol); return; }
     var mo = e.target.closest('[data-mon]'); if (mo) { S.month = Math.min(0, S.month + Number(mo.dataset.mon)); render('activity'); return; }
-    var rc = e.target.closest('[data-rc]'); if (rc) { showRcpt(rcpts()[+rc.dataset.rc]); return; }
+    var rc = e.target.closest('[data-rc]'); if (rc) { var ri = rc.dataset.rc; showRcpt(ri.charAt(0) === 'x' ? S.extra[+ri.slice(1)] : rcpts()[+ri]); return; }
     var pe = e.target.closest('[data-pend]'); if (pe) { pendSheet(pe.dataset.pend); return; }
     var a = e.target.closest('[data-act]'); if (a && A[a.dataset.act]) { A[a.dataset.act](a, e); }
   });
