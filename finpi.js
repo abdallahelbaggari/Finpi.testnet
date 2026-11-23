@@ -112,7 +112,43 @@
   document.addEventListener('keydown', function (e) { if (e.key === 'Escape') closeSheets(); });
   function api(path, body) { return fetch(path, body ? { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) } : { cache: 'no-store' }).then(function (r) { return r.json(); }); }
   function copy(t) { try { navigator.clipboard.writeText(t).then(function () { toast('Copied'); }, function () { toast('Press and hold to copy'); }); } catch (e) { toast('Press and hold to copy'); } }
-  function shareText(title, text) { if (navigator.share) navigator.share({ title: title, text: text }).catch(function () {}); else copy(text); }
+  function shareText(title, text) { if (navigator.share) navigator.share({ title: title, text: text }).catch(function () {}); else if (window.Pi && Pi.openShareDialog) { try { Pi.openShareDialog(title, text); } catch (e) { copy(text); } } else copy(text); }
+  /* Saving and sharing files. Inside the Pi Browser a page cannot save files it made itself or share them as files,
+     so FinPi keeps a private copy for 30 days (/file) and uses its link: saving downloads from that link, and sharing
+     sends a link that opens, and previews in chat apps, as the full receipt image. */
+  var upCache = {};
+  function canShareFile(f) { try { return !!(f && navigator.canShare && navigator.canShare({ files: [f] })); } catch (e) { return false; } }
+  function upload(blob, name, type) {
+    var k = name + '|' + blob.size;
+    if (!upCache[k]) upCache[k] = fetch('/file?type=' + encodeURIComponent(type) + '&name=' + encodeURIComponent(name), { method: 'POST', headers: { 'Content-Type': type }, body: blob })
+      .then(function (r) { return r.json(); }).then(function (d) { if (!d || !d.ok) throw new Error((d && d.error) || 'Could not save'); return d; })
+      .catch(function (e) { delete upCache[k]; throw e; });
+    return upCache[k];
+  }
+  function blobSave(blob, name) { var u = URL.createObjectURL(blob), a = document.createElement('a'); a.href = u; a.download = name; a.rel = 'noopener'; document.body.appendChild(a); a.click(); a.remove(); setTimeout(function () { URL.revokeObjectURL(u); }, 15000); }
+  function saveFile(blob, name, type, what) {
+    toast('Saving ' + what + '…');
+    upload(blob, name, type).then(function (d) {
+      var url = location.origin + d.file + '?dl=1', a = document.createElement('a'); a.href = url; a.download = d.name || name; a.rel = 'noopener'; document.body.appendChild(a); a.click(); a.remove();
+      var img = /^image\//.test(type), w = sheet('Saved to your phone',
+        '<p class="sh-sub">' + (img ? 'Your receipt image is in your phone’s <b>Downloads</b> and <b>Gallery</b>.' : 'Your ' + esc(what) + ' is in your phone’s <b>Downloads</b> folder.') + '</p>' +
+        '<button type="button" class="btn" data-x="open">' + ic(img ? 'rcpt' : 'down') + (img ? 'Open the receipt image' : 'Download again') + '</button>' +
+        '<p class="small muted" style="text-align:center;margin-top:10px">Not there? ' + (img ? 'Open the image, then press and hold it to save.' : 'Tap Download again.') + '</p>');
+      $('[data-x="open"]', w).onclick = function () { if (img) location.href = d.page; else { var b = document.createElement('a'); b.href = url; b.download = d.name || name; document.body.appendChild(b); b.click(); b.remove(); } };
+    }, function () { blobSave(blob, name); toast(what.charAt(0).toUpperCase() + what.slice(1) + ' saved to Downloads'); });
+  }
+  function shareFile(blob, name, type, title, text, short) {
+    var f = null; try { f = new File([blob], name, { type: type }); } catch (e) {}
+    if (canShareFile(f)) return navigator.share({ files: [f], title: title, text: text }).catch(function () {});
+    toast('Preparing to share…');
+    upload(blob, name, type).then(function (d) {
+      // the link goes first and alone, so chat apps preview it as the receipt image
+      var link = location.origin + d.page, t = short || title, msg = t + '\n' + link;
+      if (navigator.share) navigator.share({ title: title, text: t, url: link }).catch(function () {});
+      else if (window.Pi && Pi.openShareDialog) { try { Pi.openShareDialog(title, msg); } catch (e) { copy(msg); } }
+      else copy(msg);
+    }, function () { shareText(title, text); });
+  }
 
   /* ── notifications ── */
   function notes() { return get('notes', []); }
@@ -186,33 +222,17 @@
       (r.usd ? '<p class="small muted num">≈ ' + money(r.amount * r.usd, 'USD') + (r.lr && r.lc && r.lc !== 'USD' ? ' · ' + money(r.amount * r.lr, r.lc) : '') + ' at payment time</p>' : '') +
       '<span class="txd-ok">' + ic('check', 'width:15px;height:15px') + 'Verified on the Pi blockchain</span></div>' +
       '<div class="list txd-rows">' + rows.map(function (x, i) { return '<div class="txr"><span>' + esc(x[0]) + '</span><b class="' + (x[2] ? 'num mono' : '') + '">' + esc(x[1]) + '</b>' + (x[2] ? '<button type="button" class="cp" data-cp="' + i + '" aria-label="Copy ' + esc(x[0]) + '">' + ic('copy') + '</button>' : '') + '</div>'; }).join('') + '</div>' +
-      '<div class="two"><button type="button" class="btn" data-x="share">' + ic('share') + 'Share</button><button type="button" class="btn ghost" data-x="dl">' + ic('down') + 'Download</button></div>' +
+      '<div class="two"><button type="button" class="btn" data-x="share">' + ic('share') + 'Share image</button><button type="button" class="btn ghost" data-x="dl">' + ic('down') + 'Save to gallery</button></div>' +
       (v ? '<a class="btn soft" href="' + esc(v) + '">' + ic('ext') + 'View on the Pi blockchain</a>' : '') +
       '<div class="sec" style="margin-top:20px"><h2>Receipt</h2></div><div id="rc-prev" class="empty">Preparing receipt…</div>' +
-      '<p class="small muted" style="text-align:center;margin-top:8px">Tip: press and hold the receipt image to save it to your gallery.</p>');
+      '');
     $$('[data-cp]', w).forEach(function (b) { b.onclick = function () { copy(rows[+b.dataset.cp][1]); }; });
     var cvP = fontsReady().then(function () { return window.FPReceipt ? FPReceipt.canvas(spec(r)) : null; });
     cvP.then(function (cv) { var p = $('#rc-prev', w); if (!p) return; if (!cv) { p.textContent = 'Receipt image unavailable.'; return; } p.className = ''; p.innerHTML = '<img class="rc-img" alt="FinPi receipt" src="' + cv.toDataURL('image/png') + '">'; });
     var name = rcName(r), text = 'FinPi receipt · ' + rcType(r) + ' · ' + fpi(r.amount) + ' π · ' + d.toLocaleDateString('en-GB') + (v ? '\nVerify on the Pi blockchain: ' + v : '');
-    $('[data-x="share"]', w).onclick = function () {
-      cvP.then(function (cv) {
-        if (!cv) return shareText('FinPi receipt', text);
-        cv.toBlob(function (b) {
-          try { var f = new File([b], name, { type: 'image/jpeg' }); if (navigator.canShare && navigator.canShare({ files: [f] })) return navigator.share({ files: [f], title: 'FinPi receipt', text: text }).catch(function () {}); } catch (e) {}
-          shareText('FinPi receipt', text);
-        }, 'image/jpeg', 0.92);
-      });
-    };
-    $('[data-x="dl"]', w).onclick = function () {
-      cvP.then(function (cv) {
-        if (!cv) return toast('Receipt image unavailable');
-        cv.toBlob(function (b) {
-          var u = URL.createObjectURL(b), a = document.createElement('a'); a.href = u; a.download = name; a.rel = 'noopener';
-          document.body.appendChild(a); a.click(); a.remove(); setTimeout(function () { URL.revokeObjectURL(u); }, 8000);
-          toast('Receipt saved to Downloads. If it does not appear, press and hold the image to save it.');
-        }, 'image/jpeg', 0.92);
-      });
-    };
+    var jpg = cvP.then(function (cv) { return cv ? new Promise(function (ok) { cv.toBlob(ok, 'image/jpeg', 0.92); }) : null; });
+    $('[data-x="share"]', w).onclick = function () { jpg.then(function (b) { if (!b) return shareText('FinPi receipt', text); shareFile(b, name, 'image/jpeg', 'FinPi receipt', text, 'FinPi receipt · ' + rcType(r) + ' · ' + fpi(r.amount) + ' π · ' + d.toLocaleDateString('en-GB')); }); };
+    $('[data-x="dl"]', w).onclick = function () { jpg.then(function (b) { if (!b) return toast('Receipt image unavailable'); saveFile(b, name, 'image/jpeg', 'receipt'); }); };
   }
 
   /* ── live Pi price ── */
@@ -915,7 +935,7 @@
         row('mail', 'Help & contact', SUPPORT, 'help') + '</div>' +
         '<div class="sec"><h2>Legal</h2></div><div class="list">' + lrow('Terms of Service', 'terms-of-service.html') + lrow('Privacy Policy', 'privacy-policy.html') + lrow('Risk Disclosure', 'risk-disclosure.html') + '</div>' +
         (signedIn() ? '<button type="button" class="btn danger" data-act="signout" style="margin-top:18px">' + ic('out') + 'Sign out</button>' : '') +
-        '<p class="small muted" style="text-align:center;margin-top:16px">FinPi 1.0.0 · ' + NETN + ' · finpi.pi<br>Independent app, not operated by Pi Network.</p>';
+        '<p class="small muted" style="text-align:center;margin-top:16px">FinPi 1.0.0 · ' + NETN + ' · finpi.pi</p>';
       function row(i, t, s, a) { return '<button type="button" class="li" data-act="' + a + '"><span class="ico">' + ic(i) + '</span><span class="grow"><b>' + esc(t) + '</b><small>' + esc(s) + '</small></span><span class="go">' + ic('chev') + '</span></button>'; }
       function lrow(t, h) { return '<a class="li" href="' + h + '"><span class="ico">' + ic('rcpt') + '</span><span class="grow"><b>' + t + '</b></span><span class="go">' + ic('chev') + '</span></a>'; }
     }
@@ -1182,10 +1202,8 @@
       var btns = $$('.two .btn', w); btns.forEach(function (b) { b.disabled = true; }); toast('Preparing your statement…');
       buildStatement(sel).then(function (o) {
         btns.forEach(function (b) { b.disabled = false; });
-        var f = null; try { f = new File([o.blob], o.name, { type: 'application/pdf' }); } catch (e) {}
-        if (share && f && navigator.canShare && navigator.canShare({ files: [f] })) return navigator.share({ files: [f], title: 'FinPi statement' }).catch(function () {});
-        var u = URL.createObjectURL(o.blob), a = document.createElement('a'); a.href = u; a.download = o.name; a.rel = 'noopener'; document.body.appendChild(a); a.click(); a.remove(); setTimeout(function () { URL.revokeObjectURL(u); }, 10000);
-        toast(share ? 'Sharing is not available here. Statement saved to Downloads.' : 'Statement saved to Downloads');
+        if (share) shareFile(o.blob, o.name, 'application/pdf', 'FinPi statement', 'FinPi statement · ' + o.name.replace(/\.pdf$/, ''));
+        else saveFile(o.blob, o.name, 'application/pdf', 'statement');
       }).catch(function () { btns.forEach(function (b) { b.disabled = false; }); toast('Could not create the statement. Please try again.'); });
     }
     $('[data-x="dl"]', w).onclick = function () { make(false); };
@@ -1252,7 +1270,7 @@
         /* footer */
         x.fillStyle = '#E2E8F0'; x.fillRect(X, H - 120, W - 2 * X, 1);
         txt(x, 'Generated by FinPi on ' + new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' }) + '. Check any payment on the Pi blockchain with its transaction ID.', X, H - 80, '400 17px ' + F, '#64748B');
-        txt(x, 'finpi.pi · Independent app, not operated by Pi Network', X, H - 52, '400 17px ' + F, '#94A3B8');
+        txt(x, '© FinPi ' + new Date().getFullYear() + ' · finpi.pi', X, H - 52, '400 17px ' + F, '#94A3B8');
         txt(x, 'Page ' + (pi + 1) + ' of ' + pages.length, W - X, H - 80, '600 17px ' + F, '#64748B', 'right');
         return new Promise(function (ok, no) { cv.toBlob(function (b) { if (!b) return no(new Error('jpg')); b.arrayBuffer().then(function (ab) { ok({ w: W, h: H, bytes: new Uint8Array(ab) }); }, no); }, 'image/jpeg', 0.9); });
       });
@@ -1326,8 +1344,9 @@
       var rows = [['date', 'type', 'direction', 'amount_pi', 'counterparty', 'narration', 'category', 'network', 'transaction_id']].concat(rcpts().map(function (r) { return [new Date(r.ts).toISOString(), r.kind, r.dir, r.amount, r.other || '', r.narr || '', r.cat || '', r.net || '', r.txid || '']; }));
       var csv = rows.map(function (r) { return r.map(function (x) { x = String(x == null ? '' : x); if (/^[=+\-@]/.test(x)) x = "'" + x; return /[",\n]/.test(x) ? '"' + x.replace(/"/g, '""') + '"' : x; }).join(','); }).join('\n');
       var blob = new Blob([csv], { type: 'text/csv' }), name = 'FinPi-activity-' + new Date().toISOString().slice(0, 10) + '.csv';
-      try { var f = new File([blob], name, { type: 'text/csv' }); if (navigator.canShare && navigator.canShare({ files: [f] })) return navigator.share({ files: [f], title: 'FinPi activity' }).catch(function () {}); } catch (e) {}
-      var a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = name; document.body.appendChild(a); a.click(); a.remove(); toast('CSV saved');
+      var f = null; try { f = new File([blob], name, { type: 'text/csv' }); } catch (e) {}
+      if (canShareFile(f)) return navigator.share({ files: [f], title: 'FinPi activity' }).catch(function () {});
+      saveFile(blob, name, 'text/csv', 'activity file');
     },
     name: function () {
       var w = sheet('Name on receipts', '<p class="sh-sub">Shown on your receipts next to your @username. Stays on this phone.</p><input class="in" id="nm-i" maxlength="50" value="' + esc(get('name', '')) + '" placeholder="Your full name"><button type="button" class="btn" id="nm-go">Save</button>');

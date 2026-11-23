@@ -70,7 +70,7 @@
   function share(cv, fname, text) {
     cv.toBlob(function (blob) {
       try { var f = new File([blob], fname, { type: 'image/png' }); if (navigator.canShare && navigator.canShare({ files: [f] })) { navigator.share({ files: [f], title: 'FinPi receipt', text: 'FinPi receipt' }).catch(function () {}); return; } } catch (e) {}
-      if (navigator.share) navigator.share({ title: 'FinPi receipt', text: text }).catch(function () {}); else window.open('https://wa.me/?text=' + encodeURIComponent(text));
+      if (navigator.share) navigator.share({ title: 'FinPi receipt', text: text }).catch(function () {}); else if (window.Pi && Pi.openShareDialog) { try { Pi.openShareDialog('FinPi receipt', text); } catch (e) {} } else { try { navigator.clipboard.writeText(text); } catch (e) {} }
     }, 'image/png');
   }
   window.FPReceipt = { canvas: canvas, share: share };

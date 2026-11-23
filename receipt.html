@@ -69,7 +69,7 @@ button{border:0;border-radius:12px;background:var(--g);color:#fff;font:inherit;f
         '<div class="row"><span>Date</span><b>' + esc(when.toLocaleString([], { day: 'numeric', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' })) + '</b></div>' +
         '<div class="row"><span>Network</span><b>' + NETN + '</b></div>' +
         '<div class="row"><span>Transaction ID</span><b class="mono">' + esc(t.hash) + '</b></div></div>' +
-        '<div style="padding:0 20px 18px"><a class="btn ghost" target="_blank" rel="noopener" href="https://blockexplorer.minepi.com/' + (net === 'test' ? 'testnet' : 'mainnet') + '/transactions/' + esc(t.hash) + '">View on Pi Block Explorer ›</a></div>');
+        '<div style="padding:0 20px 18px"><a class="btn ghost" rel="noopener" href="https://blockexplorer.minepi.com/' + (net === 'test' ? 'testnet' : 'mainnet') + '/transactions/' + esc(t.hash) + '">View on Pi Block Explorer ›</a></div>');
     }).catch(function () { show('bad', '!', 'Could not reach the Pi blockchain', 'Check your connection and try again.'); });
   }
   $('f').onsubmit = function (e) { e.preventDefault(); var h = $('h').value.trim().toLowerCase(); history.replaceState(null, '', '#tx=' + h + '&net=' + net); check(h); };

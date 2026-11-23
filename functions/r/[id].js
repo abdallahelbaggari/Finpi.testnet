@@ -1,0 +1,30 @@
+// GET /r/<id> → a clean page for a shared receipt or statement. Chat apps show the receipt image as the link preview,
+// and opening the link shows the full receipt image with a Save button.
+import { filesDb, ID_RE } from '../_lib/files.js';
+
+const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+
+export async function onRequestGet({ request, params, env }) {
+  const id = String(params.id || ''), origin = new URL(request.url).origin;
+  let f = null;
+  if (ID_RE.test(id)) { try { const d = await filesDb(env); f = d && (await d.prepare('SELECT type, name, ts FROM files WHERE id = ?').bind(id).first()); if (f && f.ts < Date.now() - 30 * 864e5) f = null; } catch (e) {} }
+  const img = f && /^image\//.test(f.type), pdf = f && f.type === 'application/pdf';
+  const title = !f ? 'Link expired · FinPi' : img ? 'FinPi receipt' : pdf ? 'FinPi statement' : 'FinPi file';
+  const file = f ? origin + '/f/' + id : '';
+  const body = !f
+    ? '<div class="box"><h1>This link has expired</h1><p>Shared receipts and statements are available for 30 days.</p></div>'
+    : img
+      ? '<img src="' + esc(file) + '" alt="FinPi receipt"><a class="btn" href="' + esc(file) + '?dl=1" download="' + esc(f.name) + '">Save image</a>'
+      : '<div class="box"><div class="doc">PDF</div><h1>' + esc(title) + '</h1><p>' + esc(f.name) + '</p></div><a class="btn" href="' + esc(file) + '?dl=1" download="' + esc(f.name) + '">Download ' + (pdf ? 'PDF' : 'file') + '</a>';
+  const html = '<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">' +
+    '<meta name="robots" content="noindex"><meta name="referrer" content="no-referrer"><title>' + esc(title) + '</title>' +
+    '<meta property="og:title" content="' + esc(title) + '"><meta property="og:site_name" content="FinPi">' +
+    (img ? '<meta property="og:image" content="' + esc(file) + '"><meta property="og:image:type" content="' + esc(f.type) + '"><meta name="twitter:card" content="summary_large_image"><meta name="twitter:image" content="' + esc(file) + '">' : '') +
+    '<link rel="icon" href="/icons/favicon-32.png"><style>body{margin:0;background:#EEF2F7;font:16px/1.5 system-ui,-apple-system,Segoe UI,Roboto,sans-serif;color:#0F172A}' +
+    'main{max-width:560px;margin:0 auto;padding:16px 16px 32px}img{display:block;width:100%;height:auto;border-radius:18px;box-shadow:0 10px 30px -12px rgba(10,31,85,.35);background:#fff}' +
+    '.btn{display:block;margin-top:14px;padding:15px;border-radius:14px;background:#1D4ED8;color:#fff;text-align:center;font-weight:700;text-decoration:none}' +
+    '.box{background:#fff;border-radius:18px;padding:28px 20px;text-align:center}.box h1{font-size:20px;margin:10px 0 4px}.box p{margin:0;color:#64748B;word-break:break-all}' +
+    '.doc{display:inline-block;padding:14px 16px;border-radius:12px;background:#E0E7FF;color:#1D4ED8;font-weight:800}.top{display:flex;align-items:center;gap:10px;margin:4px 2px 14px;font-weight:700}.top img{width:30px;height:30px;box-shadow:none;border-radius:8px}</style></head>' +
+    '<body><main><div class="top"><img src="/icons/logo-256.png" alt="">FinPi</div>' + body + '</main></body></html>';
+  return new Response(html, { status: f ? 200 : 404, headers: { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'private, max-age=300', 'X-Robots-Tag': 'noindex', 'Referrer-Policy': 'no-referrer' } });
+}
