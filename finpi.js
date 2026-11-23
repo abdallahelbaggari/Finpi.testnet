@@ -126,16 +126,41 @@
     return upCache[k];
   }
   function blobSave(blob, name) { var u = URL.createObjectURL(blob), a = document.createElement('a'); a.href = u; a.download = name; a.rel = 'noopener'; document.body.appendChild(a); a.click(); a.remove(); setTimeout(function () { URL.revokeObjectURL(u); }, 15000); }
-  function saveFile(blob, name, type, what) {
+  function saveFile(blob, name, type, what, quiet) {
     toast('Saving ' + what + '…');
     upload(blob, name, type).then(function (d) {
       var url = location.origin + d.file + '?dl=1', a = document.createElement('a'); a.href = url; a.download = d.name || name; a.rel = 'noopener'; document.body.appendChild(a); a.click(); a.remove();
+      if (quiet) return;
       var img = /^image\//.test(type), w = sheet('Saved to your phone',
         '<p class="sh-sub">' + (img ? 'Your receipt image is in your phone’s <b>Downloads</b> and <b>Gallery</b>.' : 'Your ' + esc(what) + ' is in your phone’s <b>Downloads</b> folder.') + '</p>' +
         '<button type="button" class="btn" data-x="open">' + ic(img ? 'rcpt' : 'down') + (img ? 'Open the receipt image' : 'Download again') + '</button>' +
         '<p class="small muted" style="text-align:center;margin-top:10px">Not there? ' + (img ? 'Open the image, then press and hold it to save.' : 'Tap Download again.') + '</p>');
       $('[data-x="open"]', w).onclick = function () { if (img) location.href = d.page; else { var b = document.createElement('a'); b.href = url; b.download = d.name || name; document.body.appendChild(b); b.click(); b.remove(); } };
     }, function () { blobSave(blob, name); toast(what.charAt(0).toUpperCase() + what.slice(1) + ' saved to Downloads'); });
+  }
+  function shareLink(blob, name, type, title, short) {
+    toast('Preparing link…');
+    upload(blob, name, type).then(function (d) {
+      var link = location.origin + d.page, t = short || title, msg = t + '\n' + link;
+      if (navigator.share) navigator.share({ title: title, text: t, url: link }).catch(function () {});
+      else if (window.Pi && Pi.openShareDialog) { try { Pi.openShareDialog(title, msg); } catch (e) { copy(msg); } }
+      else copy(msg);
+    }, function () { toast('No connection. Try again.'); });
+  }
+  /* Share as a real image file first. If this browser cannot share files, save the image to the phone
+     (Gallery) so it can be sent as an image from WhatsApp or the Gallery, and offer the link as an option. */
+  function shareImage(blob, name, title, text, short) {
+    var f = null; try { f = new File([blob], name, { type: 'image/jpeg' }); } catch (e) {}
+    var fallback = function () {
+      saveFile(blob, name, 'image/jpeg', 'receipt', true);
+      var w = sheet('Share the receipt image', '<p class="sh-sub">The receipt image is saved to your phone’s <b>Gallery</b>. Open WhatsApp (or any app), tap attach, choose <b>Gallery</b> and pick the FinPi receipt.</p>' +
+        '<button type="button" class="btn" data-x="lk">' + ic('link') + 'Share as a link instead</button>');
+      $('[data-x="lk"]', w).onclick = function () { closeSheets(); shareLink(blob, name, 'image/jpeg', title, short); };
+    };
+    if (f && navigator.share && (!navigator.canShare || canShareFile(f))) {
+      return navigator.share({ files: [f], title: title }).catch(function (e) { if (!e || e.name !== 'AbortError') fallback(); });
+    }
+    fallback();
   }
   function shareFile(blob, name, type, title, text, short) {
     var f = null; try { f = new File([blob], name, { type: type }); } catch (e) {}
@@ -261,7 +286,7 @@
       (r.usd ? '<p class="small muted num">≈ ' + money(r.amount * r.usd, 'USD') + (r.lr && r.lc && r.lc !== 'USD' ? ' · ' + money(r.amount * r.lr, r.lc) : '') + ' at payment time</p>' : '') +
       '<span class="txd-ok">' + ic('check', 'width:15px;height:15px') + 'Verified on the Pi blockchain</span></div>' +
       '<div class="list txd-rows">' + rows.map(function (x, i) { return '<div class="txr"><span>' + esc(x[0]) + '</span><b class="' + (x[2] ? 'num mono' : '') + '">' + esc(x[1]) + '</b>' + (x[2] ? '<button type="button" class="cp" data-cp="' + i + '" aria-label="Copy ' + esc(x[0]) + '">' + ic('copy') + '</button>' : '') + '</div>'; }).join('') + '</div>' +
-      '<div class="two"><button type="button" class="btn" data-x="share">' + ic('share') + 'Share image</button><button type="button" class="btn ghost" data-x="dl">' + ic('down') + 'Save to gallery</button></div>' +
+      '<div class="two"><button type="button" class="btn" data-x="share">' + ic('share') + 'Share image</button><button type="button" class="btn ghost" data-x="dl">' + ic('down') + 'Save to gallery</button></div><button type="button" class="lnk" data-x="lnk" style="display:block;margin:10px auto 0">' + ic('link', 'width:16px;height:16px;vertical-align:-3px') + ' Share as a link</button>' +
       (v ? '<a class="btn soft" href="' + esc(v) + '">' + ic('ext') + 'View on the Pi blockchain</a>' : '') +
       '<div class="sec" style="margin-top:20px"><h2>Receipt</h2></div><div id="rc-prev" class="empty">Preparing receipt…</div>' +
       '');
@@ -270,7 +295,9 @@
     cvP.then(function (cv) { var p = $('#rc-prev', w); if (!p) return; if (!cv) { p.textContent = 'Receipt image unavailable.'; return; } p.className = ''; p.innerHTML = '<img class="rc-img" alt="FinPi receipt" src="' + cv.toDataURL('image/png') + '">'; });
     var name = rcName(r), text = 'FinPi receipt · ' + rcType(r) + ' · ' + fpi(r.amount) + ' π · ' + d.toLocaleDateString('en-GB') + (v ? '\nVerify on the Pi blockchain: ' + v : '');
     var jpg = cvP.then(function (cv) { return cv ? new Promise(function (ok) { cv.toBlob(ok, 'image/jpeg', 0.92); }) : null; });
-    $('[data-x="share"]', w).onclick = function () { jpg.then(function (b) { if (!b) return shareText('FinPi receipt', text); shareFile(b, name, 'image/jpeg', 'FinPi receipt', text, 'FinPi receipt · ' + rcType(r) + ' · ' + fpi(r.amount) + ' π · ' + d.toLocaleDateString('en-GB')); }); };
+    var shortT = 'FinPi receipt · ' + rcType(r) + ' · ' + fpi(r.amount) + ' π · ' + d.toLocaleDateString('en-GB');
+    $('[data-x="share"]', w).onclick = function () { jpg.then(function (b) { if (!b) return shareText('FinPi receipt', text); shareImage(b, name, 'FinPi receipt', text, shortT); }); };
+    $('[data-x="lnk"]', w).onclick = function () { jpg.then(function (b) { if (!b) return shareText('FinPi receipt', text); shareLink(b, name, 'image/jpeg', 'FinPi receipt', shortT); }); };
     $('[data-x="dl"]', w).onclick = function () { jpg.then(function (b) { if (!b) return toast('Receipt image unavailable'); saveFile(b, name, 'image/jpeg', 'receipt'); }); };
   }
 
