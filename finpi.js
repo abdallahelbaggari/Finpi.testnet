@@ -363,7 +363,7 @@
       '<label class="l" for="s-x">Narration</label><input class="in" id="s-x" maxlength="80" placeholder="What is it for? e.g. Rent, groceries, gift">' +
       '<div class="sum" id="s-sum" hidden></div>' +
       '<button type="button" class="btn" id="s-go">Continue</button>' +
-      '<p class="small muted" style="margin-top:12px;text-align:center">' + ic('lock', 'width:14px;height:14px;vertical-align:-2px') + (S.cfg.enabled ? ' Secured by Pi Network. Up to ' + S.cfg.max + ' π per payment.' : ' Secured by Pi Network.') + '</p>');
+      '<p class="small muted" style="margin-top:12px;text-align:center">' + ic('lock', 'width:14px;height:14px;vertical-align:-2px') + (S.cfg.enabled && S.cfg.max ? ' You approve every payment yourself. Up to ' + S.cfg.max + ' π per payment.' : ' You approve every payment yourself.') + '</p>');
     var u = $('#s-u', w), g = $('#s-g', w), a = $('#s-a', w), h = $('#s-uh', w), ok = null, tm = null, cat = pre.cat || '';
     function setKind(k) {
       kind = k; ok = null; h.innerHTML = '';
@@ -426,7 +426,7 @@
       if (!x) return toast('Add a narration: what is this payment for?');
       if (isG(to) && !S.cfg.enabled) return review(to, v, x, cat, { wallet: true, first: get('payees', []).indexOf(to) < 0 });
       if (!signedIn()) { needSignIn('Sign in with Pi to send inside FinPi.'); return; }
-      if (v > S.cfg.max) return toast('The most you can send at once is ' + S.cfg.max + ' π');
+      if (S.cfg.max && v > S.cfg.max) return toast('The most you can send at once is ' + S.cfg.max + ' π');
       if (!x) return toast('Add a narration: what is this payment for?');
       btn.disabled = true; btn.textContent = 'Checking…';
       api('/transfer', isG(to) ? { a: 'check', accessToken: S.token, addr: to, amt: v } : { a: 'check', accessToken: S.token, to: to, amt: v }).then(function (d) {
