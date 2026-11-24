@@ -345,7 +345,7 @@
     if (btn && !silent) { btn.disabled = true; $('#signin-t').textContent = 'Signing in…'; }
     if (!authP || Date.now() - authAt >= 20000) {
       authAt = Date.now();
-      var attempt = Pi.authenticate(['username', 'payments'], onIncomplete).then(function (a) {
+      var attempt = Pi.authenticate(['username', 'payments', 'wallet_address'], onIncomplete).then(function (a) {
         if (authP === attempt) authP = null;
         if (S.token && !S.guest) return true; // already signed in by an earlier attempt
         S.user = { username: a.user.username, uid: a.user.uid }; S.token = a.accessToken; S.guest = false;
