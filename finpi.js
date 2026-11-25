@@ -93,6 +93,9 @@
     sort: '<line x1="4" y1="6" x2="14" y2="6"/><line x1="4" y1="12" x2="11" y2="12"/><line x1="4" y1="18" x2="8" y2="18"/><polyline points="17 8 20 5 23 8"/><line x1="20" y1="5" x2="20" y2="19"/>',
     grid: '<rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/>',
     zap: '<polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/>',
+    cal: '<rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/>',
+    chevd: '<polyline points="6 9 12 15 18 9"/>',
+    cloud: '<path d="M18 10h-1.26A8 8 0 1 0 9 20h9a5 5 0 0 0 0-10z"/><polyline points="9 14 11.5 16.5 16 12"/>',
     tag: '<path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"/><line x1="7" y1="7" x2="7.01" y2="7"/>'
   };
   function ic(n, st) { return '<svg class="ic" viewBox="0 0 24 24"' + (st ? ' style="' + st + '"' : '') + ' aria-hidden="true">' + (P[n] || '') + '</svg>'; }
@@ -218,11 +221,19 @@
   function notes() { return get('notes', []); }
   function addNote(icn, t, b, tag) {
     var n = notes(); if (tag && n.some(function (x) { return x.tag === tag; })) return;
-    n.unshift({ ic: icn, t: t, b: b, ts: Date.now(), read: false, tag: tag || '' }); put('notes', n.slice(0, 60)); bellDot();
+    n.unshift({ ic: icn, t: t, b: b, ts: Date.now(), read: false, tag: tag || '' }); put('notes', n.slice(0, 60)); bellDot(); try { headsUp(icn, t, b); } catch (e) {}
     if (get('push', false) && 'Notification' in window && Notification.permission === 'granted') {
       var opt = { body: b, icon: 'icons/icon-192.png', badge: 'icons/favicon-32.png', tag: tag || undefined };
       try { navigator.serviceWorker && navigator.serviceWorker.ready.then(function (r) { r.showNotification(t, opt); }).catch(function () { try { new Notification(t, opt); } catch (e) {} }); } catch (e) {}
     }
+  }
+  function ntCls(i) { return { req: 'in', check: 'in', send: 'out', undo: 'rf', warn: 'bad', inv: 'iv', tag: 'rf', bell: 'iv', heart: 'sp', refresh: 'tl', act: 'iv' }[i] || 'out'; }
+  var huT = null;
+  function headsUp(icn, t, b) {
+    var a = $('#app'); if (!a || a.hidden) return;
+    var h = $('#hu'); if (!h) { h = document.createElement('button'); h.type = 'button'; h.id = 'hu'; h.setAttribute('aria-live', 'polite'); document.body.appendChild(h); h.onclick = function () { h.classList.remove('on'); if (A.notifs) A.notifs(); }; }
+    h.innerHTML = '<span class="ico nt ' + ntCls(icn) + '">' + ic(icn || 'bell') + '</span><span class="grow"><b>' + esc(t) + '</b><small>' + esc(b) + '</small></span>';
+    h.classList.remove('on'); void h.offsetWidth; h.classList.add('on'); clearTimeout(huT); huT = setTimeout(function () { h.classList.remove('on'); }, 4200);
   }
   function bellDot() { var d = $('#bell-dot'); if (d) d.hidden = !notes().some(function (x) { return !x.read; }); }
 
@@ -467,7 +478,7 @@
       if (!d || !d.ok) return; var ch = 0;
       (d.items || []).forEach(function (t) {
         if (t.status === 'paid') {
-          if (saveTransfer(t, t.dir)) { ch++; if (t.dir === 'in') { var m = fpi(t.amount) + ' π from @' + t.from + (t.narr ? ' · ' + t.narr : ''); addNote('req', 'You received Pi', m, 'in-' + t.pid); toast('You received ' + fpi(t.amount) + ' π'); } }
+          if (saveTransfer(t, t.dir)) { ch++; if (t.dir === 'in') { var m = fpi(t.amount) + ' π from @' + t.from + (t.narr ? ' · ' + t.narr : ''); addNote('req', 'You received Pi', m, 'in-' + t.pid); } }
         } else if (t.status === 'refunded' && t.dir === 'out') { if (saveRefund(t)) ch++; }
         else if (t.dir === 'out' && /^(failed|received|paying|refunding|refund_failed|refund_needed)$/.test(t.status)) {
           api('/transfer', { a: 'payout', paymentId: t.pid }).then(function (x) { if (x && x.ok && x.row) { if (saveTransfer(x.row, 'out')) rerender(); } else if (x && x.refunded && x.row && saveRefund(x.row)) rerender(); }).catch(function () {});
@@ -1093,7 +1104,7 @@
   function hour() { var h = new Date().getHours(); return h < 12 ? 'Good morning' : h < 17 ? 'Good afternoon' : 'Good evening'; }
   function txRow(r, i) {
     var inn = r.dir === 'in', cls = r.kind === 'refund' ? 'rf' : r.kind === 'supporter' ? 'sp' : inn ? 'in' : '';
-    return '<button type="button" class="li" data-rc="' + i + '"><span class="ico ' + cls + '">' + ic(r.kind === 'refund' ? 'undo' : r.kind === 'supporter' ? 'heart' : inn ? 'req' : 'send') + '</span><span class="grow"><b>' + esc(rcptTitle(r)) + '</b><small>' + esc((r.narr ? r.narr + ' · ' : '') + new Date(r.ts).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })) + '</small></span><span class="amt-r"><b class="' + (inn ? 'pos' : '') + '">' + (inn ? '+' : '−') + fpi(r.amount) + ' π</b><small>' + (r.cat && !inn ? esc(r.cat) : 'Verified') + '</small></span></button>';
+    return '<button type="button" class="li" data-rc="' + i + '"><span class="ico tx ' + (cls || 'out') + '">' + ic(r.kind === 'refund' ? 'undo' : r.kind === 'supporter' ? 'heart' : inn ? 'req' : 'send') + '</span><span class="grow"><b>' + esc(rcptTitle(r)) + '</b><small>' + esc((r.narr ? r.narr + ' · ' : '') + new Date(r.ts).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })) + '</small></span><span class="amt-r"><b class="' + (inn ? 'pos' : '') + '">' + (inn ? '+' : '−') + fpi(r.amount) + ' π</b><small>' + (r.cat && !inn ? esc(r.cat) : 'Verified') + '</small></span></button>';
   }
   function pendingList() {
     var pd = get('pend', {}), R = rcpts();
@@ -1145,9 +1156,8 @@
       var head = '<div class="ph"><h1>Activity</h1><p>All your payments and receipts.</p></div><div class="seg" role="tablist"><button type="button" data-seg="tx" class="' + (S.seg === 'tx' ? 'on' : '') + '">Transactions</button><button type="button" data-seg="ins" class="' + (S.seg === 'ins' ? 'on' : '') + '">Insights</button></div>';
       if (S.seg === 'ins') return head + insightsHTML();
       return head + '<div class="act-tools"><div class="act-q">' + ic('search') + '<input class="in" id="act-q" type="search" autocomplete="off" placeholder="Search payments" value="' + esc(S.q || '') + '"></div>' +
-        '<div class="chips act-ch">' + PER.map(function (x) { return '<button type="button" class="chip' + (S.per === x[0] ? ' on' : '') + '" data-per="' + x[0] + '">' + x[1] + '</button>'; }).join('') + '</div>' +
-        (S.per === 'custom' ? '<div class="two act-dt"><label><span>From</span><input class="in" type="date" id="act-f" value="' + esc(S.from || '') + '" max="' + dIso(Date.now()) + '"></label><label><span>To</span><input class="in" type="date" id="act-t" value="' + esc(S.to || '') + '" max="' + dIso(Date.now()) + '"></label></div>' : '') +
-        '<div class="chips act-ch">' + [['all', 'All'], ['out', 'Sent'], ['in', 'Received'], ['ref', 'Refunds']].map(function (x) { return '<button type="button" class="chip sm' + (S.filter === x[0] ? ' on' : '') + '" data-flt="' + x[0] + '">' + x[1] + '</button>'; }).join('') + '</div></div>' +
+        '<div class="seg act-seg" role="tablist">' + FLT.map(function (x) { return '<button type="button" data-flt="' + x[0] + '" class="' + (S.filter === x[0] ? 'on' : '') + '">' + x[1] + '</button>'; }).join('') + '</div>' +
+        '<div class="act-bar"><button type="button" class="act-pill" data-actper="1">' + ic('cal') + '<span>' + esc(perLabel()) + '</span>' + ic('chevd') + '</button><button type="button" class="act-pill" data-sort="1">' + ic('sort') + '<span>' + SORTS[S.sort] + '</span>' + ic('chevd') + '</button></div></div>' +
         '<div id="act-l">' + actList() + '</div>';
     },
     profile: function () {
@@ -1156,10 +1166,10 @@
         (!signedIn() ? '<button type="button" class="btn" data-act="signin" style="margin-top:14px"><span class="pi-dot">π</span>Sign in with Pi</button>' : '') +
         '<div class="sec"><h2>Settings</h2></div><div class="list">' +
         row('edit', 'Name on receipts', get('name', '') ? NTYPE[nType()].l + ' · ' + get('name', '') : 'Your name, business, store or shop', 'name') + row('globe', 'Currency', cname(curr()) + ' (' + curr() + ')', 'currency') +
-        row('bell', 'Phone notifications', get('push', false) ? 'On' : 'Off', 'push') + row('pie', 'Monthly budget', get('budget', 0) ? fpi(get('budget', 0)) + ' π' : 'Not set', 'budget') + row('card', 'Wallet address', get('addr', '') ? short(get('addr', '')) : 'Not added', 'addr-set') + hook('settings') + '</div>' +
+        row('bell', 'Notifications', !('Notification' in window) ? 'In-app alerts on' : get('push', false) ? 'Phone and in-app alerts' : 'In-app alerts on', 'push') + row('pie', 'Monthly budget', get('budget', 0) ? fpi(get('budget', 0)) + ' π' : 'Not set', 'budget') + row('card', 'Wallet address', get('addr', '') ? short(get('addr', '')) : 'Not added', 'addr-set') + hook('settings') + '</div>' +
         '<div class="sec"><h2>Support</h2></div><div class="list">' + row('info', 'Welcome tour', 'A quick look at FinPi', 'tour') +
         row('shield', 'Trust center', 'Payments, limits and records', 'security') + row('refresh', 'Repair app', 'Refresh FinPi and restore your data', 'repair') + row('act', 'Resolve a pending payment', 'Finishes or clears an unfinished payment', 'resolvepend') + row('heart', sup ? 'You are a Supporter' : 'Become a Supporter', sup ? 'Thank you!' : '1 π · badge only, no reward', 'supporter') +
-        row('mail', 'Help & contact', SUPPORT, 'help') + '</div>' +
+        row('mail', 'Help & contact', 'Contact the FinPi team', 'help') + '</div>' +
         '<div class="sec"><h2>Legal</h2></div><div class="list">' + lrow('Terms of Service', 'terms-of-service.html') + lrow('Privacy Policy', 'privacy-policy.html') + lrow('Risk Disclosure', 'risk-disclosure.html') + '</div>' +
         (signedIn() ? '<button type="button" class="btn danger" data-act="signout" style="margin-top:18px">' + ic('out') + 'Sign out</button>' : '') +
         '<p class="small muted" style="text-align:center;margin-top:16px">FinPi 1.0.0 · ' + NETN + ' · finpi.pi</p>';
@@ -1169,6 +1179,20 @@
   };
   var PER = [['all', 'All time'], ['today', 'Today'], ['7d', '7 days'], ['30d', '30 days'], ['month', 'This month'], ['last', 'Last month'], ['custom', 'Custom']];
   var SORTS = { new: 'Newest first', old: 'Oldest first', big: 'Largest first', small: 'Smallest first' };
+  var FLT = [['all', 'All'], ['out', 'Sent'], ['in', 'Received'], ['ref', 'Refunds']];
+  function dShort(v) { var d = new Date(v + 'T00:00:00'); return isNaN(d) ? v : d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }); }
+  function perLabel() { if (S.per === 'custom') return (S.from ? dShort(S.from) : 'Start') + ' – ' + (S.to ? dShort(S.to) : 'Today'); return PER.filter(function (x) { return x[0] === S.per; })[0][1]; }
+  function perSheet() {
+    var w = sheet('Period', '<div class="list pick">' + PER.filter(function (x) { return x[0] !== 'custom'; }).map(function (x) { return '<button type="button" class="li' + (S.per === x[0] ? ' on' : '') + '" data-pp="' + x[0] + '"><span class="grow"><b>' + x[1] + '</b></span>' + (S.per === x[0] ? ic('check') : '') + '</button>'; }).join('') + '</div>' +
+      '<div class="day">Custom range</div><div class="two act-dt"><label><span>From</span><input class="in" type="date" id="pp-f" value="' + esc(S.from || '') + '" max="' + dIso(Date.now()) + '"></label><label><span>To</span><input class="in" type="date" id="pp-t" value="' + esc(S.to || '') + '" max="' + dIso(Date.now()) + '"></label></div>' +
+      '<button type="button" class="btn" id="pp-go">' + ic('cal') + 'Show this range</button>');
+    $$('[data-pp]', w).forEach(function (b) { b.onclick = function () { S.per = b.dataset.pp; S.page = 60; closeSheets(); render('activity'); }; });
+    $('#pp-go', w).onclick = function () { var f = $('#pp-f', w).value, t = $('#pp-t', w).value; if (!f && !t) return toast('Choose a start or end date'); S.per = 'custom'; S.from = f; S.to = t; S.page = 60; closeSheets(); render('activity'); };
+  }
+  function sortSheet() {
+    var w = sheet('Sort', '<div class="list pick">' + Object.keys(SORTS).map(function (k) { return '<button type="button" class="li' + (S.sort === k ? ' on' : '') + '" data-so="' + k + '"><span class="grow"><b>' + SORTS[k] + '</b></span>' + (S.sort === k ? ic('check') : '') + '</button>'; }).join('') + '</div>');
+    $$('[data-so]', w).forEach(function (b) { b.onclick = function () { S.sort = b.dataset.so; closeSheets(); render('activity'); }; });
+  }
   function dIso(t) { var d = new Date(t); return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); }
   function perRange() {
     var t = new Date(); t.setHours(0, 0, 0, 0); var d0 = t.getTime(), n = Date.now() + 864e5, m = new Date(d0); m.setDate(1);
@@ -1192,17 +1216,19 @@
   function actList() {
     var F = actRows(), inn = 0, out = 0, f = S.filter, lim = S.page || 60, byDay = S.sort === 'new' || S.sort === 'old';
     F.forEach(function (x) { var r = x[0]; if (r.dir === 'in') inn += Number(r.amount) || 0; else out += Number(r.amount) || 0; });
-    var html = '', day = '';
+    var html = '', groups = [], cur = null;
     F.slice(0, lim).forEach(function (x) {
-      if (byDay) { var d = new Date(x[0].ts).toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' }); if (d !== day) { if (day) html += '</div>'; html += '<div class="day">' + d + '</div><div class="list">'; day = d; } }
-      else if (!day) { html += '<div class="list" style="margin-top:12px">'; day = '1'; }
-      html += txRow(x[0], x[1]);
+      var key = byDay ? new Date(x[0].ts).toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' }) : '';
+      if (!cur || cur.k !== key) { cur = { k: key, rows: [], net: 0 }; groups.push(cur); }
+      cur.rows.push(x); cur.net += (x[0].dir === 'in' ? 1 : -1) * (Number(x[0].amount) || 0);
     });
-    if (day) html += '</div>';
+    groups.forEach(function (g) { html += (g.k ? '<div class="day act-day"><span>' + g.k + '</span><b class="num ' + (g.net >= 0 ? 'pos' : '') + '">' + (g.net >= 0 ? '+' : '−') + fpi(Math.abs(r7(g.net))) + ' π</b></div>' : '<div style="height:12px"></div>') + '<div class="list anim">' + g.rows.map(function (x) { return txRow(x[0], x[1]); }).join('') + '</div>'; });
     var showPend = pendingList().length && (f === 'all' || f === 'out') && !S.q && (S.per === 'all' || perRange()[1] > Date.now());
-    return '<div class="act-sum"><div><small>Payments</small><b class="num">' + F.length + '</b></div><div><small>Received</small><b class="num pos">' + (inn ? '+' : '') + fpi(r7(inn)) + ' π</b></div><div><small>Sent</small><b class="num">' + (out ? '−' : '') + fpi(r7(out)) + ' π</b></div></div>' +
-      '<div class="sortbar"><span>' + (signedIn() ? ic('check', 'width:14px;height:14px;vertical-align:-2px') + ' Backed up' : PER.filter(function (x) { return x[0] === S.per; })[0][1]) + '</span><button type="button" data-sort="1">' + ic('sort', 'width:15px;height:15px;vertical-align:-3px') + ' ' + SORTS[S.sort] + '</button></div>' +
-      (showPend ? '<div class="day">Processing</div><div class="list">' + pendingList().map(pendRow).join('') + '</div>' : '') +
+    var fl = FLT.filter(function (x) { return x[0] === f; })[0][1];
+    return '<div class="act-card"><div class="act-k">' + ic('cal', 'width:15px;height:15px') + '<span>' + esc(perLabel()) + (f !== 'all' ? ' · ' + fl : '') + (S.q ? ' · “' + esc(S.q) + '”' : '') + '</span></div>' +
+      '<div class="act-row"><div><small>Received</small><b class="num">' + (inn ? '+' : '') + fpi(r7(inn)) + ' π</b></div><div><small>Sent</small><b class="num">' + (out ? '−' : '') + fpi(r7(out)) + ' π</b></div><div><small>Payments</small><b class="num">' + F.length + '</b></div></div>' +
+      (signedIn() ? '<button type="button" class="act-bk" data-act="backup">' + ic('cloud', 'width:15px;height:15px') + 'Backed up to your Pi account</button>' : '') + '</div>' +
+      (showPend ? '<div class="day act-day"><span>Processing</span></div><div class="list anim">' + pendingList().map(pendRow).join('') + '</div>' : '') +
       (html || (showPend ? '' : '<div class="list" style="margin-top:14px"><div class="empty">' + ic('rcpt') + '<div>' + (rcpts().length ? 'No payments match.' : 'No payments yet.') + '</div></div></div>')) +
       (F.length > lim ? '<button type="button" class="btn ghost" data-more="1" style="margin-top:12px">Show more · ' + (F.length - lim) + ' left</button>' : '') +
       (S.hMore && signedIn() && F.length <= lim ? '<button type="button" class="btn ghost" data-older="1" style="margin-top:12px">Load older history</button>' : '') +
@@ -1280,7 +1306,19 @@
     i.oninput = pv; pv();
     $('#nm-go', w).onclick = function () { var v = i.value.trim().replace(/\s+/g, ' '); if (v && v.length < 2) return toast('Enter at least 2 letters'); setName(v, t); closeSheets(); render(S.tab); toast(v ? NTYPE[t].l + ' saved' : 'Name removed'); if (after) after(); };
   }
-  function trustChips() { return '<span>' + ic('check') + 'Verified on the Pi blockchain</span><span>' + ic('refresh') + (signedIn() ? 'Backed up to your Pi account' : 'Backup after sign-in') + '</span><span>' + ic('rcpt') + 'Receipt for every payment</span>'; }
+  function trustChips() { return '<button type="button" data-act="verify">' + ic('check') + 'Verified on the Pi blockchain</button><button type="button" data-act="backup">' + ic('cloud') + (signedIn() ? 'Backed up to your Pi account' : 'Backup after sign-in') + '</button><button type="button" data-tab="activity">' + ic('rcpt') + 'Receipt for every payment</button>'; }
+  function backupSheet() {
+    if (needSignIn('Sign in with Pi to back up your payments and business records.')) return;
+    var R = rcpts(), done = R.filter(function (r) { return r.hs; }).length, bi = HK.bizInfo ? HK.bizInfo() : null;
+    var w = sheet('Backup', '<div class="bk-hero"><div class="bk-i">' + ic('cloud') + '</div><b>Backed up to your Pi account</b><small>@' + esc(me()) + ' · ' + NETN + '</small></div>' +
+      '<div class="list" style="margin-top:12px"><div class="txr"><span>Payments and receipts</span><b>' + done + ' of ' + R.length + ' saved</b></div>' + (bi ? '<div class="txr"><span>Business records</span><b>' + (bi.items ? bi.items + ' items · ' : '') + (bi.up ? 'saved ' + ago(bi.up) : 'nothing to save yet') + '</b></div>' : '') +
+      '<div class="txr"><span>Restore</span><b>Automatic on any phone after sign-in</b></div></div>' +
+      '<button type="button" class="btn" id="bk-go">' + ic('refresh') + 'Back up now</button><button type="button" class="btn ghost" data-act="repair">' + ic('cloud') + 'Restore from backup</button>');
+    $('#bk-go', w).onclick = function () {
+      var b = this; b.disabled = true; b.textContent = 'Backing up…';
+      Promise.all([hPush(), HK.bizPush ? HK.bizPush(true) : null]).then(function () { closeSheets(); toast('Backup complete'); backupSheet(); }).catch(function () { b.disabled = false; b.textContent = 'Back up now'; toast('No connection. Try again.'); });
+    };
+  }
   function trustHTML() { return '<div class="trust">' + trustChips() + '</div>'; }
   /* Repair app: clears temporary files and cached screens, checks saved data and restores history and business
      records from the backup. Payments, receipts and business records are kept. */
@@ -1721,8 +1759,8 @@
     'addr-set': function () { addrSheet(true); }, 'addr-use': function () { var s = get('addrSug', ''); if (validG(s)) { put('addr', s); put('addrSug', ''); render(S.tab); loadWal(); toast('Address saved'); } },
     'wal-load': function () { S.wal = null; loadWal(); },
     notifs: function () {
-      var N = notes(); N.forEach(function (n) { n.read = true; }); put('notes', N); bellDot();
-      sheet('Notifications', (!get('push', false) && 'Notification' in window && Notification.permission !== 'denied' ? '<button type="button" class="np-cta" data-act="push">' + ic('bell') + '<span><b>Phone notifications are off</b><small>Turn on to get alerts outside FinPi</small></span>' + ic('chev') + '</button>' : '') + (N.length ? '<div class="list">' + N.map(function (n) { return '<div class="li"><span class="ico">' + ic(n.ic || 'bell') + '</span><span class="grow"><b>' + esc(n.t) + '</b><small style="white-space:normal">' + esc(n.b) + '</small><small>' + ago(n.ts) + '</small></span></div>'; }).join('') + '</div><button type="button" class="btn ghost" data-act="notes-clear">Clear all</button>' : '<div class="empty">' + ic('bell') + '<div>No notifications yet.</div></div>'));
+      var N = notes(); put('notes', N.map(function (n) { return Object.assign({}, n, { read: true }); })); bellDot();
+      sheet('Notifications', (!get('push', false) && 'Notification' in window && Notification.permission !== 'denied' ? '<button type="button" class="np-cta" data-act="push">' + ic('bell') + '<span><b>Phone notifications are off</b><small>Turn on to get alerts outside FinPi</small></span>' + ic('chev') + '</button>' : '') + (N.length ? '<div class="list anim">' + N.map(function (n) { return '<div class="li' + (n.read ? '' : ' unread') + '"><span class="ico nt ' + ntCls(n.ic) + '">' + ic(n.ic || 'bell') + '</span><span class="grow"><b>' + esc(n.t) + '</b><small style="white-space:normal">' + esc(n.b) + '</small><small>' + ago(n.ts) + '</small></span></div>'; }).join('') + '</div><button type="button" class="btn ghost" data-act="notes-clear">Clear all</button>' : '<div class="empty">' + ic('bell') + '<div>No notifications yet.</div></div>'));
     },
     'notes-clear': function () { put('notes', []); closeSheets(); bellDot(); },
     csv: function () {
@@ -1751,14 +1789,14 @@
       };
       var t = $('#ps-t', w); if (t) t.onclick = function () { addNote('bell', 'FinPi test', 'Notifications are working.', 'test-' + Date.now()); toast('Test sent'); };
     },
-    resolvepend: function () { window.fpResolvePending(); }, travel: function () { curSheet(true); }, insights: function () { S.seg = 'ins'; go('activity'); }, repair: function () { repairSheet(); },
+    resolvepend: function () { window.fpResolvePending(); }, backup: function () { backupSheet(); }, travel: function () { curSheet(true); }, insights: function () { S.seg = 'ins'; go('activity'); }, repair: function () { repairSheet(); },
     security: function () {
       sheet('Trust center', '<div class="trust big-t">' + trustChips() + '</div>' +
         '<div class="card" style="margin-top:12px"><h3>Payments</h3><p>Every transfer is processed through Pi Network’s official payments and delivered within seconds. If delivery is not possible, the Pi is refunded automatically. Each payment is checked on the Pi blockchain, so nothing is paid twice.</p></div>' +
         '<div class="card"><h3>Limits and fees</h3><p>' + (S.cfg.max || S.cfg.daily ? (S.cfg.max ? 'Up to ' + S.cfg.max + ' π per transfer. ' : '') + (S.cfg.daily ? 'Up to ' + S.cfg.daily + ' π per Pioneer per day. ' : '') : 'No transfer limits. ') + 'Blockchain fee: ' + S.cfg.fee + ' π per transfer.</p></div>' +
         '<div class="card"><h3>Your records</h3><p>Receipts verified on the Pi blockchain. History and business records backed up to your Pi account. Statements and reports for any period.</p></div>' +
         '<div class="card"><h3>Good practice</h3><p>• Pay Pioneers and businesses you know.<br>• Check the @username and amount before you confirm.<br>• FinPi staff never ask you to send Pi.<br>• Keep your passphrase private.</p></div>' +
-        '<p class="small muted" style="margin-top:12px">Questions? ' + SUPPORT + '</p>');
+        '');
     },
     supporter: function () {
       if (get('supporter', false)) return toast('You are already a Supporter. Thank you!');
@@ -1767,7 +1805,7 @@
       $('#sp-go', w).onclick = supporterPay;
     },
     status: function () { location.href = 'setup.html'; },
-    help: function () { sheet('Help & contact', '<p class="sh-sub">We reply within 30 days, usually much sooner.</p><a class="btn" href="mailto:' + SUPPORT + '?subject=FinPi%20help">' + ic('mail') + 'Email ' + SUPPORT + '</a><div class="card" style="margin-top:14px"><h3>Common questions</h3><p><b>Where is my Pi?</b> In your own Pi Wallet. FinPi never holds balances.<br><br><b>A transfer did not arrive.</b> FinPi keeps delivering automatically, or refunds you. You will be notified either way.<br><br><b>Can a transfer be reversed?</b> No. Delivered blockchain payments are final.</p></div>'); },
+    help: function () { sheet('Help & contact', '<p class="sh-sub">We reply within 30 days, usually much sooner.</p><a class="btn" href="mailto:' + SUPPORT + '?subject=FinPi%20help">' + ic('mail') + 'Email FinPi support</a><div class="card" style="margin-top:14px"><h3>Common questions</h3><p><b>Where is my Pi?</b> In your own Pi Wallet. FinPi never holds balances.<br><br><b>A transfer did not arrive.</b> FinPi keeps delivering automatically, or refunds you. You will be notified either way.<br><br><b>Can a transfer be reversed?</b> No. Delivered blockchain payments are final.</p></div>'); },
     signout: function () { S.user = null; S.token = null; registered = false; put('user', null); closeSheets(); $('#app').hidden = true; $('#landing').hidden = false; toast('Signed out'); }
   };
   function supporterPay() {
@@ -1793,8 +1831,9 @@
     var t = e.target.closest('[data-tab]'); if (t && !t.closest('.sh-wrap')) { if (t.dataset.seg) S.seg = t.dataset.seg; go(t.dataset.tab); return; }
     var s = e.target.closest('#view [data-seg]'); if (s) { S.seg = s.dataset.seg; render('activity'); return; }
     var f = e.target.closest('[data-flt]'); if (f) { S.filter = f.dataset.flt; S.page = 60; $$('[data-flt]').forEach(function (b) { b.classList.toggle('on', b === f); }); actPaint(); return; }
+    if (e.target.closest('[data-actper]')) { perSheet(); return; }
     var pr = e.target.closest('[data-per]'); if (pr) { var was = S.per; S.per = pr.dataset.per; S.page = 60; if (S.per === 'custom' || was === 'custom') render('activity'); else { $$('[data-per]').forEach(function (b) { b.classList.toggle('on', b === pr); }); actPaint(); } return; }
-    if (e.target.closest('[data-sort]')) { var ks = Object.keys(SORTS); S.sort = ks[(ks.indexOf(S.sort) + 1) % ks.length]; actPaint(); return; }
+    if (e.target.closest('[data-sort]')) { sortSheet(); return; }
     if (e.target.closest('[data-more]')) { S.page += 100; actPaint(); return; }
     var ol = e.target.closest('[data-older]'); if (ol) { hOlder(ol); return; }
     var mo = e.target.closest('[data-mon]'); if (mo) { S.month = Math.min(0, S.month + Number(mo.dataset.mon)); render('activity'); return; }

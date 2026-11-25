@@ -84,6 +84,8 @@
     }
     if (bHas(bSnap()) && !get('bizTs', 0)) put0('bizTs', Date.now());
     K.HK.signin.push(function () { setTimeout(bPull, 800); });
+    K.HK.bizPush = function (force) { if (force && bHas(bSnap()) && get('bizTs', 0) <= get('bizUp', 0)) put0('bizTs', Date.now()); return bPush(); };
+    K.HK.bizInfo = function () { var d = bSnap(); return { up: get('bizUp', 0), items: (d.inv || []).length + (d.cust || []).length + (d.prod || []).length + (d.recur || []).length }; };
     K.HK.repair.push(bPull);
     document.addEventListener('visibilitychange', function () { if (document.hidden) bPush(); });
 
