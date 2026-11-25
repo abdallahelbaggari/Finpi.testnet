@@ -56,6 +56,43 @@
     function who(to) { var c = custFor(to); return c ? c.name : K.isG(to) ? K.short(to) : to ? '@' + to : '—'; }
     function invLink(v) { return K.payLink({ u: v.to, a: balance(v) || v.total, x: (v.no + ' · ' + (v.title || (v.items[0] && v.items[0].d) || 'Invoice')).slice(0, 80) }); }
 
+    /* ── backup of business records to the Pi account (restored on any phone after sign-in) ── */
+    var BK = ['biz', 'inv', 'invSeq', 'cust', 'recur', 'qrO'], bT = null, put0 = K.put;
+    put = function (k, v) { var r = put0(k, v); if (BK.indexOf(k) >= 0) bDirty(); return r; };
+    function bSnap() { var d = {}; BK.forEach(function (k) { var v = get(k, null); if (v !== null) d[k] = v; }); return d; }
+    function bHas(d) { return !!(d && ((d.inv || []).length || (d.cust || []).length || (d.recur || []).length || (d.biz && d.biz.name))); }
+    function bDirty() { put0('bizTs', Date.now()); clearTimeout(bT); bT = setTimeout(bPush, 2500); }
+    function bPush() {
+      if (!K.signedIn() || !K.token()) return Promise.resolve(); var ts = get('bizTs', 0);
+      if (!ts || ts <= get('bizUp', 0)) return Promise.resolve();
+      return K.api('/history', { a: 'bput', accessToken: K.token(), ts: ts, data: bSnap() }).then(function (d) { if (d && d.ok) put0('bizUp', ts); }).catch(function () {});
+    }
+    function byId(loc, srv) { var m = {}, o = []; (loc || []).forEach(function (x) { if (x && x.id) m[x.id] = x; }); (srv || []).forEach(function (x) { if (x && x.id) m[x.id] = x; }); for (var k in m) o.push(m[k]); return o.sort(function (a, b) { return (b.ts || 0) - (a.ts || 0); }); }
+    function bPull() {
+      if (!K.signedIn() || !K.token()) return Promise.resolve();
+      return K.api('/history', { a: 'bget', accessToken: K.token() }).then(function (d) {
+        if (!d || !d.ok) return; var srv = d.data, loc = bSnap();
+        if (!srv || !bHas(srv)) return bPush();
+        if (d.ts <= get('bizTs', 0) && bHas(loc)) return bPush();
+        var extra = (loc.inv || []).some(function (x) { return !(srv.inv || []).some(function (y) { return y.id === x.id; }); }) || (loc.cust || []).some(function (x) { return !(srv.cust || []).some(function (y) { return y.id === x.id; }); });
+        put0('inv', byId(loc.inv, srv.inv)); put0('cust', byId(loc.cust, srv.cust)); put0('recur', byId(loc.recur, srv.recur));
+        put0('invSeq', Math.max(loc.invSeq || 0, srv.invSeq || 0)); if (srv.biz) put0('biz', srv.biz); if (srv.qrO) put0('qrO', srv.qrO);
+        put0('bizTs', d.ts); put0('bizUp', d.ts); matchAll(); K.rerender();
+        if (extra) bDirty();
+      }).catch(function () {});
+    }
+    if (bHas(bSnap()) && !get('bizTs', 0)) put0('bizTs', Date.now());
+    K.HK.signin.push(function () { setTimeout(bPull, 800); });
+    K.HK.repair.push(bPull);
+    document.addEventListener('visibilitychange', function () { if (document.hidden) bPush(); });
+
+    /* ── payment done: animated confirmation ── */
+    function doneFx(r) {
+      var o = document.createElement('div'), inn = r.dir === 'in'; o.className = 'fp-done' + (inn ? ' in' : '');
+      o.innerHTML = '<div class="fp-done-c"><svg viewBox="0 0 120 120" aria-hidden="true"><circle class="r" cx="60" cy="60" r="52"/><path class="k" d="M38 62 l15 15 l30 -32"/></svg><b class="num bz-amt">' + (inn ? '+' : '−') + fpi(r.amount) + ' π</b><span>' + esc(inn ? 'Received from ' + (r.other || K.short(r.from)) : 'Sent to ' + (r.other || K.short(r.addr))) + '</span></div>';
+      o.onclick = function () { o.remove(); }; document.body.appendChild(o); setTimeout(function () { o.classList.add('out'); setTimeout(function () { o.remove(); }, 400); }, 1900);
+    }
+
     /* ── sounds and vibration ── */
     var AC = null;
     function ac() { try { if (!AC) AC = new (window.AudioContext || window.webkitAudioContext)(); if (AC.state === 'suspended') AC.resume(); } catch (e) { AC = null; } return AC; }
@@ -112,7 +149,7 @@
     function matchAll() { var n = 0; sales().forEach(function (r) { if (matchRcpt(r, true)) n++; }); return n; }
     K.HK.rcpt.push(function (r) {
       var fresh = Date.now() - (r.ts || 0) < 180e3;
-      if (fresh && r.kind !== 'supporter') fx(r.dir === 'in' ? 'in' : 'out');
+      if (fresh && r.kind !== 'supporter') { fx(r.dir === 'in' ? 'in' : 'out'); if (r.kind !== 'refund') try { doneFx(r); } catch (e) {} }
       matchRcpt(r, !fresh);
     });
     function invFor(r) { var k = rkey(r); return invs().filter(function (v) { return (v.pays || []).indexOf(k) >= 0; })[0]; }
