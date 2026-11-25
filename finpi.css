@@ -533,3 +533,26 @@ body{background:var(--bg)}
 .list,.card{border-color:var(--line)}
 .li .ico{border-radius:14px}
 .btn{border-radius:16px}
+
+/* ── name on receipts, quick sale, products, travel currency ── */
+.nm-prev{margin-top:12px;padding:12px 14px;border-radius:14px;background:var(--bg);border:1px dashed var(--line2);display:flex;justify-content:space-between;gap:10px;font-size:13.5px}
+.nm-prev span{color:var(--mute);flex:none}.nm-prev b{text-align:right;overflow-wrap:anywhere;color:var(--navy)}
+.qs-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:12px;max-height:46vh;overflow-y:auto;padding:2px}
+.qs-it{border-radius:18px;background:#fff;border:1.5px solid var(--line2);overflow:hidden;transition:border-color .2s,box-shadow .2s}
+.qs-it.on{border-color:var(--blue);box-shadow:0 10px 22px -16px rgba(21,67,224,.9)}
+.qs-it.out{opacity:.55}
+.qs-add{display:flex;flex-direction:column;align-items:flex-start;gap:2px;width:100%;padding:12px;text-align:left}
+.qs-add b{font-size:14px;line-height:1.3;color:var(--ink)}.qs-add span{font-size:14px;font-weight:700;color:var(--blue)}.qs-add small{font-size:11.5px;color:var(--mute)}
+.qs-n{display:flex;align-items:center;justify-content:space-between;padding:6px 8px;background:#EEF3FF}
+.qs-n button{width:34px;height:34px;border-radius:11px;background:#fff;display:flex;align-items:center;justify-content:center;color:var(--blue);box-shadow:var(--sh)}
+.qs-n .ic{width:18px;height:18px}.qs-n b{font-size:16px;color:var(--navy)}
+.qs-pay{text-align:center;padding:16px 12px;border-radius:24px;background:linear-gradient(180deg,#F4F7FF,#fff);border:1px solid var(--line)}
+.qs-amt{font-size:40px;font-weight:800;color:var(--navy);letter-spacing:-.02em}
+.qs-qr{position:relative;display:inline-block;margin:12px auto 6px;padding:12px;background:#fff;border-radius:22px;box-shadow:0 18px 36px -22px rgba(6,26,79,.6);border:1px solid var(--line)}
+.qs-qr.paid:after{content:"✓";position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:110px;font-weight:800;color:#fff;background:rgba(4,120,87,.88);border-radius:22px;animation:pop .45s cubic-bezier(.2,1.4,.4,1)}
+.qs-st{display:inline-flex;align-items:center;gap:8px;margin-top:6px;padding:8px 14px;border-radius:999px;background:#FFF4E0;color:#92400E;font-weight:700;font-size:13.5px}
+.qs-st.ok{background:#CFF3E8;color:#047857}.qs-st .ic{width:18px;height:18px}
+.qs-dot{width:9px;height:9px;border-radius:50%;background:#F59E0B;animation:blink 1.2s ease-in-out infinite}
+@keyframes blink{50%{opacity:.25}}
+.bz-pc{max-height:120px;overflow-y:auto}
+.conv .cv-tr{background:#E6F7F4}

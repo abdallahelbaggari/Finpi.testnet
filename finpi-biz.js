@@ -57,10 +57,10 @@
     function invLink(v) { return K.payLink({ u: v.to, a: balance(v) || v.total, x: (v.no + ' · ' + (v.title || (v.items[0] && v.items[0].d) || 'Invoice')).slice(0, 80) }); }
 
     /* ── backup of business records to the Pi account (restored on any phone after sign-in) ── */
-    var BK = ['biz', 'inv', 'invSeq', 'cust', 'recur', 'qrO'], bT = null, put0 = K.put;
+    var BK = ['biz', 'inv', 'invSeq', 'cust', 'recur', 'qrO', 'prod', 'name', 'nameType'], bT = null, put0 = K.put;
     put = function (k, v) { var r = put0(k, v); if (BK.indexOf(k) >= 0) bDirty(); return r; };
     function bSnap() { var d = {}; BK.forEach(function (k) { var v = get(k, null); if (v !== null) d[k] = v; }); return d; }
-    function bHas(d) { return !!(d && ((d.inv || []).length || (d.cust || []).length || (d.recur || []).length || (d.biz && d.biz.name))); }
+    function bHas(d) { return !!(d && ((d.inv || []).length || (d.cust || []).length || (d.recur || []).length || (d.prod || []).length || (d.biz && d.biz.name))); }
     function bDirty() { put0('bizTs', Date.now()); clearTimeout(bT); bT = setTimeout(bPush, 2500); }
     function bPush() {
       if (!K.signedIn() || !K.token()) return Promise.resolve(); var ts = get('bizTs', 0);
@@ -76,7 +76,7 @@
         if (d.ts <= get('bizTs', 0) && bHas(loc)) return bPush();
         var extra = (loc.inv || []).some(function (x) { return !(srv.inv || []).some(function (y) { return y.id === x.id; }); }) || (loc.cust || []).some(function (x) { return !(srv.cust || []).some(function (y) { return y.id === x.id; }); });
         put0('inv', byId(loc.inv, srv.inv)); put0('cust', byId(loc.cust, srv.cust)); put0('recur', byId(loc.recur, srv.recur));
-        put0('invSeq', Math.max(loc.invSeq || 0, srv.invSeq || 0)); if (srv.biz) put0('biz', srv.biz); if (srv.qrO) put0('qrO', srv.qrO);
+        put0('invSeq', Math.max(loc.invSeq || 0, srv.invSeq || 0)); if (srv.biz) put0('biz', srv.biz); if (srv.qrO) put0('qrO', srv.qrO); put0('prod', byId(loc.prod, srv.prod)); if (srv.name && !loc.name) { put0('name', srv.name); put0('nameType', srv.nameType || 'name'); }
         put0('bizTs', d.ts); put0('bizUp', d.ts); matchAll(); K.rerender();
         if (extra) bDirty();
       }).catch(function () {});
@@ -113,7 +113,7 @@
         else { tone(c, 660, t, 0.16, 0.16); tone(c, 990, t + 0.08, 0.3, 0.14); }
       } catch (e) {}
     }
-    F.fx = fx;
+    F.fx = fx; K.bizPut = function (b) { put('biz', b); };
 
     /* ── hide amounts ── */
     function applyHide() { document.documentElement.classList.toggle('fp-hide', !!get('hide', false)); var b = $('#hide-b'); if (b) { b.innerHTML = ic(get('hide', false) ? 'eyeoff' : 'eye'); b.setAttribute('aria-label', get('hide', false) ? 'Show amounts' : 'Hide amounts'); } }
@@ -143,6 +143,7 @@
         K.addNote('check', done ? 'Invoice paid' : 'Invoice part paid', hit.no + ' · ' + fpi(r.amount) + ' π from ' + who(payer(r)) + (done ? '' : ' · ' + fpi(balance(hit)) + ' π left'), 'invp-' + rkey(r));
         toast(done ? hit.no + ' paid' : hit.no + ' part paid');
         if (done && Date.now() - (r.ts || 0) < 180e3) setTimeout(function () { fx('paid'); }, 700);
+        if (done) stockOut(hit.id);
       }
       return true;
     }
@@ -158,7 +159,7 @@
     function bizRows(r) {
       var b = biz(), out = [];
       if (r.dir !== 'in' || r.kind === 'refund' || r.kind === 'supporter') return out;
-      if (b.name) out.push(['Business', b.name]); if (b.addr) out.push(['Address', b.addr]); if (b.tax) out.push(['Tax ID', b.tax]);
+      if (K.nType() !== 'name') { if (b.addr) out.push(['Address', b.addr]); if (b.tax) out.push(['Tax ID', b.tax]); }
       var v = invFor(r); if (v) out.push(['Invoice', v.no]);
       return out;
     }
@@ -326,9 +327,10 @@
 
     /* ── business profile ── */
     function profSheet() {
-      var b = biz();
+      var b = biz(), bt = K.nType() === 'name' ? 'business' : K.nType();
       var w = sheet('Business profile',         '<div class="bz-logo"><div class="bz-lg" id="bp-lg">' + (b.logo ? '<img alt="" src="' + esc(b.logo) + '">' : ic('store')) + '</div><div class="grow"><label class="btn soft sm" for="bp-f">' + ic('edit') + (b.logo ? 'Change logo' : 'Add logo') + '</label><input type="file" id="bp-f" accept="image/*" hidden>' + (b.logo ? '<button type="button" class="lnk small" id="bp-rl">Remove logo</button>' : '') + '</div></div>' +
-        '<label class="l" for="bp-n">Business name</label><input class="in" id="bp-n" maxlength="60" value="' + esc(b.name || '') + '" placeholder="e.g. Elbaggari Stores">' +
+        '<label class="l">Shown as</label><div class="chips" id="bp-ty">' + ['business', 'store', 'shop'].map(function (k) { return '<button type="button" class="chip' + (k === bt ? ' on' : '') + '" data-bt="' + k + '">' + K.NTYPE[k].l + '</button>'; }).join('') + '</div>' +
+        '<label class="l" for="bp-n" id="bp-nl">' + K.NTYPE[bt].l + '</label><input class="in" id="bp-n" maxlength="60" value="' + esc(b.name || '') + '" placeholder="' + esc(K.NTYPE[bt].p) + '">' +
         '<label class="l" for="bp-a">Address</label><input class="in" id="bp-a" maxlength="120" value="' + esc(b.addr || '') + '" placeholder="Street, city">' +
         '<label class="l" for="bp-t">Tax ID / registration no. (optional)</label><input class="in" id="bp-t" maxlength="40" value="' + esc(b.tax || '') + '" placeholder="e.g. RC 1234567">' +
         '<div class="two bz-two"><div><label class="l" for="bp-p">Phone</label><input class="in" id="bp-p" maxlength="30" inputmode="tel" value="' + esc(b.phone || '') + '"></div><div><label class="l" for="bp-e">Email</label><input class="in" id="bp-e" maxlength="60" inputmode="email" value="' + esc(b.email || '') + '"></div></div>' +
@@ -340,11 +342,12 @@
         rd.onload = function () { loadImg(rd.result).then(function (im) { if (!im) return toast('This image cannot be used'); var c = document.createElement('canvas'), s = Math.min(im.width, im.height); c.width = c.height = 256; var x = c.getContext('2d'); x.fillStyle = '#fff'; x.fillRect(0, 0, 256, 256); x.drawImage(im, (im.width - s) / 2, (im.height - s) / 2, s, s, 0, 0, 256, 256); logo = c.toDataURL('image/jpeg', 0.86); $('#bp-lg', w).innerHTML = '<img alt="" src="' + logo + '">'; }); };
         rd.readAsDataURL(f);
       };
+      $$('[data-bt]', w).forEach(function (q) { q.onclick = function () { bt = q.dataset.bt; $$('[data-bt]', w).forEach(function (x) { x.classList.toggle('on', x === q); }); $('#bp-nl', w).textContent = K.NTYPE[bt].l; $('#bp-n', w).placeholder = K.NTYPE[bt].p; }; });
       var rl = $('#bp-rl', w); if (rl) rl.onclick = function () { logo = ''; $('#bp-lg', w).innerHTML = ic('store'); rl.remove(); };
       $('#bp-go', w).onclick = function () {
         var n = { name: $('#bp-n', w).value.trim(), addr: $('#bp-a', w).value.trim(), tax: $('#bp-t', w).value.trim(), phone: $('#bp-p', w).value.trim(), email: $('#bp-e', w).value.trim(), terms: $('#bp-m', w).value.trim(), logo: logo };
-        if (!n.name) return toast('Enter your business name');
-        put('biz', n); K.closeSheets(); K.rerender(); toast('Business profile saved');
+        if (!n.name) return toast('Enter the ' + K.NTYPE[bt].l.toLowerCase());
+        put('biz', n); put('name', n.name); put('nameType', bt); K.closeSheets(); K.rerender(); toast('Business profile saved');
       };
     }
 
@@ -422,11 +425,12 @@
       var v = invs().filter(function (x) { return x.id === id; })[0], rc = null;
       if (!v) { v = { items: [{ d: '', q: 1, p: '' }], tax: 0, disc: 0, term: 7, notes: '', freq: '' }; if (pre && pre.cid) { var c0 = custs().filter(function (c) { return c.id === pre.cid; })[0]; if (c0) { v.cid = c0.id; v.cname = c0.name; v.cto = c0.to; v.cphone = c0.phone; v.cemail = c0.email; } } if (pre && pre.tpl) Object.assign(v, pre.tpl); }
       else { v = JSON.parse(JSON.stringify(v)); v.term = v.due ? Math.max(0, Math.round((v.due - day0(v.ts)) / 864e5)) : 0; }
-      var C = custs().slice(0, 12), items = v.items.map(function (it) { return { d: it.d, q: it.q, p: it.p }; });
+      var C = custs().slice(0, 12), items = v.items.map(function (it) { return { d: it.d, q: it.q, p: it.p, pid: it.pid }; });
       var w = sheet(id ? 'Edit ' + v.no : 'New invoice',
         (C.length ? '<label class="l">Customer</label><div class="chips" id="ie-cc">' + C.map(function (c) { return '<button type="button" class="chip' + (v.cid === c.id ? ' on' : '') + '" data-cc="' + c.id + '">' + esc(c.name) + '</button>'; }).join('') + '</div>' : '') +
         '<label class="l" for="ie-n">Bill to</label><input class="in" id="ie-n" maxlength="60" value="' + esc(v.cname || '') + '" placeholder="Customer name">' +
         '<input class="in num" id="ie-t" maxlength="60" style="margin-top:8px" autocapitalize="none" spellcheck="false" value="' + esc(v.cto || '') + '" placeholder="@username or wallet address (optional)">' +
+        (prods().length ? '<label class="l">Add from products</label><div class="chips bz-pc" id="ie-pc">' + prods().slice(0, 24).map(function (q) { return '<button type="button" class="chip" data-pp="' + q.id + '">' + esc(q.n) + ' · ' + fpi(q.p) + ' π</button>'; }).join('') + '</div>' : '') +
         '<label class="l">Items</label><div id="ie-it"></div><button type="button" class="lnk" id="ie-add">' + ic('plus', 'width:16px;height:16px;vertical-align:-3px') + ' Add item</button>' +
         '<div class="two bz-two"><div><label class="l" for="ie-d">Discount (π)</label><div class="amt sm"><input id="ie-d" type="number" inputmode="decimal" placeholder="0" value="' + (v.disc || '') + '"><span>π</span></div></div><div><label class="l" for="ie-x">Tax (%)</label><div class="amt sm"><input id="ie-x" type="number" inputmode="decimal" placeholder="0" value="' + (v.tax || '') + '"><span>%</span></div></div></div>' +
         '<label class="l">Payment due</label><div class="chips" id="ie-du">' + [[0, 'On receipt'], [7, '7 days'], [14, '14 days'], [30, '30 days']].map(function (x) { return '<button type="button" class="chip' + (v.term === x[0] ? ' on' : '') + '" data-du="' + x[0] + '">' + x[1] + '</button>'; }).join('') + '</div>' +
@@ -444,9 +448,10 @@
         $$('[data-rm]', w).forEach(function (b) { b.onclick = function () { items.splice(+b.dataset.rm, 1); drawItems(); tot(); }; });
         $('#ie-add', w).hidden = items.length >= 12;
       }
-      function cur() { return { items: items.filter(function (it) { return String(it.d).trim() && Number(it.q) > 0 && Number(it.p) > 0; }).map(function (it) { return { d: String(it.d).trim().slice(0, 60), q: r7(it.q), p: r7(it.p) }; }), disc: r7($('#ie-d', w).value) || 0, tax: Math.min(100, r7($('#ie-x', w).value) || 0) }; }
+      function cur() { return { items: items.filter(function (it) { return String(it.d).trim() && Number(it.q) > 0 && Number(it.p) > 0; }).map(function (it) { var o = { d: String(it.d).trim().slice(0, 60), q: r7(it.q), p: r7(it.p) }; if (it.pid) o.pid = it.pid; return o; }), disc: r7($('#ie-d', w).value) || 0, tax: Math.min(100, r7($('#ie-x', w).value) || 0) }; }
       function tot() { var o = cur(), c = calc(o); $('#ie-s', w).innerHTML = '<div><span>Subtotal</span><b>' + fpi(c.sub) + ' π</b></div>' + (c.disc ? '<div><span>Discount</span><b>−' + fpi(c.disc) + ' π</b></div>' : '') + (o.tax ? '<div><span>Tax ' + fpi(o.tax) + '%</span><b>' + fpi(c.tax) + ' π</b></div>' : '') + '<div class="tot"><span>Total</span><b>' + fpi(c.total) + ' π</b></div>' + (conv(c.total) ? '<div><span></span><b class="small muted">' + esc(conv(c.total)) + '</b></div>' : ''); }
       drawItems(); tot();
+      $$('[data-pp]', w).forEach(function (b) { b.onclick = function () { var q = prods().filter(function (x) { return x.id === b.dataset.pp; })[0]; if (!q) return; var ex = items.filter(function (it) { return it.pid === q.id; })[0]; if (ex) ex.q = r7(Number(ex.q || 0) + 1); else { if (items.length === 1 && !String(items[0].d).trim() && !items[0].p) items = []; if (items.length >= 12) return toast('Up to 12 items'); items.push({ d: q.n, q: 1, p: q.p, pid: q.id }); } drawItems(); tot(); }; });
       $('#ie-d', w).oninput = $('#ie-x', w).oninput = tot;
       $('#ie-add', w).onclick = function () { if (items.length < 12) { items.push({ d: '', q: 1, p: '' }); drawItems(); var L = $$('#ie-it [data-k="d"]', w); L[L.length - 1].focus(); } };
       $$('[data-cc]', w).forEach(function (b) { b.onclick = function () { var c = custs().filter(function (x) { return x.id === b.dataset.cc; })[0]; if (!c) return; cid = c.id; $('#ie-n', w).value = c.name; $('#ie-t', w).value = c.to || ''; $$('[data-cc]', w).forEach(function (x) { x.classList.toggle('on', x === b); }); }; });
@@ -485,6 +490,92 @@
       fileActions(w, function () { return invCanvas(v); }, 'FinPi-' + v.no, 'invoice', 'FinPi invoice ' + v.no, txt);
       var lk = $('[data-x="lk"]', w); if (lk) lk.onclick = function () { K.shareText('Invoice ' + v.no, txt()); };
       var cp = $('[data-x="cp"]', w); if (cp) cp.onclick = function () { K.copy(link); };
+    }
+
+    /* ── products: catalog with prices and optional stock ── */
+    function prods() { return get('prod', []); }
+    function stockOut(id) {
+      var L = invs(), v = L.filter(function (x) { return x.id === id; })[0]; if (!v || v.stk) return;
+      var P = prods(), ch = false; (v.items || []).forEach(function (it) { if (!it.pid) return; P.forEach(function (q) { if (q.id === it.pid && typeof q.stock === 'number') { q.stock = Math.max(0, r7(q.stock - Number(it.q || 0))); ch = true; } }); });
+      v.stk = true; saveInvs(L); if (ch) put('prod', P);
+      P.forEach(function (q) { if (typeof q.stock === 'number' && q.low != null && q.stock <= q.low) K.addNote('tag', 'Low stock', q.n + ' · ' + fpi(q.stock) + ' left', 'low-' + q.id + '-' + q.stock); });
+    }
+    function prodSheet(q0) {
+      var P = prods().slice().sort(function (a, b) { return a.n.localeCompare(b.n); });
+      var w = sheet('Products', '<div class="bz-search">' + ic('search') + '<input class="in" id="pr-q" placeholder="Search products" value="' + esc(q0 || '') + '"></div><div class="list" id="pr-l" style="margin-top:12px"></div>' +
+        '<button type="button" class="btn" data-x="add">' + ic('plus') + 'Add product</button>');
+      function draw() {
+        var t = $('#pr-q', w).value.trim().toLowerCase(), L = P.filter(function (q) { return !t || (q.n + ' ' + (q.sku || '')).toLowerCase().indexOf(t) >= 0; });
+        $('#pr-l', w).innerHTML = L.length ? L.map(function (q) { var low = typeof q.stock === 'number' && q.low != null && q.stock <= q.low; return '<button type="button" class="li" data-pe="' + q.id + '"><span class="ico ' + (low ? 'rf' : '') + '">' + ic('tag') + '</span><span class="grow"><b>' + esc(q.n) + '</b><small>' + esc([q.unit ? 'per ' + q.unit : '', q.sku ? 'SKU ' + q.sku : '', typeof q.stock === 'number' ? fpi(q.stock) + ' in stock' : ''].filter(Boolean).join(' · ') || 'No stock tracking') + '</small></span><span class="amt-r"><b class="num bz-amt">' + fpi(q.p) + ' π</b>' + (low ? '<small class="bz-due">Low stock</small>' : '') + '</span></button>'; }).join('')
+          : '<div class="empty">' + ic('tag') + '<div>' + (P.length ? 'No match.' : 'No products yet.') + '</div></div>';
+        $$('[data-pe]', w).forEach(function (b) { b.onclick = function () { prodEdit(b.dataset.pe); }; });
+      }
+      $('#pr-q', w).oninput = draw; draw(); $('[data-x="add"]', w).onclick = function () { prodEdit(''); };
+    }
+    function prodEdit(id, back) {
+      var q = prods().filter(function (x) { return x.id === id; })[0] || {};
+      var w = sheet(id ? 'Edit product' : 'New product', '<label class="l" for="pe-n">Product or service</label><input class="in" id="pe-n" maxlength="60" value="' + esc(q.n || '') + '" placeholder="e.g. Rice 50kg">' +
+        '<div class="two bz-two"><div><label class="l" for="pe-p">Price</label><div class="amt sm"><input id="pe-p" type="number" inputmode="decimal" value="' + (q.p || '') + '" placeholder="0.00"><span>π</span></div></div><div><label class="l" for="pe-u">Unit (optional)</label><input class="in" id="pe-u" maxlength="16" value="' + esc(q.unit || '') + '" placeholder="e.g. bag, kg, hour"></div></div>' +
+        '<div class="hint num" id="pe-c"></div>' +
+        '<div class="two bz-two"><div><label class="l" for="pe-s">Stock (optional)</label><input class="in num" id="pe-s" type="number" inputmode="decimal" value="' + (typeof q.stock === 'number' ? q.stock : '') + '" placeholder="Not tracked"></div><div><label class="l" for="pe-lo">Low stock alert</label><input class="in num" id="pe-lo" type="number" inputmode="decimal" value="' + (q.low != null ? q.low : '') + '" placeholder="e.g. 5"></div></div>' +
+        '<label class="l" for="pe-k">SKU / code (optional)</label><input class="in" id="pe-k" maxlength="24" value="' + esc(q.sku || '') + '">' +
+        '<button type="button" class="btn" id="pe-go">' + ic('check') + 'Save product</button>' + (id ? '<button type="button" class="btn danger" id="pe-rm">' + ic('trash') + 'Delete product</button>' : ''), { stack: true });
+      var pi = $('#pe-p', w); pi.oninput = function () { $('#pe-c', w).textContent = conv(r7(pi.value)); }; pi.oninput();
+      $('#pe-go', w).onclick = function () {
+        var n = $('#pe-n', w).value.trim(), pr = r7(pi.value), st = $('#pe-s', w).value.trim(), lo = $('#pe-lo', w).value.trim();
+        if (!n) return toast('Enter the product name'); if (!(pr >= 0.01)) return toast('The price must be at least 0.01 π');
+        if (st !== '' && !(Number(st) >= 0)) return toast('Stock cannot be negative'); if (lo !== '' && !(Number(lo) >= 0)) return toast('Low stock alert cannot be negative');
+        var L = prods(); if (L.some(function (x) { return x.id !== id && x.n.toLowerCase() === n.toLowerCase(); })) return toast('A product with this name already exists');
+        var d = { id: id || uid(), n: n, p: pr, unit: $('#pe-u', w).value.trim(), sku: $('#pe-k', w).value.trim(), stock: st === '' ? null : r7(st), low: lo === '' ? null : r7(lo), ts: q.ts || Date.now() };
+        L = L.filter(function (x) { return x.id !== d.id; }); L.unshift(d); put('prod', L.slice(0, 500)); toast('Product saved'); if (back) back(); else prodSheet();
+      };
+      var rm = $('#pe-rm', w); if (rm) rm.onclick = function () { put('prod', prods().filter(function (x) { return x.id !== id; })); toast('Product deleted'); prodSheet(); };
+    }
+
+    /* ── quick sale: build the sale, show one QR, and it turns Paid by itself when the payment arrives ── */
+    function saleSheet() {
+      if (K.needTarget('Quick sale')) return;
+      var cart = {}, P = prods().slice().sort(function (a, b) { return a.n.localeCompare(b.n); });
+      var w = sheet('Quick sale', (P.length ? '<div class="bz-search">' + ic('search') + '<input class="in" id="qs-q" placeholder="Search products"></div><div class="qs-grid" id="qs-g"></div>' : '<button type="button" class="btn soft" data-x="pa">' + ic('plus') + 'Add products</button>') +
+        '<label class="l" for="qs-a">' + (P.length ? 'Other amount' : 'Amount') + '</label><div class="amt sm"><input id="qs-a" type="number" inputmode="decimal" placeholder="0.00"><span>π</span></div>' +
+        '<label class="l" for="qs-x">Note (optional)</label><input class="in" id="qs-x" maxlength="40" placeholder="e.g. Table 4, delivery">' +
+        '<div class="sum" id="qs-s"></div><button type="button" class="btn" id="qs-go">' + ic('qr') + 'Charge</button>');
+      function draw() {
+        var g = $('#qs-g', w); if (!g) return; var t = ($('#qs-q', w).value || '').trim().toLowerCase();
+        g.innerHTML = P.filter(function (q) { return !t || q.n.toLowerCase().indexOf(t) >= 0; }).map(function (q) { var n = cart[q.id] || 0, out = typeof q.stock === 'number' && q.stock <= 0; return '<div class="qs-it' + (n ? ' on' : '') + (out ? ' out' : '') + '"><button type="button" class="qs-add" data-qa="' + q.id + '"><b>' + esc(q.n) + '</b><span class="num">' + fpi(q.p) + ' π</span>' + (out ? '<small>Out of stock</small>' : typeof q.stock === 'number' ? '<small>' + fpi(q.stock) + ' left</small>' : '') + '</button>' + (n ? '<div class="qs-n"><button type="button" data-qm="' + q.id + '" aria-label="Remove one">' + ic('minus') + '</button><b class="num">' + fpi(n) + '</b><button type="button" data-qa="' + q.id + '" aria-label="Add one">' + ic('plus') + '</button></div>' : '') + '</div>'; }).join('') || '<div class="empty">No match.</div>';
+        $$('[data-qa]', w).forEach(function (b) { b.onclick = function () { var q = P.filter(function (x) { return x.id === b.dataset.qa; })[0], n = r7((cart[b.dataset.qa] || 0) + 1); if (q && typeof q.stock === 'number' && n > q.stock) return toast('Only ' + fpi(q.stock) + ' in stock'); cart[b.dataset.qa] = n; draw(); tot(); }; });
+        $$('[data-qm]', w).forEach(function (b) { b.onclick = function () { cart[b.dataset.qm] = r7((cart[b.dataset.qm] || 0) - 1); if (cart[b.dataset.qm] <= 0) delete cart[b.dataset.qm]; draw(); tot(); }; });
+      }
+      function lines() { var L = []; Object.keys(cart).forEach(function (id) { var q = P.filter(function (x) { return x.id === id; })[0]; if (q) L.push({ d: q.n, q: cart[id], p: q.p, pid: q.id }); }); var a = r7($('#qs-a', w).value); if (a > 0) L.push({ d: $('#qs-x', w).value.trim() || 'Sale', q: 1, p: a }); return L; }
+      function tot() { var L = lines(), t = calc({ items: L }).total, n = L.reduce(function (s0, it) { return s0 + Number(it.q); }, 0); $('#qs-s', w).innerHTML = '<div><span>Items</span><b>' + fpi(r7(n)) + '</b></div><div class="tot"><span>Total</span><b>' + fpi(t) + ' π</b></div>' + (conv(t) ? '<div><span></span><b class="small muted">' + esc(conv(t)) + '</b></div>' : ''); return t; }
+      var qq = $('#qs-q', w); if (qq) qq.oninput = draw; $('#qs-a', w).oninput = tot; $('#qs-x', w).oninput = tot; draw(); tot();
+      var pa = $('[data-x="pa"]', w); if (pa) pa.onclick = function () { prodEdit('', saleSheet); };
+      $('#qs-go', w).onclick = function () {
+        var L = lines(), t = calc({ items: L }).total; if (!L.length || !(t >= 0.01)) return toast('Add a product or enter an amount');
+        if (L.length > 12) return toast('Up to 12 different items per sale');
+        var note = $('#qs-x', w).value.trim();
+        var v = issue({ to: K.myTarget(), cname: note ? 'Sale · ' + note : 'Walk-in customer', cto: '', items: L, term: 0, title: L.length === 1 ? L[0].d : 'Sale' }, '');
+        var all = invs(); all.forEach(function (x) { if (x.id === v.id) x.sale = true; }); saveInvs(all); K.rerender(); saleView(v.id);
+      };
+    }
+    function saleView(id) {
+      var v = invs().filter(function (x) { return x.id === id; })[0]; if (!v) return;
+      var link = invLink(v), tm = null, sy = null;
+      function stopT() { clearInterval(tm); clearInterval(sy); }
+      var w = sheet('Charge ' + v.no, '<div class="qs-pay"><div class="qs-amt num bz-amt">' + fpi(v.total) + ' π</div><div class="small muted">' + esc(conv(v.total)) + '</div>' +
+        '<div class="qr qs-qr">' + (window.FPQR ? FPQR.svg(link, 250, '#061A4F') : '') + '</div><div class="qs-st" id="qs-st"><span class="qs-dot"></span>Waiting for payment · ' + esc(v.no) + '</div>' +
+        '<p class="small muted" style="margin-top:6px">Scan with FinPi to pay ' + esc(bizName()) + '</p></div>' +
+        '<div class="two"><button type="button" class="btn ghost" data-x="lk">' + ic('share') + 'Share link</button><button type="button" class="btn ghost" data-x="inv">' + ic('inv') + 'Invoice</button></div>' +
+        '<button type="button" class="btn soft" data-x="new">' + ic('plus') + 'New sale</button>', { onClose: stopT });
+      function done() {
+        stopT(); var st = $('#qs-st', w); if (!st) return;
+        st.className = 'qs-st ok'; st.innerHTML = ic('check') + 'Paid · ' + esc(v.no); var hp = $('.qs-pay p', w); if (hp) hp.textContent = 'Payment received by ' + bizName(); var q = $('.qs-qr', w); if (q) q.classList.add('paid');
+      }
+      tm = setInterval(function () { if (!document.body.contains(w)) return stopT(); var x = invs().filter(function (q) { return q.id === id; })[0]; if (x && status(x) === 'Paid') done(); }, 1000);
+      sy = setInterval(function () { if (!document.hidden && F.sync) F.sync(); }, 5000);
+      $('[data-x="lk"]', w).onclick = function () { K.shareText('Payment request ' + v.no, bizName() + ' · ' + fpi(v.total) + ' π · ' + v.no + '\nPay with FinPi:\n' + link); };
+      $('[data-x="inv"]', w).onclick = function () { stopT(); invView(id); };
+      $('[data-x="new"]', w).onclick = function () { stopT(); saleSheet(); };
     }
 
     /* ── recurring requests ── */
@@ -528,13 +619,13 @@
         '<div class="bz-kpi"><div class="bz-k1"><small>Sales · ' + esc(rg[2]) + '</small><b class="num bz-amt">' + fpi(tot) + ' π</b><span class="bz-amt">' + esc(conv(tot) || ' ') + '</span></div>' +
         '<div><small>Payments</small><b class="num">' + S.length + '</b></div><div><small>Average</small><b class="num bz-amt">' + fpi(S.length ? Math.round(tot / S.length * 100) / 100 : 0) + ' π</b></div><div class="' + (od.length ? 'bad' : '') + '"><small>Outstanding</small><b class="num bz-amt">' + fpi(out) + ' π</b><span>' + open.length + ' open' + (od.length ? ' · ' + od.length + ' overdue' : '') + '</span></div></div>' +
         '<div class="card bz-card">' + chart(p) + '</div>' +
-        '<div class="bz-grid">' + [['inv', 'New invoice', 'b-new'], ['rcpt', 'Invoices', 'b-inv'], ['users', 'Customers', 'b-cus'], ['repeat', 'Recurring', 'b-rec'], ['qr', 'My Pi QR', 'b-qr'], ['bars', 'Reports', 'b-rep']].map(function (x, i) { return '<button type="button" class="bz-a c' + i + '" data-x="' + x[2] + '"><i>' + ic(x[0]) + '</i><span>' + x[1] + '</span></button>'; }).join('') + '</div>' +
+        '<div class="bz-grid">' + [['card', 'Quick sale', 'b-sale'], ['inv', 'New invoice', 'b-new'], ['rcpt', 'Invoices', 'b-inv'], ['tag', 'Products', 'b-prod'], ['users', 'Customers', 'b-cus'], ['repeat', 'Recurring', 'b-rec'], ['store', 'My Pi QR', 'b-qr'], ['bars', 'Reports', 'b-rep']].map(function (x, i) { return '<button type="button" class="bz-a c' + i + '" data-x="' + x[2] + '"><i>' + ic(x[0]) + '</i><span>' + x[1] + '</span></button>'; }).join('') + '</div>' +
         (open.length ? '<div class="day">Open invoices</div><div class="list">' + open.slice(0, 4).map(invRow).join('') + '</div>' : '') +
         '<div class="day">Top customers</div>' + (TC.length ? '<div class="card bz-card">' + TC.map(function (x) { return '<div class="cat"><div class="row"><span>' + esc(K.isG(x[0]) ? K.short(x[0]) : who(x[0])) + '</span><b class="num bz-amt">' + fpi(x[1]) + ' π</b></div><div class="bar"><i style="width:' + Math.max(4, x[1] / topv * 100) + '%"></i></div></div>'; }).join('') + '</div>' : '<div class="list"><div class="empty">No payments received in this period.</div></div>') +
         '<div class="day">Top items</div>' + (TI.length ? '<div class="card bz-card">' + TI.map(function (x) { return '<div class="cat"><div class="row"><span>' + esc(x[0]) + ' <small class="muted">× ' + fpi(x[2]) + '</small></span><b class="num bz-amt">' + fpi(x[1]) + ' π</b></div><div class="bar"><i style="width:' + Math.max(4, x[1] / topi * 100) + '%"></i></div></div>'; }).join('') + '</div>' : '<div class="list"><div class="empty">Items from paid invoices appear here.</div></div>'));
       $$('[data-bp]', w).forEach(function (q) { q.onclick = function () { bizSheet(q.dataset.bp); }; });
       $$('[data-x="prof"]', w).forEach(function (q) { q.onclick = profSheet; });
-      var go = { 'b-new': function () { invEdit(''); }, 'b-inv': function () { invList(); }, 'b-cus': function () { custSheet(); }, 'b-rec': recSheet, 'b-qr': qrSheet, 'b-rep': repSheet };
+      var go = { 'b-sale': function () { saleSheet(); }, 'b-prod': function () { prodSheet(); }, 'b-new': function () { invEdit(''); }, 'b-inv': function () { invList(); }, 'b-cus': function () { custSheet(); }, 'b-rec': recSheet, 'b-qr': qrSheet, 'b-rep': repSheet };
       Object.keys(go).forEach(function (k) { $('[data-x="' + k + '"]', w).onclick = go[k]; });
       bindInvRows(w);
     }
@@ -585,9 +676,9 @@
         row('inv', 'Invoices', open ? open + ' open' : 'Create and track invoices', 'invs') + row('users', 'Customers', custs().length ? custs().length + ' saved' : 'People and businesses who pay you', 'cust') +
         row('repeat', 'Recurring requests', recs().length ? recs().length + ' active' : 'Weekly or monthly invoices', 'recur') + row('qr', 'My Pi QR', 'Poster to print or share', 'myqr') + '</div>';
     };
-    K.HK.html.settings = function () { return row('store', 'Business profile', biz().name || 'Name, logo, address, tax ID', 'bizprof') + row('sound', 'Payment sounds', get('sound', true) ? 'On · sound and vibration' : 'Off', 'sound') + row(get('hide', false) ? 'eyeoff' : 'eye', 'Hide amounts', get('hide', false) ? 'On' : 'Off', 'hide'); };
+    K.HK.html.settings = function () { return row('store', 'Business profile', biz().name ? K.NTYPE[K.nType() === 'name' ? 'business' : K.nType()].l + ' · ' + biz().name : 'Name, logo, address, tax ID', 'bizprof') + row('sound', 'Payment sounds', get('sound', true) ? 'On · sound and vibration' : 'Off', 'sound') + row(get('hide', false) ? 'eyeoff' : 'eye', 'Hide amounts', get('hide', false) ? 'On' : 'Off', 'hide'); };
     Object.assign(K.A, {
-      biz: function () { bizSheet(); }, 'inv-new': function () { invEdit(''); }, invs: function () { invList(); }, cust: function () { custSheet(); }, recur: recSheet, myqr: qrSheet, bizprof: profSheet, reports: repSheet,
+      biz: function () { bizSheet(); }, sale: function () { saleSheet(); }, prods: function () { prodSheet(); }, 'inv-new': function () { invEdit(''); }, invs: function () { invList(); }, cust: function () { custSheet(); }, recur: recSheet, myqr: qrSheet, bizprof: profSheet, reports: repSheet,
       hide: toggleHide,
       sound: function () { put('sound', !get('sound', true)); if (get('sound', true)) { ac(); fx('in'); } toast(get('sound', true) ? 'Payment sounds on' : 'Payment sounds off'); K.rerender(); }
     });
@@ -596,7 +687,7 @@
     function bindManage(w, id) {
       var v = invs().filter(function (x) { return x.id === id; })[0]; if (!v) return;
       function upd(fn, msg) { saveInvs(invs().map(function (x) { if (x.id === id) fn(x); return x; })); if (msg) toast(msg); K.rerender(); invView(id); }
-      var acts = { 'x-paid': function () { upd(function (x) { x.mpaid = true; x.pts = Date.now(); }, v.no + ' marked as paid'); fx('paid'); }, 'x-unpaid': function () { upd(function (x) { x.mpaid = false; if ((x.paid || 0) < x.total) x.pts = 0; }, v.no + ' marked as unpaid'); },
+      var acts = { 'x-paid': function () { upd(function (x) { x.mpaid = true; x.pts = Date.now(); }, v.no + ' marked as paid'); stockOut(id); fx('paid'); }, 'x-unpaid': function () { upd(function (x) { x.mpaid = false; if ((x.paid || 0) < x.total) x.pts = 0; }, v.no + ' marked as unpaid'); },
         'x-edit': function () { invEdit(id); }, 'x-dup': function () { invEdit('', { tpl: { cid: v.cid, cname: v.cname, cto: v.cto, cphone: v.cphone, cemail: v.cemail, items: v.items, disc: v.disc, tax: v.tax, notes: v.notes, term: v.due ? Math.max(0, Math.round((v.due - day0(v.ts)) / 864e5)) : 0 } }); },
         'x-void': function () { upd(function (x) { x.void = true; }, v.no + ' cancelled'); }, 'x-del': function () { saveInvs(invs().filter(function (x) { return x.id !== id; })); toast(v.no + ' deleted'); K.rerender(); invList(); } };
       $$('[data-xa]', w).forEach(function (b) { if (acts[b.dataset.xa]) b.onclick = acts[b.dataset.xa]; });

@@ -114,7 +114,8 @@
     if (S.fx && S.fx[c] && S.fx.USD) return p.usd * S.fx[c] / S.fx.USD;
     if (c === 'SAR') return p.sar; if (c === 'NGN') return p.ngn; return null;
   }
-  function conv(a) { var c = curr(), r = rateIn(c), u = rateIn('USD'); if (!(a > 0) || !u) return ''; return '≈ ' + money(a * u, 'USD') + (r && c !== 'USD' ? ' · ' + money(a * r, c) : ''); }
+  function cur2() { var t = get('cur2', ''); return t && t !== curr() && t !== 'USD' ? t : ''; }
+  function conv(a) { var c = curr(), r = rateIn(c), u = rateIn('USD'), t = cur2(), rt = t ? rateIn(t) : 0; if (!(a > 0) || !u) return ''; return '≈ ' + money(a * u, 'USD') + (r && c !== 'USD' ? ' · ' + money(a * r, c) : '') + (rt ? ' · ' + money(a * rt, t) : ''); }
   function ago(t) { var s = Math.max(0, (Date.now() - t) / 1000); return s < 60 ? 'just now' : s < 3600 ? Math.round(s / 60) + ' min ago' : s < 86400 ? Math.round(s / 3600) + ' h ago' : new Date(t).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }); }
   function short(a) { a = String(a || ''); return a.length > 16 ? a.slice(0, 6) + '…' + a.slice(-6) : a; }
   function spark(arr, w, h, col, area) {
@@ -1018,24 +1019,27 @@
       '<div class="chart" style="margin-top:8px">' + spark(s, 300, 150, '#1D4ED8', .22) + '</div>' +
       '<div class="stats"><div><small>7-day low</small><b>' + money(mn, 'USD', 4) + '</b></div><div><small>7-day high</small><b>' + money(mx, 'USD', 4) + '</b></div><div><small>In ' + esc(c) + '</small><b>' + (r ? money(r, c, r < 1 ? 4 : 2) : '—') + '</b></div></div>' ;
   }
-  function curSheet() {
+  function curSheet(travel) {
     var codes = S.fx ? Object.keys(S.fx).filter(function (c) { return /^[A-Z]{3}$/.test(c); }) : ['USD', 'NGN', 'SAR'];
     if (codes.indexOf('USD') < 0) codes.push('USD');
     var list = codes.map(function (c) { return { c: c, n: cname(c) }; }).sort(function (a, b) { return a.n.localeCompare(b.n); });
-    var cur = curr();
-    var w = sheet('Your currency', '<p class="sh-sub">FinPi shows Pi values in this currency. Payments are always in Pi.</p><div class="to" style="margin-top:6px">' + ic('search', 'color:var(--mute)') + '<input id="cu-q" placeholder="Search currency" autocomplete="off"></div><div class="list cur-list" id="cu-l"></div>');
+    var cur = travel ? get('cur2', '') : curr();
+    var w = sheet(travel ? 'Travel currency' : 'Your currency', '<p class="sh-sub">' + (travel ? 'Show Pi values in the currency of the country you are visiting, next to your own.' : 'Pi values are shown in this currency. Payments are always in Pi.') + '</p>' + (travel && cur ? '<button type="button" class="btn ghost" id="cu-off">' + ic('x') + 'Turn off travel currency</button>' : '') + '<div class="to" style="margin-top:6px">' + ic('search', 'color:var(--mute)') + '<input id="cu-q" placeholder="Search currency" autocomplete="off"></div><div class="list cur-list" id="cu-l"></div>');
     function draw() {
       var q = $('#cu-q', w).value.trim().toLowerCase();
       $('#cu-l', w).innerHTML = list.filter(function (x) { return !q || x.c.toLowerCase().indexOf(q) >= 0 || x.n.toLowerCase().indexOf(q) >= 0; }).slice(0, 80).map(function (x) {
         var r = rateIn(x.c); return '<button type="button" class="li' + (x.c === cur ? ' on' : '') + '" data-cu="' + x.c + '"><span class="grow"><b>' + esc(x.n) + '</b><small>' + x.c + '</small></span><span class="amt-r"><b class="num">' + (r ? money(r, x.c, r < 1 ? 4 : 2) : '') + '</b><small>per π</small></span></button>';
       }).join('') || '<div class="empty">No currency found</div>';
-      $$('[data-cu]', w).forEach(function (b) { b.onclick = function () { put('cur', b.dataset.cu); closeSheets(); toast('Currency: ' + cname(b.dataset.cu)); render(S.tab); paintPrice(); }; });
+      $$('[data-cu]', w).forEach(function (b) { b.onclick = function () { put(travel ? 'cur2' : 'cur', b.dataset.cu); closeSheets(); toast((travel ? 'Travel currency: ' : 'Currency: ') + cname(b.dataset.cu)); render(S.tab); paintPrice(); }; });
     }
     $('#cu-q', w).oninput = draw; draw();
+    var off = $('#cu-off', w); if (off) off.onclick = function () { put('cur2', ''); closeSheets(); toast('Travel currency off'); render(S.tab); };
   }
   function cvCalc(from) {
     var p = S.p; if (!p || !p.usd) return; var c = curr(), r = rateIn(c), pi = $('#cv-pi'), us = $('#cv-usd'), lo = $('#cv-loc'); if (!pi) return;
-    var v = from === 'pi' ? parseFloat(pi.value) : from === 'usd' ? parseFloat(us.value) / p.usd : (r ? parseFloat(lo.value) / r : NaN);
+    var t2 = cur2(), r2 = t2 ? rateIn(t2) : 0, tr = $('#cv-tr');
+    var v = from === 'pi' ? parseFloat(pi.value) : from === 'usd' ? parseFloat(us.value) / p.usd : from === 'tr' ? (r2 ? parseFloat(tr.value) / r2 : NaN) : (r ? parseFloat(lo.value) / r : NaN);
+    if (tr && from !== 'tr') { var vv = from === 'pi' ? parseFloat(pi.value) : from === 'usd' ? parseFloat(us.value) / p.usd : (r ? parseFloat(lo.value) / r : NaN); tr.value = vv > 0 && r2 ? (vv * r2).toFixed(vv * r2 >= 100 ? 0 : 2) : ''; }
     if (!(v >= 0)) v = 0;
     if (from !== 'pi') pi.value = v ? +v.toFixed(4) : '';
     if (from !== 'usd') us.value = v ? (v * p.usd).toFixed(2) : '';
@@ -1106,7 +1110,7 @@
       return '<div class="ph"><h1>Wallet</h1><p>Live Pi rate in any currency, converter and blockchain tools.</p></div>' +
         '<div class="card" data-p="wchart">' + wChartHTML() + '</div>' +
         '<div class="sec"><h2>Converter</h2><button type="button" data-act="currency">' + esc(c) + ' ▾</button></div>' +
-        '<div class="card conv"><label><span>π</span><input id="cv-pi" type="number" inputmode="decimal" value="1" aria-label="Pi"></label><label><span>USD</span><input id="cv-usd" type="number" inputmode="decimal" aria-label="US dollars"></label>' + (c !== 'USD' ? '<label><span>' + esc(c) + '</span><input id="cv-loc" type="number" inputmode="decimal" aria-label="' + esc(cname(c)) + '"></label>' : '') + '</div>' +
+        '<div class="card conv"><label><span>π</span><input id="cv-pi" type="number" inputmode="decimal" value="1" aria-label="Pi"></label><label><span>USD</span><input id="cv-usd" type="number" inputmode="decimal" aria-label="US dollars"></label>' + (c !== 'USD' ? '<label><span>' + esc(c) + '</span><input id="cv-loc" type="number" inputmode="decimal" aria-label="' + esc(cname(c)) + '"></label>' : '') + (cur2() ? '<label class="cv-tr"><span>' + esc(cur2()) + '</span><input id="cv-tr" type="number" inputmode="decimal" aria-label="' + esc(cname(cur2())) + '"></label>' : '') + '</div>' + '<button type="button" class="lnk" data-act="travel" style="margin:8px 4px 0">' + ic('globe', 'width:15px;height:15px;vertical-align:-3px') + ' ' + (cur2() ? 'Travel currency: ' + esc(cname(cur2())) : 'Add a travel currency') + '</button>' +
         '<div class="sec"><h2>Tools</h2></div><div class="tiles"><button type="button" class="tile" data-act="get-rcpt"><i class="n">' + ic('rcpt') + '</i><b>Get a receipt</b><small>For any Pi payment, from its transaction ID</small></button><button type="button" class="tile" data-act="verify"><i>' + ic('check') + '</i><b>Verify receipt</b><small>Scan, upload or enter any receipt</small></button><button type="button" class="tile" data-act="check-addr"><i class="t">' + ic('search') + '</i><b>Check an address</b><small>Balance and payments of any Pi address</small></button><button type="button" class="tile" data-act="receive"><i class="a">' + ic('qr') + '</i><b>My QR code</b><small>Your wallet address to get paid</small></button><button type="button" class="tile" data-act="alerts"><i class="t">' + ic('bell') + '</i><b>Price alerts</b><small>Know when Pi reaches your price</small></button><button type="button" class="tile" data-act="statement"><i>' + ic('rcpt') + '</i><b>Statement</b><small>Monthly PDF of your payments</small></button></div>' +
         trustHTML();
     },
@@ -1125,7 +1129,7 @@
       return '<div class="pcard"><div class="avatar">' + esc(signedIn() ? me().charAt(0) : 'G') + '</div><div class="grow"><b>' + (signedIn() ? '@' + esc(me()) : 'Guest') + '</b><small>' + (get('name', '') ? esc(get('name', '')) + ' · ' : '') + NETN + '</small>' + (sup ? '<div class="badge">' + ic('star') + 'FinPi Supporter</div>' : '') + '</div></div>' +
         (!signedIn() ? '<button type="button" class="btn" data-act="signin" style="margin-top:14px"><span class="pi-dot">π</span>Sign in with Pi</button>' : '') +
         '<div class="sec"><h2>Settings</h2></div><div class="list">' +
-        row('edit', 'Name on receipts', get('name', '') || 'Not set', 'name') + row('globe', 'Currency', cname(curr()) + ' (' + curr() + ')', 'currency') +
+        row('edit', 'Name on receipts', get('name', '') ? NTYPE[nType()].l + ' · ' + get('name', '') : 'Your name, business, store or shop', 'name') + row('globe', 'Currency', cname(curr()) + ' (' + curr() + ')', 'currency') +
         row('bell', 'Phone notifications', get('push', false) ? 'On' : 'Off', 'push') + row('pie', 'Monthly budget', get('budget', 0) ? fpi(get('budget', 0)) + ' π' : 'Not set', 'budget') + row('card', 'Wallet address', get('addr', '') ? short(get('addr', '')) : 'Not added', 'addr-set') + hook('settings') + '</div>' +
         '<div class="sec"><h2>Support</h2></div><div class="list">' + row('info', 'Welcome tour', 'A quick look at FinPi', 'tour') +
         row('shield', 'Trust center', 'Payments, limits and records', 'security') + row('refresh', 'Repair app', 'Refresh FinPi and restore your data', 'repair') + row('act', 'Resolve a pending payment', 'Finishes or clears an unfinished payment', 'resolvepend') + row('heart', sup ? 'You are a Supporter' : 'Become a Supporter', sup ? 'Thank you!' : '1 π · badge only, no reward', 'supporter') +
@@ -1191,12 +1195,15 @@
     { id: 'myqr', n: 'My Pi QR', s: 'Poster to print or share', i: 'qr', c: 't', g: 'get', a: 'myqr' },
     { id: 'invoice', n: 'Invoices', s: 'Paid automatically on arrival', i: 'inv', c: 'n', g: 'get', a: 'invs' },
     { id: 'split', n: 'Split a bill', s: 'Request each share', i: 'users', c: 'a', g: 'get', a: 'split' },
+    { id: 'sale', n: 'Quick sale', s: 'Charge a customer by QR', i: 'card', c: 'g', g: 'biz', a: 'sale' },
+    { id: 'prod', n: 'Products', s: 'Catalog, prices and stock', i: 'tag', c: 'a', g: 'biz', a: 'prods' },
     { id: 'biz', n: 'Dashboard', s: 'Sales and outstanding', i: 'bars', c: 'b', g: 'biz', a: 'biz' },
     { id: 'newinv', n: 'New invoice', s: 'Items, tax and due date', i: 'plus', c: 'n', g: 'biz', a: 'inv-new' },
     { id: 'cust', n: 'Customers', s: 'Who pays you', i: 'users', c: 't', g: 'biz', a: 'cust' },
     { id: 'recur', n: 'Recurring', s: 'Weekly or monthly invoices', i: 'repeat', c: 'a', g: 'biz', a: 'recur' },
     { id: 'reports', n: 'Reports', s: 'Sales and invoices CSV', i: 'down', c: 'b', g: 'biz', a: 'reports' },
-    { id: 'bizprof', n: 'Business profile', s: 'Name, logo, tax ID', i: 'store', c: 'n', g: 'biz', a: 'bizprof' },
+    { id: 'bizprof', n: 'Business profile', s: 'Name, logo, tax ID, store, shop', i: 'store', c: 'n', g: 'biz', a: 'bizprof' },
+    { id: 'rname', n: 'Name on receipts', s: 'Name, business, store or shop', i: 'edit', c: 'k', g: 'biz', a: 'name' },
     { id: 'verify', n: 'Verify receipt', s: 'Scan, upload or enter', i: 'check', c: 'g', g: 'rec', a: 'verify' },
     { id: 'getrcpt', n: 'Get a receipt', s: 'From a transaction ID', i: 'tag', c: 'b', g: 'rec', a: 'get-rcpt' },
     { id: 'statement', n: 'Statement', s: 'Monthly PDF', i: 'rcpt', c: 'n', g: 'rec', a: 'statement' },
@@ -1210,12 +1217,13 @@
     { id: 'checkaddr', n: 'Check address', s: 'Any Pi wallet address', i: 'search', c: 't', g: 'wal', a: 'check-addr' },
     { id: 'addr', n: 'My address', s: 'Your Pi wallet address', i: 'card', c: 'n', g: 'wal', a: 'addr-set' },
     { id: 'currency', n: 'Currency', s: 'Show values in your currency', i: 'globe', c: 'a', g: 'wal', a: 'currency' },
+    { id: 'travel', n: 'Travel currency', s: 'Values in the country you visit', i: 'globe', c: 't', g: 'wal', a: 'travel' },
     { id: 'trust', n: 'Trust center', s: 'Payments, limits, records', i: 'shield', c: 'b', g: 'help', a: 'security' },
     { id: 'repair', n: 'Repair app', s: 'Refresh and restore data', i: 'refresh', c: 't', g: 'help', a: 'repair' },
     { id: 'pending', n: 'Pending payment', s: 'Finish or clear it', i: 'undo', c: 'a', g: 'help', a: 'resolvepend' },
     { id: 'help', n: 'Help & contact', s: 'We reply quickly', i: 'mail', c: 'n', g: 'help', a: 'help' }
   ];
-  var HOME_SVC = ['verify', 'invoice', 'myqr', 'links', 'split', 'statement', 'biz', 'more'];
+  var HOME_SVC = ['sale', 'verify', 'invoice', 'myqr', 'links', 'split', 'biz', 'more'];
   function svcById(id) { return id === 'more' ? { id: 'more', n: 'All services', i: 'grid', c: 'k', tab: 'pay' } : SVC.filter(function (x) { return x.id === id; })[0]; }
   function svcGrid(L, kind) {
     return '<div class="sv-grid' + (kind ? ' ' + kind : '') + '">' + L.filter(Boolean).map(function (x) {
@@ -1226,6 +1234,25 @@
     q = String(q || '').trim().toLowerCase(); var any = false;
     $$('#view .sv-grp').forEach(function (g) { var n = 0; $$('.sv', g).forEach(function (b) { var on = !q || b.dataset.k.indexOf(q) >= 0; b.hidden = !on; if (on) n++; }); g.hidden = !n; if (n) any = true; });
     $$('#view .sv-again').forEach(function (e) { e.hidden = !!q; }); var no = $('#view .sv-none'); if (no) no.hidden = any;
+  }
+  /* ── the name shown on receipts, invoices and the QR poster: a person, business, store or shop ── */
+  var NTYPE = { name: { l: 'Name', p: 'Your full name' }, business: { l: 'Business name', p: 'e.g. Elbaggari Investment Limited' }, store: { l: 'Store name', p: 'e.g. Elbaggari Stores' }, shop: { l: 'Shop name', p: 'e.g. Amina Fabrics' } };
+  function nType() { var t = get('nameType', ''); return NTYPE[t] ? t : 'name'; }
+  function setName(v, t) {
+    put('name', v); put('nameType', t);
+    if (t !== 'name') { var b = get('biz', {}) || {}; if (b.name !== v) { b.name = v; if (window.FinPi && FinPi.kit && FinPi.kit.bizPut) FinPi.kit.bizPut(b); else put('biz', b); } }
+  }
+  function nameSheet(after) {
+    var t = nType();
+    var w = sheet('Name on receipts', '<div class="chips" id="nm-t">' + Object.keys(NTYPE).map(function (k) { return '<button type="button" class="chip' + (k === t ? ' on' : '') + '" data-nt="' + k + '">' + NTYPE[k].l + '</button>'; }).join('') + '</div>' +
+      '<label class="l" for="nm-i" id="nm-l">' + NTYPE[t].l + '</label><input class="in" id="nm-i" maxlength="60" value="' + esc(get('name', '')) + '" placeholder="' + esc(NTYPE[t].p) + '">' +
+      '<div class="nm-prev"><span>On receipts</span><b id="nm-pv"></b></div>' +
+      '<button type="button" class="btn" id="nm-go">' + ic('check') + 'Save</button>');
+    var i = $('#nm-i', w);
+    function pv() { var v = i.value.trim(); $('#nm-pv', w).textContent = (v || NTYPE[t].l) + (me() ? ' (@' + me() + ')' : ''); }
+    $$('[data-nt]', w).forEach(function (b) { b.onclick = function () { t = b.dataset.nt; $$('[data-nt]', w).forEach(function (x) { x.classList.toggle('on', x === b); }); $('#nm-l', w).textContent = NTYPE[t].l; i.placeholder = NTYPE[t].p; pv(); }; });
+    i.oninput = pv; pv();
+    $('#nm-go', w).onclick = function () { var v = i.value.trim().replace(/\s+/g, ' '); if (v && v.length < 2) return toast('Enter at least 2 letters'); setName(v, t); closeSheets(); render(S.tab); toast(v ? NTYPE[t].l + ' saved' : 'Name removed'); if (after) after(); };
   }
   function trustChips() { return '<span>' + ic('check') + 'Verified on the Pi blockchain</span><span>' + ic('refresh') + (signedIn() ? 'Backed up to your Pi account' : 'Backup after sign-in') + '</span><span>' + ic('rcpt') + 'Receipt for every payment</span>'; }
   function trustHTML() { return '<div class="trust">' + trustChips() + '</div>'; }
@@ -1275,7 +1302,7 @@
     try { v.innerHTML = T[tab](); } catch (e) { guardErr(e && e.message); v.innerHTML = '<div class="list" style="margin-top:20px"><div class="empty">' + ic('refresh') + '<div>This screen did not load.</div><button type="button" class="btn" data-act="repair" style="margin-top:14px">' + ic('refresh') + 'Repair app</button></div></div>'; }
     $$('#tabs button').forEach(function (b) { b.classList.toggle('on', b.dataset.tab === tab); b.setAttribute('aria-current', b.dataset.tab === tab ? 'page' : 'false'); });
     if (tab === 'activity') $$('.act-ch .chip.on').forEach(function (c) { try { var p = c.parentNode; p.scrollLeft = c.offsetLeft - p.clientWidth / 2 + c.offsetWidth / 2; } catch (e) {} });
-    if (tab === 'wallet') { cvCalc('pi'); ['pi', 'usd', 'loc'].forEach(function (k) { var e = $('#cv-' + k); if (e) e.oninput = function () { cvCalc(k); }; }); }
+    if (tab === 'wallet') { cvCalc('pi'); ['pi', 'usd', 'loc', 'tr'].forEach(function (k) { var e = $('#cv-' + k); if (e) e.oninput = function () { cvCalc(k); }; }); }
   }
   function go(tab) { if (tab === S.tab && $('#view').innerHTML) { scrollTo({ top: 0, behavior: 'smooth' }); } closeSheets(); render(tab); scrollTo(0, 0); }
 
@@ -1680,10 +1707,7 @@
       if (canShareFile(f)) return navigator.share({ files: [f], title: 'FinPi activity' }).catch(function () {});
       saveFile(blob, name, 'text/csv', 'activity file');
     },
-    name: function () {
-      var w = sheet('Name on receipts', '<p class="sh-sub">Shown on your receipts next to your @username. Stays on this phone.</p><input class="in" id="nm-i" maxlength="50" value="' + esc(get('name', '')) + '" placeholder="Your full name"><button type="button" class="btn" id="nm-go">Save</button>');
-      $('#nm-go', w).onclick = function () { put('name', $('#nm-i', w).value.trim()); closeSheets(); render(S.tab); toast('Saved'); };
-    },
+    name: function () { nameSheet(); },
     budget: function () {
       var w = sheet('Monthly budget', '<p class="sh-sub">How much Pi do you plan to spend each month? FinPi shows your progress. Stays on this phone.</p><div class="amt"><input id="bg-i" type="number" inputmode="decimal" placeholder="0" value="' + (get('budget', 0) || '') + '"><span>π</span></div><div class="hint num" id="bg-c"></div><button type="button" class="btn" id="bg-go">Save budget</button>' + (get('budget', 0) ? '<button type="button" class="btn ghost" id="bg-rm">Remove budget</button>' : ''));
       var i = $('#bg-i', w); i.oninput = function () { $('#bg-c', w).textContent = conv(+i.value); }; i.oninput();
@@ -1701,7 +1725,7 @@
       };
       var t = $('#ps-t', w); if (t) t.onclick = function () { addNote('bell', 'FinPi test', 'Notifications are working.', 'test-' + Date.now()); toast('Test sent'); };
     },
-    resolvepend: function () { window.fpResolvePending(); }, insights: function () { S.seg = 'ins'; go('activity'); }, repair: function () { repairSheet(); },
+    resolvepend: function () { window.fpResolvePending(); }, travel: function () { curSheet(true); }, insights: function () { S.seg = 'ins'; go('activity'); }, repair: function () { repairSheet(); },
     security: function () {
       sheet('Trust center', '<div class="trust big-t">' + trustChips() + '</div>' +
         '<div class="card" style="margin-top:12px"><h3>Payments</h3><p>Every transfer is processed through Pi Network’s official payments and delivered within seconds. If delivery is not possible, the Pi is refunded automatically. Each payment is checked on the Pi blockchain, so nothing is paid twice.</p></div>' +
@@ -1780,7 +1804,7 @@
     kit: { HK: HK, P: P, A: A, T: T, get: get, put: put, esc: esc, ic: ic, toast: toast, sheet: sheet, closeSheets: closeSheets, copy: copy, fpi: fpi, conv: conv, money: money, rateIn: rateIn, curr: curr, short: short, r7: r7,
       rcpts: rcpts, me: me, signedIn: signedIn, myTarget: myTarget, needTarget: needTarget, payLink: payLink, isG: isG, validG: validG, cName: cName, contacts: contacts, toLabel: toLabel,
       shareText: shareText, shareImage: shareImage, shareLink: shareLink, shareFile: shareFile, saveFile: saveFile, canShareFile: canShareFile, makePdf: makePdf, fontsReady: fontsReady, addNote: addNote,
-      go: go, rerender: rerender, api: api, token: function () { return S.token; }, NETN: NETN, TEST: TEST, USER_RE: USER_RE, rcptTitle: rcptTitle } };
+      go: go, rerender: rerender, nType: nType, NTYPE: NTYPE, setName: setName, curSheet: curSheet, api: api, token: function () { return S.token; }, NETN: NETN, TEST: TEST, USER_RE: USER_RE, rcptTitle: rcptTitle } };
   try { document.dispatchEvent(new Event('finpi:ready')); } catch (e) {}
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', start); else start();
 })();
