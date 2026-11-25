@@ -801,7 +801,7 @@
       '<label class="btn ghost" style="cursor:pointer">' + ic('down') + 'Scan a photo from the gallery<input type="file" id="sc-f" accept="image/*" hidden></label>', { onClose: stop });
     function stop() { done = true; cancelAnimationFrame(raf); if (stream) stream.getTracks().forEach(function (t) { t.stop(); }); }
     function found(t) {
-      var c = parseCode(t); if (!c) { $('#sc-m', w) && ($('#sc-m', w).textContent = 'This QR code is not a Pi payment code.'); return false; }
+      var c = parseCode(t); if (!c) { var rv = /receipt\.html|blockexplorer/i.test(t) ? rxTx(t) : null; if (rv) { stop(); w.remove(); verifySheet(rv); return true; } $('#sc-m', w) && ($('#sc-m', w).textContent = 'This QR code is not a Pi payment code.'); return false; }
       stop(); w.remove(); if (navigator.vibrate) try { navigator.vibrate(60); } catch (e) {} openCode(c); return true;
     }
     var v = $('#sc-v', w), msg = $('#sc-m', w);
@@ -912,9 +912,101 @@
     };
     var rm = $('#ad-rm', w); if (rm) rm.onclick = function () { put('addr', ''); S.wal = null; closeSheets(); render(S.tab); toast('Address removed'); };
   }
-  function verifySheet() {
-    var w = sheet('Verify a payment', '<p class="sh-sub">Paste a transaction ID from a receipt to check it on the public Pi blockchain.</p><label class="l" for="vf-i">Transaction ID</label><textarea class="in num" id="vf-i" rows="2" maxlength="64" spellcheck="false" style="font-size:14px;resize:none" placeholder="64 letters and numbers"></textarea><button type="button" class="btn" id="vf-go">' + ic('check') + 'Verify</button>');
-    $('#vf-go', w).onclick = function () { var v = $('#vf-i', w).value.trim().toLowerCase(); if (!/^[a-f0-9]{64}$/.test(v)) return toast('A transaction ID has 64 letters and numbers'); location.href = 'receipt.html#tx=' + v + '&net=' + NETQ; };
+  /* ── Verify receipt: scan or upload any receipt (or type its transaction ID) and compare it with the Pi blockchain ── */
+  function rxTx(t) {
+    t = String(t || ''); var m = /(?:^|[^a-f0-9])([a-f0-9]{64})(?![a-f0-9])/i.exec(t); if (!m) return null;
+    var n = /net=(test|main)/i.exec(t); return { tx: m[1].toLowerCase(), net: n ? n[1].toLowerCase() : /testnet/i.test(t) ? 'test' : NETQ };
+  }
+  function vChecks() { return get('vchk', []); }
+  function camScan(v, msg, onText) {
+    var stream = null, raf = 0, done = false, cv = document.createElement('canvas'), cx = cv.getContext('2d', { willReadFrequently: true });
+    function stop() { done = true; cancelAnimationFrame(raf); if (stream) stream.getTracks().forEach(function (t) { t.stop(); }); }
+    loadJsQR().then(function () {
+      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) { msg.textContent = 'Camera is not available here. Upload a photo instead.'; return; }
+      return navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment', width: { ideal: 1280 } }, audio: false }).then(function (st) {
+        if (done) { st.getTracks().forEach(function (t) { t.stop(); }); return; }
+        stream = st; v.srcObject = st; v.play(); msg.textContent = 'Point at the QR code on the receipt';
+        var last = 0;
+        (function tick(ts) {
+          if (done) return; raf = requestAnimationFrame(tick);
+          if (ts - last < 180 || v.readyState < 2) return; last = ts;
+          var W = v.videoWidth, H = v.videoHeight, k = Math.min(1, 720 / Math.max(W, H)); cv.width = W * k; cv.height = H * k;
+          cx.drawImage(v, 0, 0, cv.width, cv.height); var t = decodeImageData(cx.getImageData(0, 0, cv.width, cv.height)); if (t && onText(t) !== false) stop();
+        })(0);
+      });
+    }).catch(function () { msg.textContent = 'Camera permission was not given. Upload a photo instead.'; });
+    return stop;
+  }
+  function photoText(f) {
+    return loadJsQR().then(function () {
+      return new Promise(function (ok) {
+        var img = new Image(), u = URL.createObjectURL(f), cv = document.createElement('canvas'), cx = cv.getContext('2d', { willReadFrequently: true });
+        img.onload = function () {
+          URL.revokeObjectURL(u); var t = '';
+          [1600, 1100, 2200, 800].some(function (mx) { var k = Math.min(1, mx / Math.max(img.width, img.height)); cv.width = Math.round(img.width * k); cv.height = Math.round(img.height * k); cx.fillStyle = '#fff'; cx.fillRect(0, 0, cv.width, cv.height); cx.drawImage(img, 0, 0, cv.width, cv.height); t = decodeImageData(cx.getImageData(0, 0, cv.width, cv.height)); return !!t; });
+          ok(t);
+        };
+        img.onerror = function () { URL.revokeObjectURL(u); ok(''); };
+        img.src = u;
+      });
+    });
+  }
+  function verifySheet(pre) {
+    var stopCam = null, mode = 'scan';
+    var w = sheet('Verify receipt',
+      '<div class="seg vr-seg" role="tablist"><button type="button" data-vm="scan" class="on">' + ic('qr', 'width:17px;height:17px;vertical-align:-3px') + ' Scan</button><button type="button" data-vm="photo">' + ic('down', 'width:17px;height:17px;vertical-align:-3px') + ' Photo</button><button type="button" data-vm="type">' + ic('edit', 'width:17px;height:17px;vertical-align:-3px') + ' Enter</button></div>' +
+      '<div id="vr-scan" class="vr-p"><div class="scan"><video id="vr-v" playsinline muted></video><div class="scan-f"></div><div class="scan-m" id="vr-m">Starting camera…</div></div></div>' +
+      '<div id="vr-photo" class="vr-p" hidden><label class="vr-drop">' + ic('rcpt') + '<b>Upload receipt image</b><small>Screenshot or photo from your gallery</small><input type="file" id="vr-f" accept="image/*" hidden></label><p class="small muted" id="vr-pm" style="text-align:center;margin-top:8px"></p></div>' +
+      '<div id="vr-type" class="vr-p" hidden><label class="l" for="vr-t">Transaction ID</label><textarea class="in num" id="vr-t" rows="2" maxlength="200" spellcheck="false" autocapitalize="none" placeholder="64 letters and numbers" style="font-size:14px;resize:none"></textarea>' +
+      '<div class="two bz-two"><div><label class="l" for="vr-a">Amount on receipt</label><div class="amt sm"><input id="vr-a" type="number" inputmode="decimal" placeholder="Optional"><span>π</span></div></div><div><label class="l" for="vr-c">Verification code</label><input class="in num" id="vr-c" maxlength="14" autocapitalize="characters" spellcheck="false" placeholder="FP-XXXXX-XXXXX"></div></div>' +
+      '<button type="button" class="btn" id="vr-go">' + ic('check') + 'Verify</button></div>' +
+      '<div id="vr-out"></div>' +
+      '<div id="vr-hist"></div>', { onClose: function () { if (stopCam) stopCam(); } });
+    function setMode(m) {
+      mode = m; $$('[data-vm]', w).forEach(function (b) { b.classList.toggle('on', b.dataset.vm === m); });
+      ['scan', 'photo', 'type'].forEach(function (k) { $('#vr-' + k, w).hidden = k !== m; });
+      if (stopCam) { stopCam(); stopCam = null; }
+      if (m === 'scan') stopCam = camScan($('#vr-v', w), $('#vr-m', w), function (t) { var r = rxTx(t); if (!r) { $('#vr-m', w).textContent = 'This QR code is not a payment receipt.'; return false; } if (navigator.vibrate) try { navigator.vibrate(60); } catch (e) {} setMode('type'); $('#vr-t', w).value = r.tx; check(r); return true; });
+    }
+    $$('[data-vm]', w).forEach(function (b) { b.onclick = function () { setMode(b.dataset.vm); }; });
+    $('#vr-f', w).onchange = function () {
+      var f = this.files && this.files[0]; if (!f) return; var pm = $('#vr-pm', w); pm.textContent = 'Reading receipt…'; this.value = '';
+      photoText(f).then(function (t) { var r = rxTx(t); if (!r) { pm.textContent = t ? 'The QR code in this image is not a payment receipt.' : 'No QR code found. Use a clear, uncropped receipt image, or enter the transaction ID.'; return; } pm.textContent = ''; setMode('type'); $('#vr-t', w).value = r.tx; check(r); })
+        .catch(function () { pm.textContent = 'Could not read this image. Check your connection and try again.'; });
+    };
+    $('#vr-go', w).onclick = function () { var r = rxTx($('#vr-t', w).value); if (!r) return toast('Enter the 64-character transaction ID'); check(r); };
+    $('#vr-c', w).oninput = function () { var v = this.value.toUpperCase().replace(/[^A-Z0-9-]/g, ''); if (v !== this.value) this.value = v; };
+    function hist() {
+      var L = vChecks(); $('#vr-hist', w).innerHTML = L.length ? '<div class="day">Recent checks</div><div class="list">' + L.slice(0, 12).map(function (c, i) { return '<button type="button" class="li" data-vh="' + i + '"><span class="ico ' + (c.ok ? 'in' : 'rf') + '">' + ic(c.ok ? 'check' : 'warn') + '</span><span class="grow"><b class="num">' + (c.amt != null ? fpi(c.amt) + ' π' : 'Not found') + '</b><small class="num">' + esc(c.tx.slice(0, 10) + '…' + c.tx.slice(-6)) + ' · ' + new Date(c.ts).toLocaleString([], { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }) + '</small></span><span class="vr-b ' + (c.ok ? 'ok' : 'bad') + '">' + (c.ok ? 'Genuine' : 'Not genuine') + '</span></button>'; }).join('') + '</div>' : '';
+      $$('[data-vh]', w).forEach(function (b) { b.onclick = function () { var c = vChecks()[+b.dataset.vh]; setMode('type'); $('#vr-t', w).value = c.tx; check({ tx: c.tx, net: c.net }); }; });
+    }
+    function check(r) {
+      var out = $('#vr-out', w), wantA = r7($('#vr-a', w).value), wantC = $('#vr-c', w).value.trim().toUpperCase(), netN = r.net === 'test' ? 'Pi Testnet' : 'Pi Mainnet';
+      out.innerHTML = '<div class="vr-res wait"><div class="vr-i">' + ic('refresh') + '</div><b>Checking the Pi blockchain…</b></div>';
+      api('/verify?tx=' + r.tx + '&net=' + r.net).then(function (d) {
+        var L = vChecks().filter(function (c) { return c.tx !== r.tx; }), rec = { tx: r.tx, net: r.net, ts: Date.now(), ok: false, amt: null };
+        if (!d || !d.ok || !d.tx || !d.tx.ok || !(d.tx.payments || []).length) {
+          out.innerHTML = '<div class="vr-res bad"><div class="vr-i">' + ic('x') + '</div><b>Not genuine</b><p>' + esc(d && d.tx && !d.tx.ok ? 'This transaction failed. No Pi was moved.' : (d && d.error) || 'This transaction is not on the ' + netN + '.') + '</p></div>';
+        } else {
+          var t = d.tx, P = t.payments, tot = r7(P.reduce(function (a, q) { return a + parseFloat(q.amount || 0); }, 0)), p0 = P[0];
+          var aOk = !(wantA > 0) || Math.abs(wantA - tot) < 1e-7, cOk = !wantC || !t.seal || wantC === t.seal, ok = aOk && cOk;
+          rec.ok = ok; rec.amt = tot;
+          var rows = [['Amount', fpi(tot) + ' π' + (conv(tot) ? ' · ' + conv(tot).replace('≈ ', '≈') : '')], ['From', p0.from], ['To', p0.to], ['Memo', t.memo || '—'], ['Date', new Date(t.at).toLocaleString([], { day: 'numeric', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' })], ['Network', netN], ['Transaction ID', t.hash]];
+          out.innerHTML = '<div class="vr-res ' + (ok ? 'ok' : 'bad') + '"><div class="vr-i">' + ic(ok ? 'check' : 'warn') + '</div><b>' + (ok ? 'Genuine payment' : 'Receipt does not match') + '</b><p>' + (ok ? 'Recorded on the ' + netN + '.' : 'The payment exists, but the receipt shows different details.') + '</p>' +
+            '<div class="vr-amt num">' + fpi(tot) + ' π</div></div>' +
+            (wantA > 0 || wantC ? '<div class="vr-cmp">' + (wantA > 0 ? '<div class="' + (aOk ? 'ok' : 'bad') + '">' + ic(aOk ? 'check' : 'x') + '<span>Amount on receipt <b class="num">' + fpi(wantA) + ' π</b> ' + (aOk ? 'matches' : 'does not match') + '</span></div>' : '') + (wantC ? '<div class="' + (cOk ? 'ok' : 'bad') + '">' + ic(cOk ? 'check' : 'x') + '<span>Verification code <b class="num">' + esc(wantC) + '</b> ' + (!t.seal ? 'cannot be checked right now' : cOk ? 'matches' : 'does not match') + '</span></div>' : '') + '</div>' : '') +
+            (t.seal ? '<div class="vr-seal"><span>Verification code</span><b class="num">' + esc(t.seal) + '</b></div>' : '') +
+            '<div class="list txd-rows" style="margin-top:12px">' + rows.map(function (x) { return '<div class="txr"><span>' + esc(x[0]) + '</span><b class="' + (/From|To|Transaction/.test(x[0]) ? 'num mono' : '') + '">' + esc(x[1] || '—') + '</b></div>'; }).join('') + '</div>' +
+            '<div class="two"><button type="button" class="btn ghost" data-x="vsh">' + ic('share') + 'Share result</button><a class="btn ghost" href="receipt.html#tx=' + t.hash + '&net=' + r.net + '">' + ic('ext') + 'Open verify page</a></div>';
+          var sh = $('[data-x="vsh"]', out); if (sh) sh.onclick = function () { shareText('FinPi payment check', (ok ? 'Genuine payment' : 'Receipt does not match') + ' · ' + fpi(tot) + ' π on the ' + netN + (t.seal ? ' · Code ' + t.seal : '') + '\n' + location.origin + '/receipt.html#tx=' + t.hash + '&net=' + r.net); };
+        }
+        L.unshift(rec); put('vchk', L.slice(0, 50)); hist();
+        try { if (navigator.vibrate) navigator.vibrate(rec.ok ? [40] : [120, 60, 120]); } catch (e) {}
+        setTimeout(function () { try { out.scrollIntoView({ behavior: 'smooth', block: 'start' }); } catch (e) {} }, 60);
+      }).catch(function () { out.innerHTML = '<div class="vr-res bad"><div class="vr-i">' + ic('warn') + '</div><b>No connection</b><p>Check your internet and try again.</p></div>'; });
+    }
+    hist();
+    if (pre && pre.tx) { setMode('type'); $('#vr-t', w).value = pre.tx; check(pre); } else setMode(pre && pre.mode || 'scan');
   }
 
   /* ── price & currency sheets ── */
@@ -994,7 +1086,7 @@
       return '<div class="hello"><h1>' + hour() + (signedIn() ? ', @' + esc(me()) : '') + '</h1><p>' + (signedIn() ? 'Here is your Pi today.' : 'You are exploring. Sign in to send and receive Pi.') + '</p></div>' +
         '<div class="hero" data-act="price" data-p="hero" role="button" tabindex="0" aria-label="Pi price details">' + heroHTML() + '</div>' +
         '<div class="qa"><button type="button" data-act="send"><i>' + ic('send') + '</i>Send</button><button type="button" data-act="request"><i class="t">' + ic('req') + '</i>Request</button><button type="button" data-act="scan"><i class="n">' + ic('qr') + '</i>Scan</button><button type="button" data-act="receive"><i class="a">' + ic('card') + '</i>Receive</button></div>' +
-        dueHTML() + hook('home') + '<div class="sec"><h2>Overview</h2></div><div class="card" data-p="month">' + monthHTML() + '</div>' +
+        dueHTML() + '<button type="button" class="vr-strip" data-act="verify"><span class="vr-si">' + ic('check') + '</span><span class="grow"><b>Verify receipt</b><small>Check any Pi receipt in seconds</small></span><span class="vr-go">Verify</span></button>' + hook('home') + '<div class="sec"><h2>Overview</h2></div><div class="card" data-p="month">' + monthHTML() + '</div>' +
         '<div class="sec"><h2>Recent activity</h2>' + (R.length ? '<button type="button" data-tab="activity">See all</button>' : '') + '</div>' +
         (pendingList().length ? '<div class="list" style="margin-bottom:10px">' + pendingList().slice(0, 3).map(pendRow).join('') + '</div>' : '') +
         (R.length ? '<div class="list">' + R.slice(0, 4).map(txRow).join('') + '</div>' : pendingList().length ? '' : '<div class="list"><div class="empty">' + ic('act') + '<div>No payments yet. Your receipts appear here.</div></div></div>') +
@@ -1015,7 +1107,7 @@
         '<button type="button" class="tile" data-act="contacts"><i class="n">' + ic('user') + '</i><b>Contacts</b><small>People you pay often</small></button>' +
         '<button type="button" class="tile" data-act="rems"><i class="a">' + ic('bell') + '</i><b>Reminders</b><small>Rent, fees and regular payments</small></button></div>' +
         hook('pay') + '<div class="sec"><h2>Tools</h2></div>' +
-        '<div class="tiles"><button type="button" class="tile" data-act="get-rcpt"><i class="n">' + ic('rcpt') + '</i><b>Get a receipt</b><small>For any Pi payment, from its transaction ID</small></button><button type="button" class="tile" data-act="verify"><i class="a">' + ic('check') + '</i><b>Verify a payment</b><small>Check any transaction on the blockchain</small></button></div>';
+        '<div class="tiles"><button type="button" class="tile" data-act="get-rcpt"><i class="n">' + ic('rcpt') + '</i><b>Get a receipt</b><small>For any Pi payment, from its transaction ID</small></button><button type="button" class="tile" data-act="verify"><i class="a">' + ic('check') + '</i><b>Verify receipt</b><small>Scan, upload or enter any receipt</small></button></div>';
     },
     wallet: function () {
       var c = curr();
@@ -1023,7 +1115,7 @@
         '<div class="card" data-p="wchart">' + wChartHTML() + '</div>' +
         '<div class="sec"><h2>Converter</h2><button type="button" data-act="currency">' + esc(c) + ' ▾</button></div>' +
         '<div class="card conv"><label><span>π</span><input id="cv-pi" type="number" inputmode="decimal" value="1" aria-label="Pi"></label><label><span>USD</span><input id="cv-usd" type="number" inputmode="decimal" aria-label="US dollars"></label>' + (c !== 'USD' ? '<label><span>' + esc(c) + '</span><input id="cv-loc" type="number" inputmode="decimal" aria-label="' + esc(cname(c)) + '"></label>' : '') + '</div>' +
-        '<div class="sec"><h2>Tools</h2></div><div class="tiles"><button type="button" class="tile" data-act="get-rcpt"><i class="n">' + ic('rcpt') + '</i><b>Get a receipt</b><small>For any Pi payment, from its transaction ID</small></button><button type="button" class="tile" data-act="verify"><i>' + ic('check') + '</i><b>Verify a payment</b><small>Check a transaction on the blockchain</small></button><button type="button" class="tile" data-act="check-addr"><i class="t">' + ic('search') + '</i><b>Check an address</b><small>Balance and payments of any Pi address</small></button><button type="button" class="tile" data-act="receive"><i class="a">' + ic('qr') + '</i><b>My QR code</b><small>Your wallet address to get paid</small></button><button type="button" class="tile" data-act="alerts"><i class="t">' + ic('bell') + '</i><b>Price alerts</b><small>Know when Pi reaches your price</small></button><button type="button" class="tile" data-act="statement"><i>' + ic('rcpt') + '</i><b>Statement</b><small>Monthly PDF of your payments</small></button></div>' +
+        '<div class="sec"><h2>Tools</h2></div><div class="tiles"><button type="button" class="tile" data-act="get-rcpt"><i class="n">' + ic('rcpt') + '</i><b>Get a receipt</b><small>For any Pi payment, from its transaction ID</small></button><button type="button" class="tile" data-act="verify"><i>' + ic('check') + '</i><b>Verify receipt</b><small>Scan, upload or enter any receipt</small></button><button type="button" class="tile" data-act="check-addr"><i class="t">' + ic('search') + '</i><b>Check an address</b><small>Balance and payments of any Pi address</small></button><button type="button" class="tile" data-act="receive"><i class="a">' + ic('qr') + '</i><b>My QR code</b><small>Your wallet address to get paid</small></button><button type="button" class="tile" data-act="alerts"><i class="t">' + ic('bell') + '</i><b>Price alerts</b><small>Know when Pi reaches your price</small></button><button type="button" class="tile" data-act="statement"><i>' + ic('rcpt') + '</i><b>Statement</b><small>Monthly PDF of your payments</small></button></div>' +
         trustHTML();
     },
     activity: function () {
@@ -1533,7 +1625,7 @@
     signin: function () { signIn(); },
     price: function () { go('wallet'); }, 'price-retry': function (el, e) { e.stopPropagation(); loadPrice(true); paintPrice(); },
     currency: function (el, e) { e && e.stopPropagation(); curSheet(); },
-    'check-addr': function () { addrSheet(false); }, verify: verifySheet,
+    'check-addr': function () { addrSheet(false); }, verify: function () { verifySheet(); },
     'addr-set': function () { addrSheet(true); }, 'addr-use': function () { var s = get('addrSug', ''); if (validG(s)) { put('addr', s); put('addrSug', ''); render(S.tab); loadWal(); toast('Address saved'); } },
     'wal-load': function () { S.wal = null; loadWal(); },
     notifs: function () {
