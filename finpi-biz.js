@@ -568,10 +568,9 @@
 
     /* ── entry points ── */
     K.HK.html.home = function () {
-      var t = sales().filter(function (r) { return r.ts >= day0(); }), open = invs().filter(function (v) { return /Unpaid|Part paid|Overdue/.test(status(v)); });
-      return '<div class="sec"><h2>Business</h2><button type="button" data-act="biz">Open</button></div>' +
-        '<button type="button" class="bz-strip" data-act="biz"><span class="bz-si">' + ic('store') + '</span><span class="grow"><b>' + esc(biz().name || 'FinPi Business') + '</b><small>Today <span class="num bz-amt">' + fpi(sum(t)) + ' π</span> · ' + (open.length ? open.length + ' open invoice' + (open.length === 1 ? '' : 's') : 'Invoices, sales and reports') + '</small></span><span class="go">' + ic('chev') + '</span></button>' +
-        '<div class="bz-mini"><button type="button" data-act="inv-new"><i>' + ic('inv') + '</i>Invoice</button><button type="button" data-act="myqr"><i class="t">' + ic('qr') + '</i>My Pi QR</button><button type="button" data-act="cust"><i class="n">' + ic('users') + '</i>Customers</button><button type="button" data-act="reports"><i class="a">' + ic('bars') + '</i>Reports</button></div>';
+      var b = biz(), V = invs(); if (!b.name && !V.length) return '';
+      var t = sales().filter(function (r) { return r.ts >= day0(); }), open = V.filter(function (v) { return /Unpaid|Part paid|Overdue/.test(status(v)); });
+      return '<button type="button" class="bz-strip" data-act="biz" style="margin-top:14px"><span class="bz-si">' + (b.logo ? '<img alt="" src="' + esc(b.logo) + '">' : ic('store')) + '</span><span class="grow"><b>' + esc(b.name || 'FinPi Business') + '</b><small>Today <span class="num bz-amt">' + fpi(sum(t)) + ' π</span>' + (open.length ? ' · ' + open.length + ' open invoice' + (open.length === 1 ? '' : 's') : '') + '</small></span><span class="go">' + ic('chev') + '</span></button>';
     };
     K.HK.html.pay = function () {
       return '<div class="sec"><h2>Business</h2><button type="button" data-act="biz">Dashboard</button></div><div class="tiles">' +
@@ -586,7 +585,7 @@
         row('inv', 'Invoices', open ? open + ' open' : 'Create and track invoices', 'invs') + row('users', 'Customers', custs().length ? custs().length + ' saved' : 'People and businesses who pay you', 'cust') +
         row('repeat', 'Recurring requests', recs().length ? recs().length + ' active' : 'Weekly or monthly invoices', 'recur') + row('qr', 'My Pi QR', 'Poster to print or share', 'myqr') + '</div>';
     };
-    K.HK.html.settings = function () { return row('sound', 'Payment sounds', get('sound', true) ? 'On · sound and vibration' : 'Off', 'sound') + row(get('hide', false) ? 'eyeoff' : 'eye', 'Hide amounts', get('hide', false) ? 'On' : 'Off', 'hide'); };
+    K.HK.html.settings = function () { return row('store', 'Business profile', biz().name || 'Name, logo, address, tax ID', 'bizprof') + row('sound', 'Payment sounds', get('sound', true) ? 'On · sound and vibration' : 'Off', 'sound') + row(get('hide', false) ? 'eyeoff' : 'eye', 'Hide amounts', get('hide', false) ? 'On' : 'Off', 'hide'); };
     Object.assign(K.A, {
       biz: function () { bizSheet(); }, 'inv-new': function () { invEdit(''); }, invs: function () { invList(); }, cust: function () { custSheet(); }, recur: recSheet, myqr: qrSheet, bizprof: profSheet, reports: repSheet,
       hide: toggleHide,

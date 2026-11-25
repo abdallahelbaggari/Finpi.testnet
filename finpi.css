@@ -485,3 +485,51 @@ body{background:radial-gradient(120% 40% at 100% 0%,rgba(21,67,224,.08),transpar
 .vr-seal{margin-top:10px;padding:12px;border-radius:16px;text-align:center;background:linear-gradient(135deg,#EEF4FF,#E6FAF6);border:1.5px dashed #1D4ED8}
 .vr-seal span{display:block;font-size:11.5px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:#475569}.vr-seal b{display:block;font-size:22px;color:#0B2A6F;letter-spacing:.05em}
 .vr-b{flex:none;padding:3px 10px;border-radius:999px;font-size:11.5px;font-weight:800}.vr-b.ok{background:#CFF3E8;color:#047857}.vr-b.bad{background:#FDECEC;color:var(--bad)}
+
+/* ══ FinPi fintech look: navy app bar, home band, floating actions, service grid, centre wallet ══ */
+:root{--navy:#061A4F;--blue:#1543E0;--blue2:#2F6BFF;--teal:#0A9488;--gold:#F5B83D;--bg:#EEF2F9;--sky:#E8EEFF;--line:rgba(6,26,79,.08);--line2:rgba(6,26,79,.14);
+  --sh:0 1px 2px rgba(6,26,79,.05),0 14px 30px -20px rgba(6,26,79,.35)}
+body{background:var(--bg)}
+#top{background:linear-gradient(90deg,#0B2A86,#0D2E8C);color:#fff;box-shadow:none;backdrop-filter:none;-webkit-backdrop-filter:none}
+#top .brand{color:#fff}#top .brand img{box-shadow:0 6px 14px -6px rgba(0,0,0,.5)}
+#top .tbtn{background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.18);color:#fff}
+#top .avatar{background:linear-gradient(135deg,#F5B83D,#14C2AE);color:#061A4F;border:2px solid rgba(255,255,255,.45);font-weight:800}
+#top .netb{background:rgba(245,184,61,.18);color:#FCD34D;border:1px solid rgba(245,184,61,.35)}
+#top .dot{border-color:#0D2E8C}
+.band{margin:-4px -16px 0;padding:8px 16px 62px;color:#fff;background:radial-gradient(90% 90% at 100% 0%,rgba(20,194,174,.32),transparent 60%),radial-gradient(60% 60% at 0% 100%,rgba(47,107,255,.35),transparent 70%),linear-gradient(180deg,#0D2E8C 0%,#061A4F 100%);border-radius:0 0 34px 34px}
+.band .hello{margin:8px 2px 16px}.band .hello h1{color:#fff}.band .hello p{color:rgba(255,255,255,.72)}
+.band .hero{background:linear-gradient(135deg,rgba(255,255,255,.16),rgba(255,255,255,.04)),radial-gradient(80% 120% at 100% 0%,rgba(20,194,174,.35),transparent 60%);border:1px solid rgba(255,255,255,.2);box-shadow:0 24px 44px -24px rgba(0,0,0,.6)}
+.qa{position:relative;z-index:2;margin:-44px 0 0;padding:14px 8px 12px;gap:4px;background:#fff;border-radius:26px;box-shadow:0 22px 40px -26px rgba(6,26,79,.55),0 1px 2px rgba(6,26,79,.06);border:1px solid var(--line)}
+.qa button{background:none!important;border:0!important;box-shadow:none!important;min-height:0;padding:4px 0;font-size:12.5px;font-weight:700}
+.qa i{width:52px;height:52px;border-radius:17px;color:#fff;background:linear-gradient(135deg,#1543E0,#2F6BFF);box-shadow:0 12px 22px -12px rgba(21,67,224,.85)}
+.qa i.t{background:linear-gradient(135deg,#0A9488,#14C2AE);box-shadow:0 12px 22px -12px rgba(10,148,136,.85);color:#fff}
+.qa i.n{background:linear-gradient(135deg,#4338CA,#6366F1);box-shadow:0 12px 22px -12px rgba(67,56,202,.85);color:#fff}
+.qa i.a{background:linear-gradient(135deg,#D97706,#F5B83D);box-shadow:0 12px 22px -12px rgba(217,119,6,.85);color:#fff}
+.sec h2{font-size:17px;font-weight:800;color:var(--navy);letter-spacing:-.01em}
+.sec button{font-weight:700;color:var(--blue);font-size:13.5px}
+.ph h1{color:var(--navy);font-weight:800}
+.sv-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:4px 2px;padding:14px 6px 10px;background:#fff;border:1px solid var(--line);border-radius:24px;box-shadow:var(--sh)}
+.sv{display:flex;flex-direction:column;align-items:center;gap:7px;padding:6px 2px 8px;border-radius:16px;text-align:center;transition:transform .15s,background .15s}
+.sv:active{transform:scale(.94);background:#F3F6FD}
+.sv b{font-size:11.8px;font-weight:700;line-height:1.25;color:var(--ink)}
+.sv i{width:48px;height:48px;border-radius:16px;display:flex;align-items:center;justify-content:center;color:#fff;background:linear-gradient(135deg,#1543E0,#2F6BFF);box-shadow:0 10px 20px -12px rgba(21,67,224,.85)}
+.sv i .ic{width:22px;height:22px}
+.sv.c-t i{background:linear-gradient(135deg,#0A9488,#14C2AE);box-shadow:0 10px 20px -12px rgba(10,148,136,.85)}
+.sv.c-n i{background:linear-gradient(135deg,#4338CA,#6366F1);box-shadow:0 10px 20px -12px rgba(67,56,202,.85)}
+.sv.c-a i{background:linear-gradient(135deg,#D97706,#F5B83D);box-shadow:0 10px 20px -12px rgba(217,119,6,.85)}
+.sv.c-g i{background:linear-gradient(135deg,#047857,#10B981);box-shadow:0 10px 20px -12px rgba(4,120,87,.85)}
+.sv.c-k i{background:linear-gradient(135deg,#061A4F,#0D2E8C);box-shadow:0 10px 20px -12px rgba(6,26,79,.85)}
+.sv[hidden],.sv-grp[hidden]{display:none!important}
+.sv-q{margin:4px 0 2px}
+.bz-si img{width:100%;height:100%;object-fit:cover;border-radius:15px}
+.bz-si{overflow:hidden}
+/* centre wallet button */
+#tabs{padding-top:8px}
+#tabs button:nth-child(3) span.b{width:60px;height:60px;border-radius:50%;margin-top:-30px;color:#fff;background:linear-gradient(135deg,#1543E0 0%,#0A9488 100%);border:4px solid #fff;box-shadow:0 16px 28px -12px rgba(21,67,224,.85)}
+#tabs button:nth-child(3) span.b .ic{width:26px;height:26px}
+#tabs button:nth-child(3).on span.b{background:linear-gradient(135deg,#061A4F,#1543E0);transform:translateY(-3px)}
+/* profile and cards */
+.pcard{border-radius:26px}
+.list,.card{border-color:var(--line)}
+.li .ico{border-radius:14px}
+.btn{border-radius:16px}

@@ -91,6 +91,7 @@
     ext: '<path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/>',
     warn: '<path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>',
     sort: '<line x1="4" y1="6" x2="14" y2="6"/><line x1="4" y1="12" x2="11" y2="12"/><line x1="4" y1="18" x2="8" y2="18"/><polyline points="17 8 20 5 23 8"/><line x1="20" y1="5" x2="20" y2="19"/>',
+    grid: '<rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/>',
     tag: '<path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"/><line x1="7" y1="7" x2="7.01" y2="7"/>'
   };
   function ic(n, st) { return '<svg class="ic" viewBox="0 0 24 24"' + (st ? ' style="' + st + '"' : '') + ' aria-hidden="true">' + (P[n] || '') + '</svg>'; }
@@ -1083,31 +1084,22 @@
   var T = {
     home: function () {
       var R = rcpts();
-      return '<div class="hello"><h1>' + hour() + (signedIn() ? ', @' + esc(me()) : '') + '</h1><p>' + (signedIn() ? 'Here is your Pi today.' : 'You are exploring. Sign in to send and receive Pi.') + '</p></div>' +
-        '<div class="hero" data-act="price" data-p="hero" role="button" tabindex="0" aria-label="Pi price details">' + heroHTML() + '</div>' +
+      return '<div class="band"><div class="hello"><h1>' + hour() + (signedIn() ? ', @' + esc(me()) : '') + '</h1><p>' + (signedIn() ? 'Here is your Pi today.' : 'You are exploring. Sign in to send and receive Pi.') + '</p></div>' +
+        '<div class="hero" data-act="price" data-p="hero" role="button" tabindex="0" aria-label="Pi price details">' + heroHTML() + '</div></div>' +
         '<div class="qa"><button type="button" data-act="send"><i>' + ic('send') + '</i>Send</button><button type="button" data-act="request"><i class="t">' + ic('req') + '</i>Request</button><button type="button" data-act="scan"><i class="n">' + ic('qr') + '</i>Scan</button><button type="button" data-act="receive"><i class="a">' + ic('card') + '</i>Receive</button></div>' +
-        dueHTML() + '<button type="button" class="vr-strip" data-act="verify"><span class="vr-si">' + ic('check') + '</span><span class="grow"><b>Verify receipt</b><small>Check any Pi receipt in seconds</small></span><span class="vr-go">Verify</span></button>' + hook('home') + '<div class="sec"><h2>Overview</h2></div><div class="card" data-p="month">' + monthHTML() + '</div>' +
+        dueHTML() + '<div class="sec"><h2>Services</h2><button type="button" data-tab="pay">All services</button></div>' + svcGrid(HOME_SVC.map(svcById), 'home') + hook('home') + '<div class="sec"><h2>Overview</h2></div><div class="card" data-p="month">' + monthHTML() + '</div>' +
         '<div class="sec"><h2>Recent activity</h2>' + (R.length ? '<button type="button" data-tab="activity">See all</button>' : '') + '</div>' +
         (pendingList().length ? '<div class="list" style="margin-bottom:10px">' + pendingList().slice(0, 3).map(pendRow).join('') + '</div>' : '') +
         (R.length ? '<div class="list">' + R.slice(0, 4).map(txRow).join('') + '</div>' : pendingList().length ? '' : '<div class="list"><div class="empty">' + ic('act') + '<div>No payments yet. Your receipts appear here.</div></div></div>') +
         trustHTML();
     },
     pay: function () {
-      var on = S.cfg.enabled, pl = contacts().map(function (c) { return c.to; }).concat(get('payees', [])).filter(function (p, i, L) { return (isG(p) || userSends()) && L.map(function (q) { return q.toLowerCase(); }).indexOf(p.toLowerCase()) === i; });
-      return '<div class="ph"><h1>Send &amp; receive</h1><p>Send, request and receive Pi, with a receipt for every payment.</p></div>' +
-        '<div class="tiles" style="margin-top:14px">' +
-        '<button type="button" class="tile" data-act="send"><i>' + ic('send') + '</i><b>Send Pi</b><small>' + (on ? (S.cfg.usernames ? 'To a @username or a wallet address' : 'To any Pi wallet address') : 'From your Pi Wallet to any address') + '</small></button>' +
-        '<button type="button" class="tile" data-act="request"><i class="t">' + ic('req') + '</i><b>Request Pi</b><small>A payment code with the amount</small></button>' +
-        '<button type="button" class="tile" data-act="scan"><i class="n">' + ic('qr') + '</i><b>Scan to pay</b><small>A payment code or wallet QR</small></button>' +
-        '<button type="button" class="tile" data-act="receive"><i class="a">' + ic('card') + '</i><b>Receive Pi</b><small>' + (on && S.cfg.usernames ? 'Your @username and wallet address' : 'Your wallet address and QR code') + '</small></button></div>' +
-        (pl.length ? '<div class="sec"><h2>Pay again</h2><button type="button" data-act="contacts">Contacts</button></div><div class="chips">' + pl.slice(0, 8).map(function (p) { return '<button type="button" class="chip" data-act="send-to" data-u="' + esc(p) + '">' + esc(cName(p) || toLabel(p)) + '</button>'; }).join('') + '</div>' : '') +
-        '<div class="sec"><h2>More ways to pay</h2></div><div class="tiles">' +
-        '<button type="button" class="tile" data-act="links"><i>' + ic('link') + '</i><b>Payment links</b><small>Share a link or QR to get paid</small></button>' +
-        '<button type="button" class="tile" data-act="split"><i class="t">' + ic('users') + '</i><b>Split a bill</b><small>Share a cost and request each part</small></button>' +
-        '<button type="button" class="tile" data-act="contacts"><i class="n">' + ic('user') + '</i><b>Contacts</b><small>People you pay often</small></button>' +
-        '<button type="button" class="tile" data-act="rems"><i class="a">' + ic('bell') + '</i><b>Reminders</b><small>Rent, fees and regular payments</small></button></div>' +
-        hook('pay') + '<div class="sec"><h2>Tools</h2></div>' +
-        '<div class="tiles"><button type="button" class="tile" data-act="get-rcpt"><i class="n">' + ic('rcpt') + '</i><b>Get a receipt</b><small>For any Pi payment, from its transaction ID</small></button><button type="button" class="tile" data-act="verify"><i class="a">' + ic('check') + '</i><b>Verify receipt</b><small>Scan, upload or enter any receipt</small></button></div>';
+      var pl = contacts().map(function (c) { return c.to; }).concat(get('payees', [])).filter(function (p, i, L) { return (isG(p) || userSends()) && L.map(function (q) { return q.toLowerCase(); }).indexOf(p.toLowerCase()) === i; });
+      return '<div class="ph"><h1>Services</h1><p>Payments, business, receipts and tools.</p></div>' +
+        '<div class="act-q sv-q">' + ic('search') + '<input class="in" id="sv-q" type="search" autocomplete="off" placeholder="Search services"></div>' +
+        (pl.length ? '<div class="sec sv-again"><h2>Pay again</h2><button type="button" data-act="contacts">Contacts</button></div><div class="chips sv-again">' + pl.slice(0, 8).map(function (p) { return '<button type="button" class="chip" data-act="send-to" data-u="' + esc(p) + '">' + esc(cName(p) || toLabel(p)) + '</button>'; }).join('') + '</div>' : '') +
+        SVC_G.map(function (g) { var L = SVC.filter(function (x) { return x.g === g[0]; }); return '<div class="sv-grp" data-g="' + g[0] + '"><div class="sec"><h2>' + g[1] + '</h2></div>' + svcGrid(L) + '</div>'; }).join('') +
+        '<div class="sv-none" hidden><div class="list"><div class="empty">' + ic('search') + '<div>No service found.</div></div></div></div>';
     },
     wallet: function () {
       var c = curr();
@@ -1132,11 +1124,10 @@
       var sup = get('supporter', false);
       return '<div class="pcard"><div class="avatar">' + esc(signedIn() ? me().charAt(0) : 'G') + '</div><div class="grow"><b>' + (signedIn() ? '@' + esc(me()) : 'Guest') + '</b><small>' + (get('name', '') ? esc(get('name', '')) + ' · ' : '') + NETN + '</small>' + (sup ? '<div class="badge">' + ic('star') + 'FinPi Supporter</div>' : '') + '</div></div>' +
         (!signedIn() ? '<button type="button" class="btn" data-act="signin" style="margin-top:14px"><span class="pi-dot">π</span>Sign in with Pi</button>' : '') +
-        hook('profile') + '<div class="sec"><h2>Settings</h2></div><div class="list">' +
+        '<div class="sec"><h2>Settings</h2></div><div class="list">' +
         row('edit', 'Name on receipts', get('name', '') || 'Not set', 'name') + row('globe', 'Currency', cname(curr()) + ' (' + curr() + ')', 'currency') +
         row('bell', 'Phone notifications', get('push', false) ? 'On' : 'Off', 'push') + row('pie', 'Monthly budget', get('budget', 0) ? fpi(get('budget', 0)) + ' π' : 'Not set', 'budget') + row('card', 'Wallet address', get('addr', '') ? short(get('addr', '')) : 'Not added', 'addr-set') + hook('settings') + '</div>' +
-        '<div class="sec"><h2>Tools</h2></div><div class="list">' + row('users', 'Contacts', contacts().length ? contacts().length + ' saved' : 'People you pay often', 'contacts') + row('bell', 'Payment reminders', rems().length ? rems().length + ' active' : 'Rent, fees and regular payments', 'rems') + row('act', 'Price alerts', alerts().filter(function (a) { return !a.hit; }).length ? alerts().filter(function (a) { return !a.hit; }).length + ' active' : 'Know when Pi reaches your price', 'alerts') + row('rcpt', 'Monthly statement', 'PDF of your payments', 'statement') + row('info', 'Welcome tour', 'See how FinPi works', 'tour') + '</div>' +
-        '<div class="sec"><h2>Support</h2></div><div class="list">' +
+        '<div class="sec"><h2>Support</h2></div><div class="list">' + row('info', 'Welcome tour', 'A quick look at FinPi', 'tour') +
         row('shield', 'Trust center', 'Payments, limits and records', 'security') + row('refresh', 'Repair app', 'Refresh FinPi and restore your data', 'repair') + row('act', 'Resolve a pending payment', 'Finishes or clears an unfinished payment', 'resolvepend') + row('heart', sup ? 'You are a Supporter' : 'Become a Supporter', sup ? 'Thank you!' : '1 π · badge only, no reward', 'supporter') +
         row('mail', 'Help & contact', SUPPORT, 'help') + '</div>' +
         '<div class="sec"><h2>Legal</h2></div><div class="list">' + lrow('Terms of Service', 'terms-of-service.html') + lrow('Privacy Policy', 'privacy-policy.html') + lrow('Risk Disclosure', 'risk-disclosure.html') + '</div>' +
@@ -1188,6 +1179,54 @@
       (F.length ? '<div class="two" style="margin-top:4px"><button type="button" class="btn" data-act="statement">' + ic('rcpt') + 'Statement PDF</button><button type="button" class="btn ghost" data-act="csv">' + ic('down') + 'Export CSV</button></div>' : '');
   }
   function actPaint() { var l = $('#act-l'); if (l) l.innerHTML = actList(); else render('activity'); }
+  /* ── services: one list, used by Home, the Services tab and search ── */
+  var SVC_G = [['pay', 'Payments'], ['get', 'Get paid'], ['biz', 'Business'], ['rec', 'Receipts & records'], ['plan', 'Planning'], ['wal', 'Wallet tools'], ['help', 'Help']];
+  var SVC = [
+    { id: 'send', n: 'Send Pi', s: 'To a @username or wallet address', i: 'send', c: 'b', g: 'pay', a: 'send' },
+    { id: 'request', n: 'Request Pi', s: 'Payment code with the amount', i: 'req', c: 't', g: 'pay', a: 'request' },
+    { id: 'scan', n: 'Scan to pay', s: 'Payment code or wallet QR', i: 'qr', c: 'n', g: 'pay', a: 'scan' },
+    { id: 'receive', n: 'Receive Pi', s: 'Your @username and address', i: 'card', c: 'a', g: 'pay', a: 'receive' },
+    { id: 'contacts', n: 'Contacts', s: 'People you pay often', i: 'user', c: 'b', g: 'pay', a: 'contacts' },
+    { id: 'links', n: 'Payment links', s: 'Share a link to get paid', i: 'link', c: 'b', g: 'get', a: 'links' },
+    { id: 'myqr', n: 'My Pi QR', s: 'Poster to print or share', i: 'qr', c: 't', g: 'get', a: 'myqr' },
+    { id: 'invoice', n: 'Invoices', s: 'Paid automatically on arrival', i: 'inv', c: 'n', g: 'get', a: 'invs' },
+    { id: 'split', n: 'Split a bill', s: 'Request each share', i: 'users', c: 'a', g: 'get', a: 'split' },
+    { id: 'biz', n: 'Dashboard', s: 'Sales and outstanding', i: 'bars', c: 'b', g: 'biz', a: 'biz' },
+    { id: 'newinv', n: 'New invoice', s: 'Items, tax and due date', i: 'plus', c: 'n', g: 'biz', a: 'inv-new' },
+    { id: 'cust', n: 'Customers', s: 'Who pays you', i: 'users', c: 't', g: 'biz', a: 'cust' },
+    { id: 'recur', n: 'Recurring', s: 'Weekly or monthly invoices', i: 'repeat', c: 'a', g: 'biz', a: 'recur' },
+    { id: 'reports', n: 'Reports', s: 'Sales and invoices CSV', i: 'down', c: 'b', g: 'biz', a: 'reports' },
+    { id: 'bizprof', n: 'Business profile', s: 'Name, logo, tax ID', i: 'store', c: 'n', g: 'biz', a: 'bizprof' },
+    { id: 'verify', n: 'Verify receipt', s: 'Scan, upload or enter', i: 'check', c: 'g', g: 'rec', a: 'verify' },
+    { id: 'getrcpt', n: 'Get a receipt', s: 'From a transaction ID', i: 'tag', c: 'b', g: 'rec', a: 'get-rcpt' },
+    { id: 'statement', n: 'Statement', s: 'Monthly PDF', i: 'rcpt', c: 'n', g: 'rec', a: 'statement' },
+    { id: 'activity', n: 'Activity', s: 'Any period, search, sort', i: 'act', c: 't', g: 'rec', tab: 'activity' },
+    { id: 'csv', n: 'Export CSV', s: 'Your payments as a file', i: 'down', c: 'a', g: 'rec', a: 'csv' },
+    { id: 'rems', n: 'Reminders', s: 'Rent, fees, regular payments', i: 'bell', c: 'a', g: 'plan', a: 'rems' },
+    { id: 'budget', n: 'Budget', s: 'Monthly spending limit', i: 'pie', c: 't', g: 'plan', a: 'budget' },
+    { id: 'insights', n: 'Insights', s: 'Where your Pi goes', i: 'bars', c: 'b', g: 'plan', a: 'insights' },
+    { id: 'alerts', n: 'Price alerts', s: 'When Pi reaches your price', i: 'act', c: 'n', g: 'plan', a: 'alerts' },
+    { id: 'wallet', n: 'Pi rate', s: 'Live rate and converter', i: 'conv', c: 'b', g: 'wal', tab: 'wallet' },
+    { id: 'checkaddr', n: 'Check address', s: 'Any Pi wallet address', i: 'search', c: 't', g: 'wal', a: 'check-addr' },
+    { id: 'addr', n: 'My address', s: 'Your Pi wallet address', i: 'card', c: 'n', g: 'wal', a: 'addr-set' },
+    { id: 'currency', n: 'Currency', s: 'Show values in your currency', i: 'globe', c: 'a', g: 'wal', a: 'currency' },
+    { id: 'trust', n: 'Trust center', s: 'Payments, limits, records', i: 'shield', c: 'b', g: 'help', a: 'security' },
+    { id: 'repair', n: 'Repair app', s: 'Refresh and restore data', i: 'refresh', c: 't', g: 'help', a: 'repair' },
+    { id: 'pending', n: 'Pending payment', s: 'Finish or clear it', i: 'undo', c: 'a', g: 'help', a: 'resolvepend' },
+    { id: 'help', n: 'Help & contact', s: 'We reply quickly', i: 'mail', c: 'n', g: 'help', a: 'help' }
+  ];
+  var HOME_SVC = ['verify', 'invoice', 'myqr', 'links', 'split', 'statement', 'biz', 'more'];
+  function svcById(id) { return id === 'more' ? { id: 'more', n: 'All services', i: 'grid', c: 'k', tab: 'pay' } : SVC.filter(function (x) { return x.id === id; })[0]; }
+  function svcGrid(L, kind) {
+    return '<div class="sv-grid' + (kind ? ' ' + kind : '') + '">' + L.filter(Boolean).map(function (x) {
+      return '<button type="button" class="sv c-' + x.c + '" ' + (x.tab ? 'data-tab="' + x.tab + '"' : 'data-act="' + x.a + '"') + ' data-k="' + esc((x.n + ' ' + (x.s || '') + ' ' + x.g).toLowerCase()) + '"><i>' + ic(x.i) + '</i><b>' + esc(x.n) + '</b></button>';
+    }).join('') + '</div>';
+  }
+  function svcFilter(q) {
+    q = String(q || '').trim().toLowerCase(); var any = false;
+    $$('#view .sv-grp').forEach(function (g) { var n = 0; $$('.sv', g).forEach(function (b) { var on = !q || b.dataset.k.indexOf(q) >= 0; b.hidden = !on; if (on) n++; }); g.hidden = !n; if (n) any = true; });
+    $$('#view .sv-again').forEach(function (e) { e.hidden = !!q; }); var no = $('#view .sv-none'); if (no) no.hidden = any;
+  }
   function trustChips() { return '<span>' + ic('check') + 'Verified on the Pi blockchain</span><span>' + ic('refresh') + (signedIn() ? 'Backed up to your Pi account' : 'Backup after sign-in') + '</span><span>' + ic('rcpt') + 'Receipt for every payment</span>'; }
   function trustHTML() { return '<div class="trust">' + trustChips() + '</div>'; }
   /* Repair app: clears temporary files and cached screens, checks saved data and restores history and business
@@ -1662,7 +1701,7 @@
       };
       var t = $('#ps-t', w); if (t) t.onclick = function () { addNote('bell', 'FinPi test', 'Notifications are working.', 'test-' + Date.now()); toast('Test sent'); };
     },
-    resolvepend: function () { window.fpResolvePending(); }, repair: function () { repairSheet(); },
+    resolvepend: function () { window.fpResolvePending(); }, insights: function () { S.seg = 'ins'; go('activity'); }, repair: function () { repairSheet(); },
     security: function () {
       sheet('Trust center', '<div class="trust big-t">' + trustChips() + '</div>' +
         '<div class="card" style="margin-top:12px"><h3>Payments</h3><p>Every transfer is processed through Pi Network’s official payments and delivered within seconds. If delivery is not possible, the Pi is refunded automatically. Each payment is checked on the Pi blockchain, so nothing is paid twice.</p></div>' +
@@ -1717,6 +1756,7 @@
   var qT = null;
   document.addEventListener('input', function (e) {
     var t = e.target; if (!t || !t.id) return;
+    if (t.id === 'sv-q') { svcFilter(t.value); return; }
     if (t.id === 'act-q') { clearTimeout(qT); qT = setTimeout(function () { S.q = t.value.slice(0, 80); S.page = 60; actPaint(); }, 160); }
     else if (t.id === 'act-f' || t.id === 'act-t') { S[t.id === 'act-f' ? 'from' : 'to'] = t.value; S.page = 60; actPaint(); }
   });
