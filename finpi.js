@@ -1726,24 +1726,34 @@
 
   /* ── welcome screens (first open) ── */
   var ONB = [
-    { t: 'Send and receive Pi', p: 'Pay any Pioneer by @username, Pi wallet address or QR code, with a verified receipt for every payment.', img: '<svg viewBox="0 0 320 220" aria-hidden="true"><defs><linearGradient id="ob1" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#1D4ED8"/><stop offset="1" stop-color="#0A1F55"/></linearGradient><linearGradient id="obg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#FCD34D"/><stop offset="1" stop-color="#F59E0B"/></linearGradient></defs><circle cx="160" cy="110" r="100" fill="#E8EEFC"/><rect x="40" y="52" width="92" height="140" rx="18" fill="url(#ob1)"/><rect x="50" y="68" width="72" height="54" rx="10" fill="#fff" opacity=".14"/><circle cx="86" cy="95" r="14" fill="#5EEAD4"/><rect x="58" y="134" width="56" height="8" rx="4" fill="#fff" opacity=".5"/><rect x="58" y="150" width="40" height="8" rx="4" fill="#fff" opacity=".3"/><rect x="188" y="52" width="92" height="140" rx="18" fill="#fff" stroke="#C7D5F5" stroke-width="3"/><circle cx="234" cy="95" r="14" fill="#1D4ED8" opacity=".85"/><rect x="206" y="134" width="56" height="8" rx="4" fill="#C7D5F5"/><rect x="206" y="150" width="40" height="8" rx="4" fill="#E2E8F0"/><path d="M136 96 C160 70 168 70 186 92" stroke="#0D9488" stroke-width="5" fill="none" stroke-linecap="round" stroke-dasharray="2 10"/><path d="M178 84 l10 9 -13 4" stroke="#0D9488" stroke-width="5" fill="none" stroke-linecap="round" stroke-linejoin="round"/><circle cx="160" cy="146" r="26" fill="url(#obg)"/><text x="160" y="157" text-anchor="middle" font-family="Georgia,serif" font-size="30" font-weight="700" fill="#7C2D12">π</text></svg>' },
-    { t: 'Your Pi in your currency', p: 'See the live value of Pi in your own currency, convert any amount and set price alerts.', img: '<svg viewBox="0 0 320 220" aria-hidden="true"><defs><linearGradient id="ob2" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#0D9488" stop-opacity=".35"/><stop offset="1" stop-color="#0D9488" stop-opacity="0"/></linearGradient></defs><circle cx="160" cy="110" r="100" fill="#E6F7F4"/><rect x="44" y="40" width="232" height="150" rx="22" fill="#fff" stroke="#CFE9E4" stroke-width="3"/><rect x="64" y="58" width="70" height="10" rx="5" fill="#CBD5E1"/><rect x="64" y="76" width="110" height="18" rx="9" fill="#0A1F55"/><path d="M64 160 L100 140 L130 148 L160 118 L190 128 L222 96 L256 104 L256 172 L64 172 Z" fill="url(#ob2)"/><path d="M64 160 L100 140 L130 148 L160 118 L190 128 L222 96 L256 104" stroke="#0D9488" stroke-width="5" fill="none" stroke-linecap="round" stroke-linejoin="round"/><circle cx="222" cy="96" r="8" fill="#fff" stroke="#0D9488" stroke-width="4"/><g font-family="Poppins,Arial,sans-serif" font-weight="700" font-size="20" text-anchor="middle"><circle cx="52" cy="54" r="22" fill="#1D4ED8"/><text x="52" y="61" fill="#fff">$</text><circle cx="272" cy="168" r="22" fill="#0A1F55"/><text x="272" y="175" fill="#fff">₦</text><circle cx="282" cy="48" r="18" fill="#F59E0B"/><text x="282" y="55" fill="#fff" font-size="17">€</text></g></svg>' },
-    { t: 'Receipts anyone can verify', p: 'Every payment gets a professional receipt to share or download, checked on the Pi blockchain.', img: '<svg viewBox="0 0 320 220" aria-hidden="true"><circle cx="160" cy="110" r="100" fill="#EEF0FF"/><path d="M98 30 h124 v170 l-15 -10 -15 10 -16 -10 -15 10 -16 -10 -15 10 -16 -10 -16 10z" fill="#fff" stroke="#C7CBF5" stroke-width="3" stroke-linejoin="round"/><rect x="98" y="30" width="124" height="44" fill="#0A1F55"/><rect x="114" y="46" width="50" height="12" rx="6" fill="#fff" opacity=".85"/><rect x="114" y="90" width="92" height="16" rx="8" fill="#0B1B33"/><rect x="114" y="116" width="62" height="8" rx="4" fill="#CBD5E1"/><rect x="114" y="132" width="78" height="8" rx="4" fill="#E2E8F0"/><g fill="#0A1F55"><rect x="168" y="150" width="10" height="10"/><rect x="182" y="150" width="10" height="10"/><rect x="196" y="150" width="10" height="10"/><rect x="168" y="164" width="10" height="10"/><rect x="196" y="164" width="10" height="10"/><rect x="182" y="178" width="10" height="6"/></g><circle cx="236" cy="66" r="30" fill="#0F766E"/><path d="M222 66 l10 10 18 -20" stroke="#fff" stroke-width="7" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>' }
+    { t: 'Welcome to FinPi', p: 'Live Pi rate in your currency and a verified receipt for every payment', img: 'icons/onb-1.webp' },
+    { t: 'Send and receive Pi', p: 'Pay any Pioneer by @username or Pi wallet address', img: 'icons/onb-2.webp' },
+    { t: 'Scan to pay', p: 'Scan a FinPi QR code to pay a merchant or a friend', img: 'icons/onb-3.webp' },
+    { t: 'Run your business', p: 'Quick sale, invoices, products and business reports', img: 'icons/onb-4.webp' },
+    { t: 'Verify any receipt', p: 'Check any receipt against the Pi blockchain in seconds', img: 'icons/onb-5.webp' }
   ];
+  ONB.forEach(function (s0) { var im = new Image(); im.src = s0.img; });
   function onboarding(force) {
     if (!force && get('onb', false)) return;
     var i = 0, o = document.createElement('div'); o.id = 'onb'; o.setAttribute('role', 'dialog'); o.setAttribute('aria-modal', 'true'); o.setAttribute('aria-label', 'Welcome to FinPi');
-    function draw() {
-      var s = ONB[i], last = i === ONB.length - 1;
+    function draw(dir) {
+      var s0 = ONB[i], last = i === ONB.length - 1;
       o.innerHTML = '<div class="onb-top"><div class="brand"><img src="icons/logo-256.png" alt="">FinPi</div>' + (last ? '' : '<button type="button" class="onb-skip" data-o="skip">Skip</button>') + '</div>' +
-        '<div class="onb-img">' + s.img + '</div><div class="onb-txt"><h2>' + esc(s.t) + '</h2><p>' + esc(s.p) + '</p></div>' +
+        '<div class="onb-art ' + (dir || '') + '"><img src="' + s0.img + '" alt=""></div>' +
+        '<div class="onb-panel"><div class="onb-txt ' + (dir || '') + '"><h2>' + esc(s0.t) + '</h2><p>' + esc(s0.p) + '</p></div>' +
         '<div class="onb-dots">' + ONB.map(function (x, k) { return '<i class="' + (k === i ? 'on' : '') + '"></i>'; }).join('') + '</div>' +
-        '<div class="onb-b"><button type="button" class="btn" data-o="next">' + (last ? 'Get started' : 'Next') + '</button></div>';
+        '<div class="onb-b">' + (last ? '<button type="button" class="btn" data-o="signin"><span class="pi-dot">π</span>Sign in with Pi</button><button type="button" class="onb-ex" data-o="explore">Explore without signing in</button>' : '<button type="button" class="btn" data-o="next">Continue</button>') + '</div></div>';
     }
-    function end() { put('onb', true); o.remove(); }
-    o.addEventListener('click', function (e) { var b = e.target.closest('[data-o]'); if (!b) return; if (b.dataset.o === 'skip' || i === ONB.length - 1) return end(); i++; draw(); });
+    function end() { put('onb', true); o.classList.add('out'); setTimeout(function () { o.remove(); }, 260); }
+    o.addEventListener('click', function (e) {
+      var b = e.target.closest('[data-o]'); if (!b) return; var k = b.dataset.o;
+      if (k === 'skip') return end();
+      if (k === 'signin') { end(); if (!$('#app').hidden) return; var si = $('#signin'); if (si) si.click(); return; }
+      if (k === 'explore') { end(); if (!$('#app').hidden) return; var ex = $('#explore'); if (ex) ex.click(); return; }
+      if (i < ONB.length - 1) { i++; draw('fwd'); }
+    });
     var sx = null; o.addEventListener('touchstart', function (e) { sx = e.touches[0].clientX; }, { passive: true });
-    o.addEventListener('touchend', function (e) { if (sx === null) return; var dx = e.changedTouches[0].clientX - sx; sx = null; if (Math.abs(dx) < 50) return; if (dx < 0 && i < ONB.length - 1) i++; else if (dx > 0 && i > 0) i--; else return; draw(); });
+    o.addEventListener('touchend', function (e) { if (sx === null) return; var dx = e.changedTouches[0].clientX - sx; sx = null; if (Math.abs(dx) < 50) return; if (dx < 0 && i < ONB.length - 1) { i++; draw('fwd'); } else if (dx > 0 && i > 0) { i--; draw('back'); } });
     draw(); document.body.appendChild(o);
   }
 
