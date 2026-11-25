@@ -639,11 +639,95 @@
     }
 
     /* ── reports ── */
+    /* ── business report: one A4 page with sales, invoices, products, customers and a document ID ── */
+    var PLAB = { month: 'This month', last: 'Last month', '30d': 'Last 30 days', all: 'All time' };
+    function perRg(per) { var n = Date.now(); if (per === 'all') return [0, n + 1]; if (per === '30d') return [day0() - 29 * 864e5, n + 1]; var d = new Date(day0()); d.setDate(1); if (per === 'last') { var e = d.getTime(); d.setMonth(d.getMonth() - 1); return [d.getTime(), e]; } return [d.getTime(), n + 1]; }
+    function perName(per) { var r = perRg(per); if (per === 'month' || per === 'last') return new Date(r[0]).toLocaleDateString('en-GB', { month: 'long', year: 'numeric' }); if (per === 'all') return 'All time'; return dstr(r[0]) + ' – ' + dstr(Date.now()); }
+    function repData(per) {
+      var r = perRg(per), S = sales().filter(function (x) { return x.ts >= r[0] && x.ts < r[1]; }), tot = sum(S);
+      var V = invs().filter(function (v) { return !v.void && v.ts >= r[0] && v.ts < r[1]; });
+      var paid = V.filter(function (v) { return status(v) === 'Paid'; }), open = invs().filter(function (v) { return /Unpaid|Part paid|Overdue/.test(status(v)); }), od = open.filter(function (v) { return status(v) === 'Overdue'; });
+      var items = {}; invs().forEach(function (v) { if (status(v) === 'Paid' && (v.pts || v.ts) >= r[0] && (v.pts || v.ts) < r[1]) v.items.forEach(function (it) { var k = it.d.trim(); items[k] = items[k] || [0, 0]; items[k][0] += r7(it.q * it.p); items[k][1] += Number(it.q); }); });
+      var TI = Object.keys(items).map(function (k) { return [k, r7(items[k][0]), items[k][1]]; }).sort(function (a, b) { return b[1] - a[1]; }).slice(0, 6);
+      var cu = {}, cn = {}; S.forEach(function (x) { var k = payer(x) || '—'; cu[k] = r7((cu[k] || 0) + Number(x.amount)); cn[k] = (cn[k] || 0) + 1; });
+      var TC = Object.keys(cu).map(function (k) { return [K.isG(k) ? K.short(k) : who(k), cu[k], cn[k]]; }).sort(function (a, b) { return b[1] - a[1]; }).slice(0, 6);
+      // chart: days (or months for all time)
+      var B = [], L = [];
+      if (per === 'all') { var d0 = new Date(day0()); d0.setDate(1); d0.setMonth(d0.getMonth() - 11); for (var m = 0; m < 12; m++) { var a = new Date(d0); a.setMonth(a.getMonth() + m); var e = new Date(a); e.setMonth(e.getMonth() + 1); B.push(sum(S.filter(function (x) { return x.ts >= a.getTime() && x.ts < e.getTime(); }))); L.push(a.toLocaleDateString('en-GB', { month: 'short' })); } }
+      else { var end = Math.min(r[1], Date.now()), n = Math.max(1, Math.round((day0(end) - r[0]) / 864e5) + 1); for (var i = 0; i < n; i++) { var t = r[0] + i * 864e5; B.push(sum(S.filter(function (x) { return day0(x.ts) === day0(t + 3600e3); }))); L.push(String(new Date(t + 3600e3).getDate())); } }
+      return { S: S, tot: tot, V: V, paid: paid, open: open, od: od, TI: TI, TC: TC, B: B, L: L, out: r7(open.reduce(function (a, v) { return a + balance(v); }, 0)) };
+    }
+    function docIdOf(str) {
+      try { return crypto.subtle.digest('SHA-256', new TextEncoder().encode(str)).then(function (b) { var u = new Uint8Array(b), A = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789', c = ''; for (var k = 0; k < 10; k++) c += A[u[k] % 32]; return 'FPR-' + c.slice(0, 5) + '-' + c.slice(5); }).catch(function () { return ''; }); } catch (e) { return Promise.resolve(''); }
+    }
+    function reportCanvas(per) {
+      var b = biz(), D = repData(per), FR = window.FPReceipt || {}, me = K.myTarget();
+      var src = ['finpi-report', K.NETN, me, per, perName(per), D.tot, D.S.length].concat(D.S.map(function (x) { return (x.txid || x.pid) + '|' + x.amount; })).join('\n');
+      return Promise.all([loadImg(b.logo || 'icons/icon-512.png'), docIdOf(src)]).then(function (res) {
+        var logo = res[0], DOC = res[1], W = 1240, H = 1754, X = 80, cv = document.createElement('canvas'); cv.width = W; cv.height = H; var x = cv.getContext('2d');
+        x.fillStyle = '#FFFFFF'; x.fillRect(0, 0, W, H);
+        if (FR.guilloche) { FR.guilloche(x, 0, 300, W, H - 300, '#1D4ED8', .035); FR.rosette(x, W / 2, 980, 340, '#0D9488', .04); }
+        var g = x.createLinearGradient(0, 0, W, 300); g.addColorStop(0, '#061A4F'); g.addColorStop(.6, '#1543E0'); g.addColorStop(1, '#0A9488'); x.fillStyle = g; x.fillRect(0, 0, W, 290);
+        if (FR.guilloche) FR.guilloche(x, 0, 0, W, 290, '#FFFFFF', .1);
+        if (logo) { x.save(); rr(x, X, 64, 112, 112, 26); x.clip(); x.fillStyle = '#fff'; x.fillRect(X, 64, 112, 112); x.drawImage(logo, X, 64, 112, 112); x.restore(); }
+        x.font = '700 42px ' + FONT; T(x, fit(x, bizName(), 600), X + 140, 116, '700 42px ' + FONT, '#FFFFFF');
+        x.font = '500 23px ' + FONT; T(x, fit(x, [b.addr, b.tax ? 'Tax ID ' + b.tax : ''].filter(Boolean).join(' · ') || (me ? (K.isG(me) ? K.short(me) : '@' + me) : ''), 600), X + 140, 156, '500 23px ' + FONT, 'rgba(255,255,255,.85)');
+        T(x, 'BUSINESS REPORT', W - X, 100, '700 22px ' + FONT, '#99F6E4', 'right');
+        T(x, perName(per), W - X, 148, '800 38px ' + FONT, '#FFFFFF', 'right');
+        T(x, 'Generated ' + dstr(Date.now()) + ' · ' + K.NETN, W - X, 186, '500 20px ' + FONT, 'rgba(255,255,255,.8)', 'right');
+        // KPI cards
+        var avg = D.S.length ? Math.round(D.tot / D.S.length * 100) / 100 : 0, cw = (W - 2 * X - 3 * 20) / 4, y = 330;
+        [['SALES', fpi(D.tot) + ' π', conv(D.tot), '#0B2A6F'], ['PAYMENTS', String(D.S.length), D.S.length ? 'received' : '', '#0B1B33'], ['AVERAGE SALE', fpi(avg) + ' π', conv(avg), '#0B1B33'], ['OUTSTANDING', fpi(D.out) + ' π', D.open.length + ' open' + (D.od.length ? ' · ' + D.od.length + ' overdue' : ''), D.od.length ? '#B42318' : '#0B1B33']].forEach(function (k, i) {
+          var cx = X + i * (cw + 20); x.fillStyle = i === 0 ? '#EEF3FF' : '#F5F7FB'; rr(x, cx, y, cw, 150, 20); x.fill(); x.strokeStyle = i === 0 ? 'rgba(21,67,224,.3)' : '#E2E8F0'; x.lineWidth = 2; x.stroke();
+          T(x, k[0], cx + 22, y + 40, '700 17px ' + FONT, '#64748B'); x.font = '800 32px ' + MONO; T(x, fit(x, k[1], cw - 40), cx + 22, y + 88, '800 32px ' + MONO, k[3]);
+          if (k[2]) { x.font = '500 16px ' + FONT; T(x, fit(x, k[2], cw - 40), cx + 22, y + 124, '500 16px ' + FONT, '#64748B'); }
+        });
+        // chart
+        y = 530; T(x, per === 'all' ? 'SALES BY MONTH (π)' : 'SALES BY DAY (π)', X, y, '700 19px ' + FONT, '#64748B');
+        var ch = 230, cy = y + 24, mx = Math.max.apply(null, D.B.concat([0])), bw = (W - 2 * X) / Math.max(1, D.B.length);
+        x.strokeStyle = '#E2E8F0'; x.lineWidth = 1.5; [0, .5, 1].forEach(function (f) { var yy = cy + ch - ch * f; x.beginPath(); x.moveTo(X, yy); x.lineTo(W - X, yy); x.stroke(); });
+        if (mx) T(x, fpi(r7(mx)), X, cy + 14, '600 15px ' + MONO, '#94A3B8');
+        D.B.forEach(function (v, i) { var h = mx ? Math.max(v ? 4 : 0, v / mx * (ch - 10)) : 0; if (!h) return; var gg = x.createLinearGradient(0, cy + ch - h, 0, cy + ch); gg.addColorStop(0, '#14B8A6'); gg.addColorStop(1, '#1543E0'); x.fillStyle = gg; rr(x, X + i * bw + bw * .18, cy + ch - h, Math.max(2, bw * .64), h, Math.min(6, bw * .3)); x.fill(); });
+        var step = Math.ceil(D.L.length / 16); D.L.forEach(function (l, i) { if (i % step === 0 || i === D.L.length - 1) T(x, l, X + i * bw + bw / 2, cy + ch + 26, '500 15px ' + FONT, '#64748B', 'center'); });
+        if (!mx) T(x, 'No sales in this period', W / 2, cy + ch / 2, '600 22px ' + FONT, '#94A3B8', 'center');
+        // tables
+        y = 860; var colW = (W - 2 * X - 40) / 2;
+        function table(cx, title, head, rows, empty) {
+          T(x, title, cx, y, '700 19px ' + FONT, '#64748B');
+          x.fillStyle = '#F1F5FB'; rr(x, cx, y + 18, colW, 48, 12); x.fill();
+          T(x, head[0], cx + 16, y + 50, '700 17px ' + FONT, '#334155'); T(x, head[1], cx + colW - 150, y + 50, '700 17px ' + FONT, '#334155', 'right'); T(x, head[2], cx + colW - 16, y + 50, '700 17px ' + FONT, '#334155', 'right');
+          if (!rows.length) { T(x, empty, cx + 16, y + 110, '500 18px ' + FONT, '#94A3B8'); return; }
+          rows.forEach(function (rw, i) { var yy = y + 108 + i * 52; x.font = '600 19px ' + FONT; T(x, fit(x, rw[0], colW - 230), cx + 16, yy, '600 19px ' + FONT, '#0B1B33'); T(x, fpi(rw[2]), cx + colW - 150, yy, '500 18px ' + MONO, '#334155', 'right'); T(x, fpi(rw[1]) + ' π', cx + colW - 16, yy, '700 18px ' + MONO, '#0B2A6F', 'right'); x.fillStyle = '#EEF2F7'; x.fillRect(cx, yy + 18, colW, 1.5); });
+        }
+        table(X, 'TOP PRODUCTS AND SERVICES', ['Item', 'Qty', 'Amount'], D.TI, 'Items appear when invoices and sales are paid');
+        table(X + colW + 40, 'TOP CUSTOMERS', ['Customer', 'Payments', 'Amount'], D.TC, 'No payments received in this period');
+        // invoices summary
+        y = 1270; T(x, 'INVOICES AND SALES', X, y, '700 19px ' + FONT, '#64748B');
+        var iv = [['Issued', D.V.length, r7(D.V.reduce(function (a, v) { return a + v.total; }, 0))], ['Paid', D.paid.length, r7(D.paid.reduce(function (a, v) { return a + v.total; }, 0))], ['Open now', D.open.length, D.out], ['Overdue now', D.od.length, r7(D.od.reduce(function (a, v) { return a + balance(v); }, 0))]];
+        iv.forEach(function (k, i) { var cx = X + i * (cw + 20); x.fillStyle = '#F5F7FB'; rr(x, cx, y + 20, cw, 110, 18); x.fill(); T(x, k[0], cx + 20, y + 56, '600 18px ' + FONT, '#64748B'); T(x, String(k[1]), cx + 20, y + 104, '800 30px ' + MONO, i === 3 && k[1] ? '#B42318' : '#0B1B33'); x.font = '600 19px ' + MONO; T(x, fit(x, fpi(k[2]) + ' π', cw - 90), cx + cw - 20, y + 104, '600 19px ' + MONO, '#334155', 'right'); });
+        // footer
+        x.fillStyle = '#E2E8F0'; x.fillRect(X, H - 150, W - 2 * X, 2);
+        T(x, 'Values in Pi. Local values are at today’s rate. Each payment can be checked on the Pi blockchain with its transaction ID.', X, H - 112, '500 17px ' + FONT, '#64748B');
+        T(x, 'Created with FinPi · finpi.pi', X, H - 80, '500 17px ' + FONT, '#94A3B8');
+        if (DOC) T(x, 'Document ID ' + DOC, W - X, H - 80, '700 17px ' + MONO, '#0B2A6F', 'right');
+        if (FR.watermark) { FR.watermark(x, 0, 300, W, H - 460, 'FINPI BUSINESS REPORT · ' + bizName() + ' · ' + perName(per) + (DOC ? ' · ' + DOC : ''), .035); FR.microline(x, 'FINPI•BUSINESS REPORT•' + bizName().toUpperCase() + '•' + perName(per).toUpperCase() + '•' + (DOC || '') + '•', X, H - 40, W - 2 * X); }
+        return cv;
+      });
+    }
+    function reportSheet(per) {
+      per = per || 'month';
+      var w = sheet('Business report', '<div class="chips" id="br-p">' + Object.keys(PLAB).map(function (k) { return '<button type="button" class="chip' + (k === per ? ' on' : '') + '" data-bp2="' + k + '">' + PLAB[k] + '</button>'; }).join('') + '</div>' +
+        '<div class="bz-prev">Preparing report…</div>' + fileBtns(''));
+      $$('[data-bp2]', w).forEach(function (q) { q.onclick = function () { reportSheet(q.dataset.bp2); }; });
+      var nm = perName(per).replace(/[^A-Za-z0-9]+/g, '-').replace(/^-|-$/g, '');
+      fileActions(w, function () { return reportCanvas(per); }, 'FinPi-business-report-' + nm, 'business report', 'FinPi business report ' + perName(per), function () { return bizName() + ' · business report · ' + perName(per); });
+    }
+
     function repSheet() {
       var per = 'month';
       var w = sheet('Business reports', '<label class="l">Period</label><div class="chips" id="rp-p">' + [['month', 'This month'], ['last', 'Last month'], ['30d', 'Last 30 days'], ['all', 'All time']].map(function (x) { return '<button type="button" class="chip' + (x[0] === per ? ' on' : '') + '" data-rp="' + x[0] + '">' + x[1] + '</button>'; }).join('') + '</div>' +
         '<div class="card" id="rp-s"></div>' +
-        '<div class="list" style="margin-top:12px">' + row('down', 'Sales report (CSV)', 'Every payment received, with values', 'x', ' data-xr="sales"') + row('inv', 'Invoices report (CSV)', 'Numbers, customers, status and balances', 'x', ' data-xr="inv"') + row('rcpt', 'Monthly statement (PDF)', 'All payments for a month', 'x', ' data-xr="st"') + '</div>');
+        '<div class="list" style="margin-top:12px">' + row('bars', 'Business report (PDF)', 'Sales, invoices, products and customers on one page', 'x', ' data-xr="pdf"') + row('down', 'Sales report (CSV)', 'Every payment received, with values', 'x', ' data-xr="sales"') + row('inv', 'Invoices report (CSV)', 'Numbers, customers, status and balances', 'x', ' data-xr="inv"') + row('rcpt', 'Monthly statement (PDF)', 'All payments for a month', 'x', ' data-xr="st"') + '</div>');
       function rg() { var n = Date.now(); if (per === 'all') return [0, n + 1, 'all']; if (per === '30d') return [day0() - 29 * 864e5, n + 1, 'last-30-days']; var d = new Date(day0()); d.setDate(1); if (per === 'last') { var e = d.getTime(); d.setMonth(d.getMonth() - 1); return [d.getTime(), e, d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0')]; } return [d.getTime(), n + 1, d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0')]; }
       function info() { var r = rg(), S = sales().filter(function (x) { return x.ts >= r[0] && x.ts < r[1]; }), V = invs().filter(function (v) { return v.ts >= r[0] && v.ts < r[1]; }); $('#rp-s', w).innerHTML = '<div class="stats" style="margin-top:0"><div><small>Sales</small><b class="bz-amt">' + fpi(sum(S)) + ' π</b></div><div><small>Payments</small><b>' + S.length + '</b></div><div><small>Invoices</small><b>' + V.length + '</b></div></div>'; }
       $$('[data-rp]', w).forEach(function (b) { b.onclick = function () { per = b.dataset.rp; $$('[data-rp]', w).forEach(function (x) { x.classList.toggle('on', x === b); }); info(); }; });
@@ -653,6 +737,7 @@
         b.onclick = function () {
           var r = rg(), k = b.dataset.xr;
           if (k === 'st') return K.A.statement();
+          if (k === 'pdf') return reportSheet(per);
           if (k === 'sales') {
             var S = sales().filter(function (x) { return x.ts >= r[0] && x.ts < r[1]; }).sort(function (a, c) { return a.ts - c.ts; });
             if (!S.length) return toast('No sales in this period');
@@ -686,7 +771,7 @@
     };
     K.HK.html.settings = function () { return row('store', 'Business profile', biz().name ? K.NTYPE[K.nType() === 'name' ? 'business' : K.nType()].l + ' · ' + biz().name : 'Name, logo, address, tax ID', 'bizprof') + row('sound', 'Payment sounds', get('sound', true) ? 'On · sound and vibration' : 'Off', 'sound') + row(get('hide', false) ? 'eyeoff' : 'eye', 'Hide amounts', get('hide', false) ? 'On' : 'Off', 'hide'); };
     Object.assign(K.A, {
-      biz: function () { bizSheet(); }, sale: function () { saleSheet(); }, prods: function () { prodSheet(); }, 'inv-new': function () { invEdit(''); }, invs: function () { invList(); }, cust: function () { custSheet(); }, recur: recSheet, myqr: qrSheet, bizprof: profSheet, reports: repSheet,
+      biz: function () { bizSheet(); }, bizreport: function () { reportSheet(); }, sale: function () { saleSheet(); }, prods: function () { prodSheet(); }, 'inv-new': function () { invEdit(''); }, invs: function () { invList(); }, cust: function () { custSheet(); }, recur: recSheet, myqr: qrSheet, bizprof: profSheet, reports: repSheet,
       hide: toggleHide,
       sound: function () { put('sound', !get('sound', true)); if (get('sound', true)) { ac(); fx('in'); } toast(get('sound', true) ? 'Payment sounds on' : 'Payment sounds off'); K.rerender(); }
     });

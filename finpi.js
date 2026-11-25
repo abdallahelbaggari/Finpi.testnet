@@ -1253,6 +1253,7 @@
     { id: 'newinv', n: 'New invoice', s: 'Items, tax and due date', i: 'plus', c: 'n', g: 'biz', a: 'inv-new' },
     { id: 'cust', n: 'Customers', s: 'Who pays you', i: 'users', c: 't', g: 'biz', a: 'cust' },
     { id: 'recur', n: 'Recurring', s: 'Weekly or monthly invoices', i: 'repeat', c: 'a', g: 'biz', a: 'recur' },
+    { id: 'bizreport', n: 'Business report', s: 'One-page PDF for any period', i: 'bars', c: 'n', g: 'biz', a: 'bizreport' },
     { id: 'reports', n: 'Reports', s: 'Sales and invoices CSV', i: 'down', c: 'b', g: 'biz', a: 'reports' },
     { id: 'bizprof', n: 'Business profile', s: 'Name, logo, tax ID, store, shop', i: 'store', c: 'n', g: 'biz', a: 'bizprof' },
     { id: 'rname', n: 'Name on receipts', s: 'Name, business, store or shop', i: 'edit', c: 'k', g: 'biz', a: 'name' },
