@@ -78,6 +78,7 @@
         put0('inv', byId(loc.inv, srv.inv)); put0('cust', byId(loc.cust, srv.cust)); put0('recur', byId(loc.recur, srv.recur));
         put0('invSeq', Math.max(loc.invSeq || 0, srv.invSeq || 0)); if (srv.biz) put0('biz', srv.biz); if (srv.qrO) put0('qrO', srv.qrO); put0('prod', byId(loc.prod, srv.prod)); if (srv.name && !loc.name) { put0('name', srv.name); put0('nameType', srv.nameType || 'name'); }
         put0('bizTs', d.ts); put0('bizUp', d.ts); matchAll(); K.rerender();
+        if (!bHas(loc)) K.addNote('refresh', 'Business records restored', (srv.inv || []).length + ' invoices, ' + (srv.cust || []).length + ' customers and ' + (srv.prod || []).length + ' products restored from your backup.', 'brs-' + d.ts);
         if (extra) bDirty();
       }).catch(function () {});
     }
@@ -104,12 +105,13 @@
     }
     function fx(kind) {
       if (!get('sound', true)) return;
-      try { if (navigator.vibrate) navigator.vibrate(kind === 'in' ? [60, 50, 90] : kind === 'paid' ? [50, 40, 50, 40, 120] : kind === 'err' ? [200] : [40]); } catch (e) {}
+      try { if (navigator.vibrate && kind !== 'scan') navigator.vibrate(kind === 'in' ? [60, 50, 90] : kind === 'paid' ? [50, 40, 50, 40, 120] : kind === 'err' ? [200] : [40]); } catch (e) {}
       var c = ac(); if (!c) return; var t = c.currentTime + 0.02;
       try {
         if (kind === 'in') { tone(c, 880, t, 0.22, 0.22); tone(c, 1318.5, t + 0.12, 0.42, 0.2); }
         else if (kind === 'paid') { tone(c, 784, t, 0.18, 0.2); tone(c, 988, t + 0.1, 0.2, 0.2); tone(c, 1568, t + 0.2, 0.5, 0.18); }
         else if (kind === 'err') { tone(c, 220, t, 0.3, 0.15, 'triangle'); }
+        else if (kind === 'scan') { tone(c, 1320, t, 0.09, 0.16); tone(c, 1760, t + 0.07, 0.12, 0.12); }
         else { tone(c, 660, t, 0.16, 0.16); tone(c, 990, t + 0.08, 0.3, 0.14); }
       } catch (e) {}
     }
@@ -181,6 +183,10 @@
           K.addNote('inv', 'Invoice ready to send', v.no + ' · ' + (x.tpl.cname || who(x.tpl.cto)) + ' · ' + fpi(v.total) + ' π', 'rec-' + v.id); }
       });
       if (ch) { put('recur', R); K.rerender(); }
+      // overdue invoices: one notification each
+      var L = invs(), od = false;
+      L.forEach(function (v) { if (!v.odn && status(v) === 'Overdue') { v.odn = 1; od = true; K.addNote('warn', 'Invoice overdue', v.no + ' · ' + (v.cname || who(v.cto)) + ' · ' + fpi(balance(v)) + ' π due since ' + dstr(v.due), 'od-' + v.id); } });
+      if (od) saveInvs(L);
     }
 
     /* ── shared bits ── */
@@ -332,7 +338,7 @@
         '<label class="l">Shown as</label><div class="chips" id="bp-ty">' + ['business', 'store', 'shop'].map(function (k) { return '<button type="button" class="chip' + (k === bt ? ' on' : '') + '" data-bt="' + k + '">' + K.NTYPE[k].l + '</button>'; }).join('') + '</div>' +
         '<label class="l" for="bp-n" id="bp-nl">' + K.NTYPE[bt].l + '</label><input class="in" id="bp-n" maxlength="60" value="' + esc(b.name || '') + '" placeholder="' + esc(K.NTYPE[bt].p) + '">' +
         '<label class="l" for="bp-a">Address</label><input class="in" id="bp-a" maxlength="120" value="' + esc(b.addr || '') + '" placeholder="Street, city">' +
-        '<label class="l" for="bp-t">Tax ID / registration no. (optional)</label><input class="in" id="bp-t" maxlength="40" value="' + esc(b.tax || '') + '" placeholder="e.g. RC 1234567">' +
+        '<label class="l" for="bp-t">Tax ID / registration no. (optional)</label><input class="in" id="bp-t" maxlength="40" value="' + esc(b.tax || '') + '" placeholder="e.g. 12-3456789">' +
         '<div class="two bz-two"><div><label class="l" for="bp-p">Phone</label><input class="in" id="bp-p" maxlength="30" inputmode="tel" value="' + esc(b.phone || '') + '"></div><div><label class="l" for="bp-e">Email</label><input class="in" id="bp-e" maxlength="60" inputmode="email" value="' + esc(b.email || '') + '"></div></div>' +
         '<label class="l" for="bp-m">Invoice note (optional)</label><input class="in" id="bp-m" maxlength="120" value="' + esc(b.terms || '') + '" placeholder="e.g. Thank you for your business">' +
         '<button type="button" class="btn" id="bp-go">' + ic('check') + 'Save</button>');

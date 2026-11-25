@@ -92,6 +92,7 @@
     warn: '<path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>',
     sort: '<line x1="4" y1="6" x2="14" y2="6"/><line x1="4" y1="12" x2="11" y2="12"/><line x1="4" y1="18" x2="8" y2="18"/><polyline points="17 8 20 5 23 8"/><line x1="20" y1="5" x2="20" y2="19"/>',
     grid: '<rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/>',
+    zap: '<polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/>',
     tag: '<path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"/><line x1="7" y1="7" x2="7.01" y2="7"/>'
   };
   function ic(n, st) { return '<svg class="ic" viewBox="0 0 24 24"' + (st ? ' style="' + st + '"' : '') + ' aria-hidden="true">' + (P[n] || '') + '</svg>'; }
@@ -424,7 +425,18 @@
     $('#av').textContent = signedIn() ? me().charAt(0) : 'G';
     $('#netb').hidden = !TEST; bellDot(); render(S.tab);
   }
-  function afterSignIn() { HK.signin.forEach(function (f) { try { f(); } catch (e) {} }); register(); historySync(); loadCfg().then(function () { sync(); if (pendingCode) { var c = pendingCode; pendingCode = null; openCode(c); } }); }
+  function askPush() {
+    if (get('pushAsk', false) || get('push', false) || !('Notification' in window) || Notification.permission === 'denied') return;
+    setTimeout(function () {
+      if ($('.sh-wrap') || $('#app').hidden || get('pushAsk', false)) return; put('pushAsk', true);
+      if (Notification.permission === 'granted') { put('push', true); return; }
+      var w = sheet('Payment notifications', '<div class="np-hero">' + ic('bell') + '</div><p class="sh-sub" style="text-align:center">Get notified when you receive Pi, an invoice is paid, a payment is due or a refund is made.</p>' +
+        '<button type="button" class="btn" id="np-on">' + ic('bell') + 'Turn on notifications</button><button type="button" class="btn ghost" id="np-no">Not now</button>');
+      $('#np-on', w).onclick = function () { Notification.requestPermission().then(function (p) { if (p === 'granted') { put('push', true); toast('Notifications on'); } else toast('You can turn them on later in Profile'); closeSheets(); render(S.tab); }).catch(function () { closeSheets(); }); };
+      $('#np-no', w).onclick = function () { closeSheets(); };
+    }, 6000);
+  }
+  function afterSignIn() { askPush(); HK.signin.forEach(function (f) { try { f(); } catch (e) {} }); register(); historySync(); loadCfg().then(function () { sync(); if (pendingCode) { var c = pendingCode; pendingCode = null; openCode(c); } }); }
 
   /* ── transfers: server status, registration, sync ── */
   function loadCfg() {
@@ -797,37 +809,20 @@
   function loadJsQR() { if (window.jsQR) return Promise.resolve(); if (!jsqrP) jsqrP = new Promise(function (ok, no) { var s = document.createElement('script'); s.src = 'vendor/jsqr.js?v=1'; s.onload = ok; s.onerror = function () { jsqrP = null; no(); }; document.head.appendChild(s); }); return jsqrP; }
   function decodeImageData(d) { try { var q = window.jsQR && jsQR(d.data, d.width, d.height, { inversionAttempts: 'attemptBoth' }); return q ? q.data : ''; } catch (e) { return ''; } }
   function scanSheet() {
-    var stream = null, raf = 0, done = false, cv = document.createElement('canvas'), cx = cv.getContext('2d', { willReadFrequently: true });
-    var w = sheet('Scan QR code', '<p class="sh-sub">Point the camera at a FinPi payment code or a Pi wallet address QR.</p>' +
-      '<div class="scan"><video id="sc-v" playsinline muted></video><div class="scan-f"></div><div class="scan-m" id="sc-m">Starting camera…</div></div>' +
-      '<label class="btn ghost" style="cursor:pointer">' + ic('down') + 'Scan a photo from the gallery<input type="file" id="sc-f" accept="image/*" hidden></label>', { onClose: stop });
-    function stop() { done = true; cancelAnimationFrame(raf); if (stream) stream.getTracks().forEach(function (t) { t.stop(); }); }
+    var stop = null;
+    var w = sheet('Scan QR code', '<p class="sh-sub">Payment code, Pi wallet address or FinPi receipt.</p>' + scanBox('sc-b') +
+      '<label class="btn ghost" style="cursor:pointer">' + ic('down') + 'Scan a photo from the gallery<input type="file" id="sc-f" accept="image/*" hidden></label>', { onClose: function () { if (stop) stop(); } });
+    var box = $('#sc-b', w), msg = $('.scan-m', box);
+    function finish(fn) { if (stop) stop(); scanOk(); setTimeout(function () { w.remove(); fn(); }, 220); }
     function found(t) {
-      var c = parseCode(t); if (!c) { var rv = /receipt\.html|blockexplorer/i.test(t) ? rxTx(t) : null; if (rv) { stop(); w.remove(); verifySheet(rv); return true; } $('#sc-m', w) && ($('#sc-m', w).textContent = 'This QR code is not a Pi payment code.'); return false; }
-      stop(); w.remove(); if (navigator.vibrate) try { navigator.vibrate(60); } catch (e) {} openCode(c); return true;
+      var c = parseCode(t);
+      if (!c) { var rv = /receipt\.html|blockexplorer|#tx=/i.test(t) ? rxTx(t) : null; if (rv) { finish(function () { verifySheet(rv); }); return true; } msg.textContent = 'This QR code is not a Pi payment code or receipt.'; return false; }
+      finish(function () { openCode(c); }); return true;
     }
-    var v = $('#sc-v', w), msg = $('#sc-m', w);
-    loadJsQR().then(function () {
-      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) { msg.textContent = 'Camera is not available here. Scan a photo instead.'; return; }
-      return navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment', width: { ideal: 1280 } }, audio: false }).then(function (s) {
-        if (done) { s.getTracks().forEach(function (t) { t.stop(); }); return; }
-        stream = s; v.srcObject = s; v.play(); msg.textContent = 'Looking for a QR code…';
-        var last = 0;
-        (function tick(ts) {
-          if (done) return; raf = requestAnimationFrame(tick);
-          if (ts - last < 180 || v.readyState < 2) return; last = ts;
-          var W = v.videoWidth, H = v.videoHeight, k = Math.min(1, 720 / Math.max(W, H)); cv.width = W * k; cv.height = H * k;
-          cx.drawImage(v, 0, 0, cv.width, cv.height); var t = decodeImageData(cx.getImageData(0, 0, cv.width, cv.height)); if (t) found(t);
-        })(0);
-      });
-    }).catch(function () { msg.textContent = 'Camera permission was not given. You can scan a photo instead.'; });
+    stop = qrScan(box, found);
     $('#sc-f', w).onchange = function () {
-      var f = this.files && this.files[0]; if (!f) return; msg.textContent = 'Reading photo…';
-      loadJsQR().then(function () {
-        var img = new Image(), u = URL.createObjectURL(f);
-        img.onload = function () { var k = Math.min(1, 1400 / Math.max(img.width, img.height)); cv.width = img.width * k; cv.height = img.height * k; cx.drawImage(img, 0, 0, cv.width, cv.height); URL.revokeObjectURL(u); var t = decodeImageData(cx.getImageData(0, 0, cv.width, cv.height)); if (!t || !found(t)) msg.textContent = t ? 'This QR code is not a Pi payment code.' : 'No QR code found in this photo. Try a clearer one.'; };
-        img.src = u;
-      }).catch(function () { msg.textContent = 'Could not load the scanner. Check your connection.'; });
+      var f = this.files && this.files[0]; this.value = ''; if (!f) return; msg.textContent = 'Reading photo…';
+      qrFromFile(f).then(function (t) { if (!t) { msg.textContent = 'No QR code found in this photo. Use a clear, uncropped image.'; return; } found(t); }).catch(function () { msg.textContent = 'Could not read this photo.'; });
     };
   }
 
@@ -920,33 +915,64 @@
     var n = /net=(test|main)/i.exec(t); return { tx: m[1].toLowerCase(), net: n ? n[1].toLowerCase() : /testnet/i.test(t) ? 'test' : NETQ };
   }
   function vChecks() { return get('vchk', []); }
-  function camScan(v, msg, onText) {
-    var stream = null, raf = 0, done = false, cv = document.createElement('canvas'), cx = cv.getContext('2d', { willReadFrequently: true });
+  /* ── QR engine: the phone's built-in detector when available, otherwise jsQR on a centre crop and the full frame,
+     both colour polarities, continuous focus and torch. Photos are read at several sizes and regions. ── */
+  var BD = null, bdP = null;
+  function bdReady() {
+    if (bdP) return bdP;
+    bdP = Promise.resolve().then(function () { if (!('BarcodeDetector' in window)) return null; return BarcodeDetector.getSupportedFormats().then(function (f) { if (f.indexOf('qr_code') >= 0) BD = new BarcodeDetector({ formats: ['qr_code'] }); return BD; }); }).catch(function () { return null; });
+    return bdP;
+  }
+  function scanBox(id) { return '<div class="scan" id="' + id + '"><video playsinline muted></video><div class="scan-f"><i></i><i></i><i></i><i></i><b class="scan-l"></b></div><button type="button" class="scan-t" hidden aria-label="Torch">' + ic('zap') + '</button><div class="scan-m">Starting camera…</div></div>'; }
+  function scanOk() { try { if (navigator.vibrate) navigator.vibrate(60); } catch (e) {} try { if (window.FinPi && FinPi.fx) FinPi.fx('scan'); } catch (e) {} }
+  function qrScan(box, onText) {
+    var v = $('video', box), msg = $('.scan-m', box), tb = $('.scan-t', box), stream = null, track = null, raf = 0, done = false, busy = false, n = 0, last = 0;
+    var cv = document.createElement('canvas'), cx = cv.getContext('2d', { willReadFrequently: true });
     function stop() { done = true; cancelAnimationFrame(raf); if (stream) stream.getTracks().forEach(function (t) { t.stop(); }); }
-    loadJsQR().then(function () {
-      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) { msg.textContent = 'Camera is not available here. Upload a photo instead.'; return; }
-      return navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment', width: { ideal: 1280 } }, audio: false }).then(function (st) {
+    function hit(t) { if (done || !t) return; if (onText(t) === false) return; box.classList.add('ok'); stop(); }
+    function jsq(full) {
+      var W = v.videoWidth, H = v.videoHeight; if (!W) return '';
+      var sx = 0, sy = 0, sw = W, sh = H, tgt = 960;
+      if (!full) { var m = Math.min(W, H) * .72; sx = (W - m) / 2; sy = (H - m) / 2; sw = sh = m; tgt = 640; }
+      var k = Math.min(1, tgt / Math.max(sw, sh)); cv.width = Math.round(sw * k); cv.height = Math.round(sh * k);
+      cx.drawImage(v, sx, sy, sw, sh, 0, 0, cv.width, cv.height);
+      try { var d = cx.getImageData(0, 0, cv.width, cv.height), q = jsQR(d.data, d.width, d.height, { inversionAttempts: n % 4 === 3 ? 'attemptBoth' : 'dontInvert' }); return q ? q.data : ''; } catch (e) { return ''; }
+    }
+    Promise.all([loadJsQR().catch(function () {}), bdReady()]).then(function () {
+      if (done) return;
+      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) { msg.textContent = 'Camera is not available here. Use a photo instead.'; return; }
+      return navigator.mediaDevices.getUserMedia({ video: { facingMode: { ideal: 'environment' }, width: { ideal: 1920 }, height: { ideal: 1080 } }, audio: false }).then(function (st) {
         if (done) { st.getTracks().forEach(function (t) { t.stop(); }); return; }
-        stream = st; v.srcObject = st; v.play(); msg.textContent = 'Point at the QR code on the receipt';
-        var last = 0;
+        stream = st; track = st.getVideoTracks()[0]; v.srcObject = st; v.play().catch(function () {});
+        try {
+          var cap = track.getCapabilities ? track.getCapabilities() : {};
+          if (cap.focusMode && cap.focusMode.indexOf('continuous') >= 0) track.applyConstraints({ advanced: [{ focusMode: 'continuous' }] }).catch(function () {});
+          if (cap.torch && tb) { tb.hidden = false; var on = false; tb.onclick = function () { on = !on; track.applyConstraints({ advanced: [{ torch: on }] }).catch(function () {}); tb.classList.toggle('on', on); }; }
+        } catch (e) {}
+        box.classList.add('scanning'); msg.textContent = 'Point the camera at the QR code';
         (function tick(ts) {
           if (done) return; raf = requestAnimationFrame(tick);
-          if (ts - last < 180 || v.readyState < 2) return; last = ts;
-          var W = v.videoWidth, H = v.videoHeight, k = Math.min(1, 720 / Math.max(W, H)); cv.width = W * k; cv.height = H * k;
-          cx.drawImage(v, 0, 0, cv.width, cv.height); var t = decodeImageData(cx.getImageData(0, 0, cv.width, cv.height)); if (t && onText(t) !== false) stop();
+          if (busy || ts - last < 110 || v.readyState < 2) return; last = ts; n++;
+          if (BD) { busy = true; BD.detect(v).then(function (c) { busy = false; if (c && c[0] && c[0].rawValue) hit(c[0].rawValue); else if (window.jsQR && n % 3 === 0) hit(jsq(true)); }).catch(function () { busy = false; BD = null; }); }
+          else if (window.jsQR) hit(jsq(n % 2 === 0));
         })(0);
       });
-    }).catch(function () { msg.textContent = 'Camera permission was not given. Upload a photo instead.'; });
+    }).catch(function (e) { msg.textContent = e && e.name === 'NotAllowedError' ? 'Allow camera access, or use a photo instead.' : 'The camera could not start. Use a photo instead.'; });
     return stop;
   }
-  function photoText(f) {
-    return loadJsQR().then(function () {
+  function qrFromFile(f) {
+    return Promise.all([loadJsQR().catch(function () {}), bdReady()]).then(function () {
       return new Promise(function (ok) {
-        var img = new Image(), u = URL.createObjectURL(f), cv = document.createElement('canvas'), cx = cv.getContext('2d', { willReadFrequently: true });
+        var img = new Image(), u = URL.createObjectURL(f);
         img.onload = function () {
-          URL.revokeObjectURL(u); var t = '';
-          [1600, 1100, 2200, 800].some(function (mx) { var k = Math.min(1, mx / Math.max(img.width, img.height)); cv.width = Math.round(img.width * k); cv.height = Math.round(img.height * k); cx.fillStyle = '#fff'; cx.fillRect(0, 0, cv.width, cv.height); cx.drawImage(img, 0, 0, cv.width, cv.height); t = decodeImageData(cx.getImageData(0, 0, cv.width, cv.height)); return !!t; });
-          ok(t);
+          URL.revokeObjectURL(u);
+          function tryJs() {
+            var cv = document.createElement('canvas'), cx = cv.getContext('2d', { willReadFrequently: true }), t = '', W = img.naturalWidth, H = img.naturalHeight;
+            var R = [[0, 0, W, H], [0, H * .5, W, H * .5], [0, H * .35, W, H * .45], [W * .08, H * .08, W * .84, H * .84], [0, 0, W, H * .5]];
+            [1600, 1100, 2400, 800].some(function (mx) { return R.some(function (r) { var k = Math.min(1, mx / Math.max(r[2], r[3])); cv.width = Math.max(1, Math.round(r[2] * k)); cv.height = Math.max(1, Math.round(r[3] * k)); cx.fillStyle = '#fff'; cx.fillRect(0, 0, cv.width, cv.height); cx.drawImage(img, r[0], r[1], r[2], r[3], 0, 0, cv.width, cv.height); t = window.jsQR ? decodeImageData(cx.getImageData(0, 0, cv.width, cv.height)) : ''; return !!t; }); });
+            ok(t);
+          }
+          if (BD) BD.detect(img).then(function (c) { if (c && c[0] && c[0].rawValue) ok(c[0].rawValue); else tryJs(); }).catch(tryJs); else tryJs();
         };
         img.onerror = function () { URL.revokeObjectURL(u); ok(''); };
         img.src = u;
@@ -957,7 +983,7 @@
     var stopCam = null, mode = 'scan';
     var w = sheet('Verify receipt',
       '<div class="seg vr-seg" role="tablist"><button type="button" data-vm="scan" class="on">' + ic('qr', 'width:17px;height:17px;vertical-align:-3px') + ' Scan</button><button type="button" data-vm="photo">' + ic('down', 'width:17px;height:17px;vertical-align:-3px') + ' Photo</button><button type="button" data-vm="type">' + ic('edit', 'width:17px;height:17px;vertical-align:-3px') + ' Enter</button></div>' +
-      '<div id="vr-scan" class="vr-p"><div class="scan"><video id="vr-v" playsinline muted></video><div class="scan-f"></div><div class="scan-m" id="vr-m">Starting camera…</div></div></div>' +
+      '<div id="vr-scan" class="vr-p">' + scanBox('vr-b') + '</div>' +
       '<div id="vr-photo" class="vr-p" hidden><label class="vr-drop">' + ic('rcpt') + '<b>Upload receipt image</b><small>Screenshot or photo from your gallery</small><input type="file" id="vr-f" accept="image/*" hidden></label><p class="small muted" id="vr-pm" style="text-align:center;margin-top:8px"></p></div>' +
       '<div id="vr-type" class="vr-p" hidden><label class="l" for="vr-t">Transaction ID</label><textarea class="in num" id="vr-t" rows="2" maxlength="200" spellcheck="false" autocapitalize="none" placeholder="64 letters and numbers" style="font-size:14px;resize:none"></textarea>' +
       '<div class="two bz-two"><div><label class="l" for="vr-a">Amount on receipt</label><div class="amt sm"><input id="vr-a" type="number" inputmode="decimal" placeholder="Optional"><span>π</span></div></div><div><label class="l" for="vr-c">Verification code</label><input class="in num" id="vr-c" maxlength="14" autocapitalize="characters" spellcheck="false" placeholder="FP-XXXXX-XXXXX"></div></div>' +
@@ -968,12 +994,12 @@
       mode = m; $$('[data-vm]', w).forEach(function (b) { b.classList.toggle('on', b.dataset.vm === m); });
       ['scan', 'photo', 'type'].forEach(function (k) { $('#vr-' + k, w).hidden = k !== m; });
       if (stopCam) { stopCam(); stopCam = null; }
-      if (m === 'scan') stopCam = camScan($('#vr-v', w), $('#vr-m', w), function (t) { var r = rxTx(t); if (!r) { $('#vr-m', w).textContent = 'This QR code is not a payment receipt.'; return false; } if (navigator.vibrate) try { navigator.vibrate(60); } catch (e) {} setMode('type'); $('#vr-t', w).value = r.tx; check(r); return true; });
+      if (m === 'scan') stopCam = qrScan($('#vr-b', w), function (t) { var r = rxTx(t); if (!r) { $('#vr-b .scan-m', w).textContent = 'This QR code is not a payment receipt.'; return false; } scanOk(); setTimeout(function () { setMode('type'); $('#vr-t', w).value = r.tx; check(r); }, 250); return true; });
     }
     $$('[data-vm]', w).forEach(function (b) { b.onclick = function () { setMode(b.dataset.vm); }; });
     $('#vr-f', w).onchange = function () {
       var f = this.files && this.files[0]; if (!f) return; var pm = $('#vr-pm', w); pm.textContent = 'Reading receipt…'; this.value = '';
-      photoText(f).then(function (t) { var r = rxTx(t); if (!r) { pm.textContent = t ? 'The QR code in this image is not a payment receipt.' : 'No QR code found. Use a clear, uncropped receipt image, or enter the transaction ID.'; return; } pm.textContent = ''; setMode('type'); $('#vr-t', w).value = r.tx; check(r); })
+      qrFromFile(f).then(function (t) { var r = rxTx(t); if (!r) { pm.textContent = t ? 'The QR code in this image is not a payment receipt.' : 'No QR code found. Use a clear, uncropped receipt image, or enter the transaction ID.'; return; } pm.textContent = ''; setMode('type'); $('#vr-t', w).value = r.tx; check(r); })
         .catch(function () { pm.textContent = 'Could not read this image. Check your connection and try again.'; });
     };
     $('#vr-go', w).onclick = function () { var r = rxTx($('#vr-t', w).value); if (!r) return toast('Enter the 64-character transaction ID'); check(r); };
@@ -1236,7 +1262,7 @@
     $$('#view .sv-again').forEach(function (e) { e.hidden = !!q; }); var no = $('#view .sv-none'); if (no) no.hidden = any;
   }
   /* ── the name shown on receipts, invoices and the QR poster: a person, business, store or shop ── */
-  var NTYPE = { name: { l: 'Name', p: 'Your full name' }, business: { l: 'Business name', p: 'e.g. Elbaggari Investment Limited' }, store: { l: 'Store name', p: 'e.g. Elbaggari Stores' }, shop: { l: 'Shop name', p: 'e.g. Amina Fabrics' } };
+  var NTYPE = { name: { l: 'Name', p: 'Your full name' }, business: { l: 'Business name', p: 'e.g. Global Trading Ltd' }, store: { l: 'Store name', p: 'e.g. City Market Store' }, shop: { l: 'Shop name', p: 'e.g. Corner Fashion Shop' } };
   function nType() { var t = get('nameType', ''); return NTYPE[t] ? t : 'name'; }
   function setName(v, t) {
     put('name', v); put('nameType', t);
@@ -1328,7 +1354,7 @@
   function contactEdit(i, preTo) {
     var L = contacts(), c = i >= 0 ? L[i] : { name: '', to: preTo || '' }, rec = get('payees', []).filter(function (p) { return !L.some(function (x) { return x.to.toLowerCase() === p.toLowerCase(); }); }).slice(0, 6);
     var w = sheet(i >= 0 ? 'Edit contact' : 'Add contact',
-      '<label class="l" for="ct-n">Name</label><input class="in" id="ct-n" maxlength="40" placeholder="e.g. Amina, Landlord, Shop" value="' + esc(c.name) + '">' +
+      '<label class="l" for="ct-n">Name</label><input class="in" id="ct-n" maxlength="40" placeholder="e.g. Alex, Landlord, Shop" value="' + esc(c.name) + '">' +
       '<label class="l" for="ct-t">' + (userSends() ? '@username or wallet address' : 'Pi wallet address') + '</label><textarea class="in num" id="ct-t" rows="2" maxlength="60" autocapitalize="none" spellcheck="false" style="font-size:14px;resize:none" placeholder="' + (userSends() ? '@username or G…' : 'G…') + '">' + esc(c.to ? (isG(c.to) ? c.to : '@' + c.to) : '') + '</textarea><div class="hint" id="ct-h"></div>' +
       (i < 0 && rec.length ? '<label class="l">From your recent payments</label><div class="chips">' + rec.map(function (p) { return '<button type="button" class="chip" data-rp="' + esc(p) + '">' + esc(toLabel(p)) + '</button>'; }).join('') + '</div>' : '') +
       '<button type="button" class="btn" id="ct-go">Save contact</button>' + (i >= 0 ? '<button type="button" class="btn ghost" id="ct-pay">' + ic('send') + 'Send Pi</button><button type="button" class="btn danger" id="ct-rm">' + ic('trash') + 'Delete contact</button>' : ''), { stack: true });
@@ -1390,7 +1416,7 @@
     var w = sheet('Split a bill', '<p class="sh-sub">Share a cost and send everyone their part as a payment request.</p>' +
       '<label class="l" for="sp-a">Total amount</label><div class="amt"><input id="sp-a" type="number" inputmode="decimal" min="0" step="any" placeholder="0.00"><span>π</span></div><div class="hint num" id="sp-c"></div>' +
       '<label class="l" for="sp-x">What is it for?</label><input class="in" id="sp-x" maxlength="60" placeholder="e.g. Dinner, shared taxi, rent">' +
-      '<label class="l" for="sp-p">Who is sharing? (names, separated by commas)</label><input class="in" id="sp-p" maxlength="300" placeholder="e.g. Amina, Musa, Fatima">' +
+      '<label class="l" for="sp-p">Who is sharing? (names, separated by commas)</label><input class="in" id="sp-p" maxlength="300" placeholder="e.g. Alex, Maria, Sam">' +
       '<label class="chk"><input type="checkbox" id="sp-me" checked><span>Include my share</span></label>' +
       '<div class="sum" id="sp-sum" hidden></div><button type="button" class="btn" id="sp-go">' + ic('users') + 'Create requests</button>' +
       (splits().length ? '<button type="button" class="btn ghost" id="sp-old">Previous splits</button>' : ''));
@@ -1696,7 +1722,7 @@
     'wal-load': function () { S.wal = null; loadWal(); },
     notifs: function () {
       var N = notes(); N.forEach(function (n) { n.read = true; }); put('notes', N); bellDot();
-      sheet('Notifications', N.length ? '<div class="list">' + N.map(function (n) { return '<div class="li"><span class="ico">' + ic(n.ic || 'bell') + '</span><span class="grow"><b>' + esc(n.t) + '</b><small style="white-space:normal">' + esc(n.b) + '</small><small>' + ago(n.ts) + '</small></span></div>'; }).join('') + '</div><button type="button" class="btn ghost" data-act="notes-clear">Clear all</button>' : '<div class="empty">' + ic('bell') + '<div>No notifications yet.</div></div>');
+      sheet('Notifications', (!get('push', false) && 'Notification' in window && Notification.permission !== 'denied' ? '<button type="button" class="np-cta" data-act="push">' + ic('bell') + '<span><b>Phone notifications are off</b><small>Turn on to get alerts outside FinPi</small></span>' + ic('chev') + '</button>' : '') + (N.length ? '<div class="list">' + N.map(function (n) { return '<div class="li"><span class="ico">' + ic(n.ic || 'bell') + '</span><span class="grow"><b>' + esc(n.t) + '</b><small style="white-space:normal">' + esc(n.b) + '</small><small>' + ago(n.ts) + '</small></span></div>'; }).join('') + '</div><button type="button" class="btn ghost" data-act="notes-clear">Clear all</button>' : '<div class="empty">' + ic('bell') + '<div>No notifications yet.</div></div>'));
     },
     'notes-clear': function () { put('notes', []); closeSheets(); bellDot(); },
     csv: function () {
@@ -1796,7 +1822,7 @@
     checkPendingWallet(); checkPendingInApp();
     var hc = readHash(); if (hc) { pendingCode = hc; var lm = $('#ld-msg'); if (lm) { lm.style.color = 'var(--blue)'; lm.textContent = 'You opened a payment request. Sign in with Pi or explore to pay it.'; } }
     addEventListener('hashchange', function () { var c = readHash(); if (c) { if ($('#app').hidden) { pendingCode = c; } else openCode(c); } });
-    setInterval(function () { if (!document.hidden) { loadPrice(); sync(); checkPendingWallet(); checkPendingInApp(); checkRems(); } }, 60000);
+    var bgN = 0; setInterval(function () { if (!document.hidden) { loadPrice(); sync(); checkPendingWallet(); checkPendingInApp(); checkRems(); } else if (++bgN % 2 === 0) { sync(); checkRems(); } }, 60000);
     document.addEventListener('visibilitychange', function () { if (!document.hidden) { loadPrice(); sync(); checkPendingWallet(); checkPendingInApp(); checkRems(); } });
     if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(function () {});
   }

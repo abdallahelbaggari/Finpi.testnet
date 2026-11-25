@@ -67,7 +67,7 @@
     ]).catch(function () { return ''; });
   }
   /* QR code for "scan to verify" — works with either QR library the page has loaded */
-  function qrImg(text) { return Promise.resolve(text && window.FPQR ? FPQR.canvas(text, 240, '#0B2A6F', '#FFFFFF') : null); }
+  function qrImg(text) { return Promise.resolve(text && window.FPQR ? FPQR.canvas(text, 250, '#061A4F', '#FFFFFF') : null); }
   function canvas(r) {
     return Promise.all([loadImg((r.base || '') + 'icons/icon-512.png'), qrImg(r.verify), r.seal != null ? r.seal : getSeal(r.verify)]).then(function (res) {
       var logo = res[0], qr = res[1], code = res[2] || '', tx = (txOf(r.verify) || {}).tx || '';
@@ -77,7 +77,7 @@
         mx.font = row[2] ? '600 26px ' + M : '700 31px ' + F; return { k: row[0], lines: wrap(mx, row[1], maxW), mono: !!row[2] };
       });
       var rowsH = rows.reduce(function (a, b) { return a + 86 + (b.lines.length - 1) * 38; }, 0);
-      var QH = r.verify ? 270 : 0;
+      var QH = r.verify ? 350 : 0, QX = 0, QY = 0;
       var H = 860 + rowsH + QH + 270, cv = document.createElement('canvas'); cv.width = W; cv.height = H; var x = cv.getContext('2d');
       x.fillStyle = '#EEF2F8'; x.fillRect(0, 0, W, H);
       x.save(); rr(x, 60, 60, W - 120, H - 120, 44); x.fillStyle = '#FFFFFF'; x.shadowColor = 'rgba(11,27,51,.14)'; x.shadowBlur = 40; x.fill(); x.restore();
@@ -103,10 +103,10 @@
       });
       if (r.verify) {
         var by = y - 10;
-        x.fillStyle = '#F0F7FF'; rr(x, 120, by, W - 240, 230, 24); x.fill(); x.strokeStyle = 'rgba(29,78,216,.22)'; x.lineWidth = 2; x.stroke();
-        if (qr) { x.fillStyle = '#FFFFFF'; rr(x, 140, by + 20, 190, 190, 14); x.fill(); x.drawImage(qr, 148, by + 28, 174, 174); }
-        var tx0 = qr ? 360 : 150; x.textAlign = 'left';
-        x.fillStyle = '#1D4ED8'; x.font = '800 32px ' + F; x.fillText('Scan to verify', tx0, by + 66);
+        var bh = 310; x.fillStyle = '#EEF4FF'; rr(x, 120, by, W - 240, bh, 26); x.fill(); x.strokeStyle = 'rgba(21,67,224,.35)'; x.lineWidth = 3; x.stroke();
+        if (qr) { var qs = 270; x.fillStyle = '#FFFFFF'; rr(x, 140, by + 20, qs, qs, 18); x.fill(); x.strokeStyle = '#061A4F'; x.lineWidth = 3; x.stroke(); QX = 140 + (qs - qr.width) / 2; QY = by + 20 + (qs - qr.height) / 2; x.imageSmoothingEnabled = false; x.drawImage(qr, QX, QY); x.imageSmoothingEnabled = true; }
+        var tx0 = qr ? 440 : 150; x.textAlign = 'left'; by += 30;
+        x.fillStyle = '#1543E0'; x.font = '800 34px ' + F; x.fillText('Scan to verify', tx0, by + 66);
         if (code) {
           x.fillStyle = '#64748B'; x.font = '700 21px ' + F; x.fillText('VERIFICATION CODE', tx0, by + 108);
           x.fillStyle = '#0B2A6F'; x.font = '700 38px ' + M; x.fillText(code, tx0, by + 152);
@@ -126,6 +126,7 @@
       var mt = 'FINPI•' + (tx ? tx.toUpperCase() : 'RECEIPT') + '•' + amt + 'π•' + (code ? code + '•' : '');
       microline(x, mt, 84, 82, W - 168); microline(x, mt, 84, H - 70, W - 168); microline(x, mt, 72, 84, H - 168, true); microline(x, mt, W - 72, 84, H - 168, true);
       emblem(x, W - 170, 420, 64);
+      if (qr && QX) { x.fillStyle = '#FFFFFF'; x.fillRect(QX, QY, qr.width, qr.height); x.imageSmoothingEnabled = false; x.drawImage(qr, QX, QY); x.imageSmoothingEnabled = true; }
       return cv;
     });
   }

@@ -556,3 +556,28 @@ body{background:var(--bg)}
 @keyframes blink{50%{opacity:.25}}
 .bz-pc{max-height:120px;overflow-y:auto}
 .conv .cv-tr{background:#E6F7F4}
+
+/* ── scanner: clear frame, corner guides, moving line, torch, success state ── */
+.scan{background:#020817;aspect-ratio:1/1;max-height:min(84vw,420px);border-radius:26px;box-shadow:0 22px 44px -24px rgba(6,26,79,.8)}
+.scan video{width:100%;height:100%;object-fit:cover;display:block}
+.scan-f{inset:12%;border:0;border-radius:24px;box-shadow:0 0 0 999px rgba(2,8,23,.55)}
+.scan-f i{position:absolute;width:44px;height:44px;border:5px solid #5EEAD4;transition:border-color .2s}
+.scan-f i:nth-child(1){left:-3px;top:-3px;border-right:0;border-bottom:0;border-radius:22px 0 0 0}
+.scan-f i:nth-child(2){right:-3px;top:-3px;border-left:0;border-bottom:0;border-radius:0 22px 0 0}
+.scan-f i:nth-child(3){left:-3px;bottom:-3px;border-right:0;border-top:0;border-radius:0 0 0 22px}
+.scan-f i:nth-child(4){right:-3px;bottom:-3px;border-left:0;border-top:0;border-radius:0 0 22px 0}
+.scan-l{position:absolute;left:8%;right:8%;top:8%;height:3px;border-radius:3px;background:linear-gradient(90deg,transparent,#5EEAD4,transparent);box-shadow:0 0 14px 2px rgba(94,234,212,.7);opacity:0}
+.scan.scanning .scan-l{opacity:1;animation:sweep 2.2s ease-in-out infinite}
+@keyframes sweep{0%{top:8%}50%{top:90%}100%{top:8%}}
+.scan.ok .scan-f i{border-color:#22C55E}.scan.ok .scan-l{display:none}
+.scan.ok .scan-f{background:rgba(34,197,94,.18);transition:background .2s}
+.scan-m{bottom:14px;font-size:14px;padding:0 10px}
+.scan-t{position:absolute;top:12px;right:12px;width:44px;height:44px;border-radius:50%;display:flex;align-items:center;justify-content:center;color:#fff;background:rgba(255,255,255,.18);border:1px solid rgba(255,255,255,.3);backdrop-filter:blur(6px)}
+.scan-t.on{background:#F5B83D;color:#061A4F}
+/* notifications */
+.np-hero{width:76px;height:76px;margin:6px auto 10px;border-radius:24px;display:flex;align-items:center;justify-content:center;color:#fff;background:linear-gradient(135deg,#1543E0,#0A9488);box-shadow:0 16px 30px -16px rgba(21,67,224,.9)}
+.np-hero .ic{width:36px;height:36px}
+.np-cta{display:flex;align-items:center;gap:12px;width:100%;margin-bottom:12px;padding:12px 14px;border-radius:18px;text-align:left;background:linear-gradient(135deg,#EEF3FF,#E6F7F4);border:1px solid rgba(21,67,224,.2);color:var(--blue)}
+.np-cta span{flex:1}.np-cta b{display:block;color:var(--ink);font-size:14.5px}.np-cta small{display:block;color:var(--mute);font-size:12.5px}
+/* QR codes shown in the app: white frame and quiet zone */
+.qr svg{background:#fff;padding:10px;border-radius:16px;box-shadow:0 0 0 1px rgba(6,26,79,.1),0 16px 30px -22px rgba(6,26,79,.6)}
