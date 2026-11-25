@@ -15,6 +15,8 @@
   var SUPPORT = 'finpi.app@gmail.com', USER_RE = /^[A-Za-z0-9_.-]{2,40}$/;
   var CATS = ['Food', 'Transport', 'Shopping', 'Bills', 'Family', 'Business', 'Gifts', 'Charity', 'Other'];
   var S = { user: null, token: null, guest: false, tab: 'home', p: null, fx: null, cfg: { enabled: false, payments: null, fee: 0.01, max: 0, daily: 0 }, filter: 'all', seg: 'tx', sort: 'new', extra: [], hMore: false, month: 0, wal: null };
+  var HK = { rcpt: [], spec: [], rows: [], html: {} };
+  function hook(k) { var f = HK.html[k]; try { return f ? f() : ''; } catch (e) { return ''; } }
   var r7 = function (n) { return Math.round(Number(n) * 1e7) / 1e7; };
   var me = function () { return S.user && S.user.username || ''; };
   var signedIn = function () { return !!(S.user && S.token); };
@@ -132,8 +134,8 @@
       var url = location.origin + d.file + '?dl=1', a = document.createElement('a'); a.href = url; a.download = d.name || name; a.rel = 'noopener'; document.body.appendChild(a); a.click(); a.remove();
       if (quiet) return;
       var img = /^image\//.test(type), w = sheet('Saved to your phone',
-        '<p class="sh-sub">' + (img ? 'Your receipt image is in your phone’s <b>Downloads</b> and <b>Gallery</b>.' : 'Your ' + esc(what) + ' is in your phone’s <b>Downloads</b> folder.') + '</p>' +
-        '<button type="button" class="btn" data-x="open">' + ic(img ? 'rcpt' : 'down') + (img ? 'Open the receipt image' : 'Download again') + '</button>' +
+        '<p class="sh-sub">' + (img ? 'Your ' + esc(what) + ' image is in your phone’s <b>Downloads</b> and <b>Gallery</b>.' : 'Your ' + esc(what) + ' is in your phone’s <b>Downloads</b> folder.') + '</p>' +
+        '<button type="button" class="btn" data-x="open">' + ic(img ? 'rcpt' : 'down') + (img ? 'Open the image' : 'Download again') + '</button>' +
         '<p class="small muted" style="text-align:center;margin-top:10px">Not there? ' + (img ? 'Open the image, then press and hold it to save.' : 'Tap Download again.') + '</p>');
       $('[data-x="open"]', w).onclick = function () { if (img) location.href = d.page; else { var b = document.createElement('a'); b.href = url; b.download = d.name || name; document.body.appendChild(b); b.click(); b.remove(); } };
     }, function () { blobSave(blob, name); toast(what.charAt(0).toUpperCase() + what.slice(1) + ' saved to Downloads'); });
@@ -152,8 +154,9 @@
   function shareImage(blob, name, title, text, short) {
     var f = null; try { f = new File([blob], name, { type: 'image/jpeg' }); } catch (e) {}
     var fallback = function () {
-      saveFile(blob, name, 'image/jpeg', 'receipt', true);
-      var w = sheet('Share the receipt image', '<p class="sh-sub">The receipt image is saved to your phone’s <b>Gallery</b>. Open WhatsApp (or any app), tap attach, choose <b>Gallery</b> and pick the FinPi receipt.</p>' +
+      var wh = String(title || 'FinPi receipt').replace(/^FinPi /, '').toLowerCase();
+      saveFile(blob, name, 'image/jpeg', wh, true);
+      var w = sheet('Share the ' + wh + ' image', '<p class="sh-sub">The ' + esc(wh) + ' image is saved to your phone’s <b>Gallery</b>. Open WhatsApp (or any app), tap attach, choose <b>Gallery</b> and pick the FinPi ' + esc(wh) + '.</p>' +
         '<button type="button" class="btn" data-x="lk">' + ic('link') + 'Share as a link instead</button>');
       $('[data-x="lk"]', w).onclick = function () { closeSheets(); shareLink(blob, name, 'image/jpeg', title, short); };
     };
@@ -193,7 +196,7 @@
   function saveRcpt(r) {
     var R = rcpts(); if (r.txid && R.some(function (x) { return x.txid === r.txid; })) return false;
     var c = curr(); r.usd = r.usd || rateIn('USD'); r.lc = c; r.lr = rateIn(c); r.net = r.net || NETN; r.ts = r.ts || Date.now(); r.saved = Date.now();
-    R.unshift(r); R.sort(function (a, b) { return (b.ts || 0) - (a.ts || 0); }); put('rcpts', R.slice(0, LCAP)); try { remMatch(r); } catch (e) {} hSoon(); return true;
+    R.unshift(r); R.sort(function (a, b) { return (b.ts || 0) - (a.ts || 0); }); put('rcpts', R.slice(0, LCAP)); try { remMatch(r); } catch (e) {} HK.rcpt.forEach(function (f) { try { f(r); } catch (e) {} }); hSoon(); return true;
   }
   /* ── full history, backed up on the server for this Pi account (never lost, no size limit) ── */
   function hKey(r) { var t = String(r.txid || '').toLowerCase(); if (/^[a-f0-9]{64}$/.test(t)) return 'tx:' + t + (r.kind === 'refund' ? ':r' : '') + (r.dir ? ':' + r.dir : ''); var f = String(r.ref || r.pid || ''); return f ? 'ref:' + f : ''; }
@@ -279,6 +282,7 @@
     if (r.kind === 'wallet') { if (r.from) rows.push(['Sender address', r.from, 1]); if (inn ? r.to : r.addr) rows.push(['Recipient address', inn ? r.to : r.addr, 1]); }
     else if (r.addr) rows.push([inn || r.kind === 'refund' ? 'Your address' : 'Recipient address', r.addr, 1]);
     if (r.txid) rows.push(['Transaction ID', r.txid, 1]);
+    HK.rows.forEach(function (f) { try { f(rows, r); } catch (e) {} });
     var cls = r.kind === 'refund' ? 'rf' : r.kind === 'supporter' ? 'sp' : inn ? 'in' : '';
     var w = sheet('Transaction details',
       '<div class="txd"><span class="ico ' + cls + '">' + ic(r.kind === 'refund' ? 'undo' : r.kind === 'supporter' ? 'heart' : inn ? 'req' : 'send') + '</span><p class="small">' + esc(rcType(r)) + '</p>' +
@@ -291,7 +295,7 @@
       '<div class="sec" style="margin-top:20px"><h2>Receipt</h2></div><div id="rc-prev" class="empty">Preparing receipt…</div>' +
       '');
     $$('[data-cp]', w).forEach(function (b) { b.onclick = function () { copy(rows[+b.dataset.cp][1]); }; });
-    var cvP = fontsReady().then(function () { return window.FPReceipt ? FPReceipt.canvas(spec(r)) : null; });
+    var cvP = fontsReady().then(function () { return window.FPReceipt ? FPReceipt.canvas(HK.spec.reduce(function (sp, f) { try { return f(sp, r) || sp; } catch (e) { return sp; } }, spec(r))) : null; });
     cvP.then(function (cv) { var p = $('#rc-prev', w); if (!p) return; if (!cv) { p.textContent = 'Receipt image unavailable.'; return; } p.className = ''; p.innerHTML = '<img class="rc-img" alt="FinPi receipt" src="' + cv.toDataURL('image/png') + '">'; });
     var name = rcName(r), text = 'FinPi receipt · ' + rcType(r) + ' · ' + fpi(r.amount) + ' π · ' + d.toLocaleDateString('en-GB') + (v ? '\nVerify on the Pi blockchain: ' + v : '');
     var jpg = cvP.then(function (cv) { return cv ? new Promise(function (ok) { cv.toBlob(ok, 'image/jpeg', 0.92); }) : null; });
@@ -954,7 +958,7 @@
       return '<div class="hello"><h1>' + hour() + (signedIn() ? ', @' + esc(me()) : '') + '</h1><p>' + (signedIn() ? 'Here is your Pi today.' : 'You are exploring. Sign in to send and receive Pi.') + '</p></div>' +
         '<div class="hero" data-act="price" data-p="hero" role="button" tabindex="0" aria-label="Pi price details">' + heroHTML() + '</div>' +
         '<div class="qa"><button type="button" data-act="send"><i>' + ic('send') + '</i>Send</button><button type="button" data-act="request"><i class="t">' + ic('req') + '</i>Request</button><button type="button" data-act="scan"><i class="n">' + ic('qr') + '</i>Scan</button><button type="button" data-act="receive"><i class="a">' + ic('card') + '</i>Receive</button></div>' +
-        dueHTML() + '<div class="sec"><h2>Overview</h2></div><div class="card" data-p="month">' + monthHTML() + '</div>' +
+        dueHTML() + hook('home') + '<div class="sec"><h2>Overview</h2></div><div class="card" data-p="month">' + monthHTML() + '</div>' +
         '<div class="sec"><h2>Recent activity</h2>' + (R.length ? '<button type="button" data-tab="activity">See all</button>' : '') + '</div>' +
         (pendingList().length ? '<div class="list" style="margin-bottom:10px">' + pendingList().slice(0, 3).map(pendRow).join('') + '</div>' : '') +
         (R.length ? '<div class="list">' + R.slice(0, 4).map(txRow).join('') + '</div>' : pendingList().length ? '' : '<div class="list"><div class="empty">' + ic('act') + '<div>No payments yet. Your receipts appear here.</div></div></div>') +
@@ -974,7 +978,7 @@
         '<button type="button" class="tile" data-act="split"><i class="t">' + ic('users') + '</i><b>Split a bill</b><small>Share a cost and request each part</small></button>' +
         '<button type="button" class="tile" data-act="contacts"><i class="n">' + ic('user') + '</i><b>Contacts</b><small>People you pay often</small></button>' +
         '<button type="button" class="tile" data-act="rems"><i class="a">' + ic('bell') + '</i><b>Reminders</b><small>Rent, fees and regular payments</small></button></div>' +
-        '<div class="sec"><h2>Tools</h2></div>' +
+        hook('pay') + '<div class="sec"><h2>Tools</h2></div>' +
         '<div class="tiles"><button type="button" class="tile" data-act="get-rcpt"><i class="n">' + ic('rcpt') + '</i><b>Get a receipt</b><small>For any Pi payment, from its transaction ID</small></button><button type="button" class="tile" data-act="verify"><i class="a">' + ic('check') + '</i><b>Verify a payment</b><small>Check any transaction on the blockchain</small></button></div>';
     },
     wallet: function () {
@@ -1006,9 +1010,9 @@
       var sup = get('supporter', false);
       return '<div class="pcard"><div class="avatar">' + esc(signedIn() ? me().charAt(0) : 'G') + '</div><div class="grow"><b>' + (signedIn() ? '@' + esc(me()) : 'Guest') + '</b><small>' + (get('name', '') ? esc(get('name', '')) + ' · ' : '') + NETN + '</small>' + (sup ? '<div class="badge">' + ic('star') + 'FinPi Supporter</div>' : '') + '</div></div>' +
         (!signedIn() ? '<button type="button" class="btn" data-act="signin" style="margin-top:14px"><span class="pi-dot">π</span>Sign in with Pi</button>' : '') +
-        '<div class="sec"><h2>Settings</h2></div><div class="list">' +
+        hook('profile') + '<div class="sec"><h2>Settings</h2></div><div class="list">' +
         row('edit', 'Name on receipts', get('name', '') || 'Not set', 'name') + row('globe', 'Currency', cname(curr()) + ' (' + curr() + ')', 'currency') +
-        row('bell', 'Phone notifications', get('push', false) ? 'On' : 'Off', 'push') + row('pie', 'Monthly budget', get('budget', 0) ? fpi(get('budget', 0)) + ' π' : 'Not set', 'budget') + row('card', 'Wallet address', get('addr', '') ? short(get('addr', '')) : 'Not added', 'addr-set') + '</div>' +
+        row('bell', 'Phone notifications', get('push', false) ? 'On' : 'Off', 'push') + row('pie', 'Monthly budget', get('budget', 0) ? fpi(get('budget', 0)) + ' π' : 'Not set', 'budget') + row('card', 'Wallet address', get('addr', '') ? short(get('addr', '')) : 'Not added', 'addr-set') + hook('settings') + '</div>' +
         '<div class="sec"><h2>Tools</h2></div><div class="list">' + row('users', 'Contacts', contacts().length ? contacts().length + ' saved' : 'People you pay often', 'contacts') + row('bell', 'Payment reminders', rems().length ? rems().length + ' active' : 'Rent, fees and regular payments', 'rems') + row('act', 'Price alerts', alerts().filter(function (a) { return !a.hit; }).length ? alerts().filter(function (a) { return !a.hit; }).length + ' active' : 'Know when Pi reaches your price', 'alerts') + row('rcpt', 'Monthly statement', 'PDF of your payments', 'statement') + row('info', 'Welcome tour', 'See how FinPi works', 'tour') + '</div>' +
         '<div class="sec"><h2>Security &amp; support</h2></div><div class="list">' +
         row('shield', 'Security center', 'Limits, safety and how FinPi works', 'security') + row('act', 'Resolve a pending payment', 'Finishes or clears an unfinished payment', 'resolvepend') + row('heart', sup ? 'You are a Supporter' : 'Become a Supporter', sup ? 'Thank you!' : '1 π · badge only, no reward', 'supporter') +
@@ -1514,6 +1518,11 @@
     document.addEventListener('visibilitychange', function () { if (!document.hidden) { loadPrice(); sync(); checkPendingWallet(); checkPendingInApp(); checkRems(); } });
     if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(function () {});
   }
-  window.FinPi = { S: S, render: render, sync: sync, showRcpt: showRcpt, sendSheet: sendSheet };
+  window.FinPi = { S: S, render: render, sync: sync, showRcpt: showRcpt, sendSheet: sendSheet,
+    kit: { HK: HK, P: P, A: A, T: T, get: get, put: put, esc: esc, ic: ic, toast: toast, sheet: sheet, closeSheets: closeSheets, copy: copy, fpi: fpi, conv: conv, money: money, rateIn: rateIn, curr: curr, short: short, r7: r7,
+      rcpts: rcpts, me: me, signedIn: signedIn, myTarget: myTarget, needTarget: needTarget, payLink: payLink, isG: isG, validG: validG, cName: cName, contacts: contacts, toLabel: toLabel,
+      shareText: shareText, shareImage: shareImage, shareLink: shareLink, shareFile: shareFile, saveFile: saveFile, canShareFile: canShareFile, makePdf: makePdf, fontsReady: fontsReady, addNote: addNote,
+      go: go, rerender: rerender, NETN: NETN, TEST: TEST, USER_RE: USER_RE, rcptTitle: rcptTitle } };
+  try { document.dispatchEvent(new Event('finpi:ready')); } catch (e) {}
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', start); else start();
 })();
