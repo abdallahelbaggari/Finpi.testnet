@@ -10,7 +10,7 @@
   /* storage: if the phone's browser storage is full, the oldest receipts that are already backed up are trimmed
      (they stay in the server history) and the save is retried, so nothing new is ever lost */
   function put(k, v) {
-    try { localStorage.setItem(K + k, JSON.stringify(v)); return true; } catch (e) {}
+    try { localStorage.setItem(K + k, JSON.stringify(v)); if (k === 'name' || k === 'nameType') setTimeout(function () { try { HK.dirty.forEach(function (f) { f(); }); } catch (e) {} }, 0); return true; } catch (e) {}
     try {
       ['errlog', 'price', 'fx', 'payers'].forEach(function (x) { if (x !== k) localStorage.removeItem(K + x); });
       var N = JSON.parse(localStorage.getItem(K + 'notes') || '[]'); if (k !== 'notes' && N.length > 15) localStorage.setItem(K + 'notes', JSON.stringify(N.slice(0, 15)));
@@ -47,7 +47,7 @@
   var SUPPORT = 'finpi.app@gmail.com', USER_RE = /^[A-Za-z0-9_.-]{2,40}$/;
   var CATS = ['Food', 'Transport', 'Shopping', 'Bills', 'Family', 'Business', 'Gifts', 'Charity', 'Other'];
   var S = { per: 'all', q: '', from: '', to: '', page: 60, user: null, token: null, guest: false, tab: 'home', p: null, fx: null, cfg: { enabled: false, payments: null, fee: 0.01, max: 0, daily: 0 }, filter: 'all', seg: 'tx', sort: 'new', extra: [], hMore: false, month: 0, wal: null };
-  var HK = { rcpt: [], spec: [], rows: [], html: {}, signin: [], repair: [] };
+  var HK = { rcpt: [], spec: [], rows: [], html: {}, signin: [], repair: [], dirty: [] };
   function hook(k) { var f = HK.html[k]; try { return f ? f() : ''; } catch (e) { return ''; } }
   var r7 = function (n) { return Math.round(Number(n) * 1e7) / 1e7; };
   var me = function () { return S.user && S.user.username || ''; };
@@ -231,7 +231,7 @@
   var huT = null;
   function headsUp(icn, t, b) {
     var a = $('#app'); if (!a || a.hidden) return;
-    var h = $('#hu'); if (!h) { h = document.createElement('button'); h.type = 'button'; h.id = 'hu'; h.setAttribute('aria-live', 'polite'); document.body.appendChild(h); h.onclick = function () { h.classList.remove('on'); if (A.notifs) A.notifs(); }; }
+    var h = $('#hu'); if (!h) { h = document.createElement('button'); h.type = 'button'; h.id = 'hu'; h.setAttribute('aria-live', 'polite'); document.body.insertBefore(h, document.body.firstChild); h.onclick = function () { h.classList.remove('on'); if (A.notifs) A.notifs(); }; }
     h.innerHTML = '<span class="ico nt ' + ntCls(icn) + '">' + ic(icn || 'bell') + '</span><span class="grow"><b>' + esc(t) + '</b><small>' + esc(b) + '</small></span>';
     h.classList.remove('on'); void h.offsetWidth; h.classList.add('on'); clearTimeout(huT); huT = setTimeout(function () { h.classList.remove('on'); }, 4200);
   }
@@ -469,7 +469,7 @@
     if (!t.refund_txid) return false; learnAddr(t.refund_addr);
     var tl = t.to_kind === 'address' || !t.to ? short(t.to_addr) : '@' + t.to;
     var ok = saveRcpt({ kind: 'refund', dir: 'in', amount: t.amount, other: tl, narr: t.narr, pid: t.pid, txid: t.refund_txid, addr: t.refund_addr, ts: t.done_ts || Date.now(), me: me() });
-    if (ok) addNote('undo', 'Refunded automatically', fpi(t.amount) + ' π returned to you: your transfer to ' + tl + ' could not be delivered.', 'ref-' + t.pid);
+    if (ok && Date.now() - (t.done_ts || Date.now()) < 864e5) addNote('undo', 'Refunded automatically', fpi(t.amount) + ' π returned to you: your transfer to ' + tl + ' could not be delivered.', 'ref-' + t.pid);
     return ok;
   }
   function sync() {
@@ -478,7 +478,7 @@
       if (!d || !d.ok) return; var ch = 0;
       (d.items || []).forEach(function (t) {
         if (t.status === 'paid') {
-          if (saveTransfer(t, t.dir)) { ch++; if (t.dir === 'in') { var m = fpi(t.amount) + ' π from @' + t.from + (t.narr ? ' · ' + t.narr : ''); addNote('req', 'You received Pi', m, 'in-' + t.pid); } }
+          if (saveTransfer(t, t.dir)) { ch++; if (t.dir === 'in' && Date.now() - (t.done_ts || Date.now()) < 864e5) { var m = fpi(t.amount) + ' π from @' + t.from + (t.narr ? ' · ' + t.narr : ''); addNote('req', 'You received Pi', m, 'in-' + t.pid); } }
         } else if (t.status === 'refunded' && t.dir === 'out') { if (saveRefund(t)) ch++; }
         else if (t.dir === 'out' && /^(failed|received|paying|refunding|refund_failed|refund_needed)$/.test(t.status)) {
           api('/transfer', { a: 'payout', paymentId: t.pid }).then(function (x) { if (x && x.ok && x.row) { if (saveTransfer(x.row, 'out')) rerender(); } else if (x && x.refunded && x.row && saveRefund(x.row)) rerender(); }).catch(function () {});
@@ -752,7 +752,7 @@
   }
   /* add a receipt from a transaction ID (a payment made in Pi Wallet) */
   function addTxSheet(p) {
-    var w = sheet(p ? 'Add the transaction ID' : 'Get a receipt', '<p class="sh-sub">' + (p ? 'In Pi Wallet, open the payment and copy its transaction ID (64 letters and numbers).' : 'Paste the transaction ID of any Pi payment you sent or received. FinPi reads it from the Pi blockchain and makes a professional receipt.') + '</p>' +
+    var w = sheet(p ? 'Add the transaction ID' : 'Get a receipt', '<p class="sh-sub">' + (p ? 'In Pi Wallet, open the payment and copy its transaction ID (64 letters and numbers).' : 'Paste the transaction ID of any Pi payment you sent or received.') + '</p>' +
       '<label class="l" for="tx-i">Transaction ID</label><textarea class="in num" id="tx-i" rows="2" maxlength="80" spellcheck="false" style="font-size:14px;resize:none" placeholder="64 letters and numbers"></textarea><div class="hint" id="tx-h"></div>' +
       '<button type="button" class="btn" id="tx-go">' + ic('search') + 'Find payment</button><div id="tx-r"></div>', { stack: true });
     $('#tx-go', w).onclick = function () {
@@ -804,7 +804,7 @@
   function requestSheet(isLink) {
     if (needTarget(isLink ? 'Payment links' : 'Request Pi')) return;
     var to = myTarget();
-    var w = sheet(isLink ? 'Create payment link' : 'Request Pi', '<p class="sh-sub">' + (isLink ? 'Leave the amount empty to let the payer choose.' : 'Create a payment code. The payer scans it with FinPi, checks the details and pays you.') + '</p>' +
+    var w = sheet(isLink ? 'Create payment link' : 'Request Pi', '<p class="sh-sub">' + (isLink ? 'Leave the amount empty to let the payer choose.' : 'A payment code with the amount, ready to scan.') + '</p>' +
       '<label class="l" for="q-a">Amount' + (isLink ? ' (optional)' : '') + '</label><div class="amt"><input id="q-a" type="number" inputmode="decimal" placeholder="0.00"><span>π</span></div><div class="hint num" id="q-c"></div>' +
       '<label class="l" for="q-x">What is it for?</label><input class="in" id="q-x" maxlength="80" placeholder="e.g. Rent, groceries, shop payment">' +
       '<button type="button" class="btn" id="q-go">' + ic(isLink ? 'link' : 'qr') + (isLink ? 'Create link' : 'Create payment code') + '</button>', { stack: !!isLink });
@@ -1089,9 +1089,10 @@
     var m = monthRange(off), o = { out: 0, inn: 0, n: 0, cats: {} };
     rcpts().forEach(function (r) {
       if (r.ts < m[0] || r.ts >= m[1]) return; o.n++;
+      if (r.kind === 'refund') { o.out -= Number(r.amount); return; }
       if (r.dir === 'in') o.inn += Number(r.amount); else { o.out += Number(r.amount); var c = r.kind === 'supporter' ? 'Other' : (r.cat || 'Other'); o.cats[c] = (o.cats[c] || 0) + Number(r.amount); }
     });
-    o.out = r7(o.out); o.inn = r7(o.inn); return o;
+    o.out = r7(Math.max(0, o.out)); o.inn = r7(o.inn); return o;
   }
   function monthHTML() {
     var s = monthStats(0), b = get('budget', 0), u = rateIn('USD'), pct = b ? Math.min(100, s.out / b * 100) : 0;
@@ -1172,7 +1173,7 @@
         row('mail', 'Help & contact', 'Contact the FinPi team', 'help') + '</div>' +
         '<div class="sec"><h2>Legal</h2></div><div class="list">' + lrow('Terms of Service', 'terms-of-service.html') + lrow('Privacy Policy', 'privacy-policy.html') + lrow('Risk Disclosure', 'risk-disclosure.html') + '</div>' +
         (signedIn() ? '<button type="button" class="btn danger" data-act="signout" style="margin-top:18px">' + ic('out') + 'Sign out</button>' : '') +
-        '<p class="small muted" style="text-align:center;margin-top:16px">FinPi 1.0.0 · ' + NETN + ' · finpi.pi</p>';
+        '<p class="small muted" style="text-align:center;margin-top:16px">FinPi 1.1.0 · ' + NETN + ' · finpi.pi</p>';
       function row(i, t, s, a) { return '<button type="button" class="li" data-act="' + a + '"><span class="ico">' + ic(i) + '</span><span class="grow"><b>' + esc(t) + '</b><small>' + esc(s) + '</small></span><span class="go">' + ic('chev') + '</span></button>'; }
       function lrow(t, h) { return '<a class="li" href="' + h + '"><span class="ico">' + ic('rcpt') + '</span><span class="grow"><b>' + t + '</b></span><span class="go">' + ic('chev') + '</span></a>'; }
     }
@@ -1215,7 +1216,7 @@
   }
   function actList() {
     var F = actRows(), inn = 0, out = 0, f = S.filter, lim = S.page || 60, byDay = S.sort === 'new' || S.sort === 'old';
-    F.forEach(function (x) { var r = x[0]; if (r.dir === 'in') inn += Number(r.amount) || 0; else out += Number(r.amount) || 0; });
+    F.forEach(function (x) { var r = x[0], a = Number(r.amount) || 0; if (r.kind === 'refund') { if (f === 'ref') inn += a; else out -= a; } else if (r.dir === 'in') inn += a; else out += a; }); out = Math.max(0, out);
     var html = '', groups = [], cur = null;
     F.slice(0, lim).forEach(function (x) {
       var key = byDay ? new Date(x[0].ts).toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' }) : '';
@@ -1581,7 +1582,7 @@
   }
   function alertsSheet() {
     var L = alerts(), c = curr(), r = rateIn(c), dir = 'above';
-    var w = sheet('Price alerts', '<p class="sh-sub">Get notified when 1 π reaches your price. FinPi checks the live rate while it is open.</p>' +
+    var w = sheet('Price alerts', '<p class="sh-sub">Get notified when 1 π reaches your price.</p>' +
       '<div class="card"><p class="small">1 π now</p><div class="num" style="font-size:24px;font-weight:700">' + (r ? money(r, c, r < 1 ? 4 : 2) : '—') + '</div></div>' +
       '<label class="l">Notify me when 1 π goes</label><div class="seg" id="pa-d"><button type="button" data-d="above" class="on">Above</button><button type="button" data-d="below">Below</button></div>' +
       '<label class="l" for="pa-v">Price in ' + esc(c) + '</label><div class="amt"><input id="pa-v" type="number" inputmode="decimal" min="0" step="any" placeholder="' + (r ? (r * 1.1).toFixed(r < 1 ? 4 : 2) : '0') + '"><span style="font-size:15px">' + esc(c) + '</span></div>' +
@@ -1602,7 +1603,7 @@
     var R = rcpts(), opts = [];
     for (var k = 0; k > -12; k--) { var m = monthRange(k); if (k === 0 || R.some(function (r) { return r.ts >= m[0] && r.ts < m[1]; })) opts.push(k); }
     var sel = 0;
-    var w = sheet('Monthly statement', '<p class="sh-sub">A PDF of all your FinPi payments for a month, with values and transaction IDs.</p>' +
+    var w = sheet('Monthly statement', '<p class="sh-sub">All your payments for a month, with values and transaction IDs.</p>' +
       '<label class="l">Month</label><div class="chips" id="st-m">' + opts.map(function (k) { return '<button type="button" class="chip' + (k === 0 ? ' on' : '') + '" data-m="' + k + '">' + monthRange(k)[2].toLocaleDateString('en-GB', { month: 'short', year: 'numeric' }) + '</button>'; }).join('') + '</div>' +
       '<div class="card" id="st-s" style="margin-top:12px"></div>' +
       '<div class="two"><button type="button" class="btn" data-x="dl">' + ic('down') + 'Download</button><button type="button" class="btn ghost" data-x="sh">' + ic('share') + 'Share</button></div>');
@@ -1784,14 +1785,14 @@
     },
     name: function () { nameSheet(); },
     budget: function () {
-      var w = sheet('Monthly budget', '<p class="sh-sub">How much Pi do you plan to spend each month? FinPi shows your progress. Stays on this phone.</p><div class="amt"><input id="bg-i" type="number" inputmode="decimal" placeholder="0" value="' + (get('budget', 0) || '') + '"><span>π</span></div><div class="hint num" id="bg-c"></div><button type="button" class="btn" id="bg-go">Save budget</button>' + (get('budget', 0) ? '<button type="button" class="btn ghost" id="bg-rm">Remove budget</button>' : ''));
+      var w = sheet('Monthly budget', '<p class="sh-sub">Your monthly Pi spending limit.</p><div class="amt"><input id="bg-i" type="number" inputmode="decimal" placeholder="0" value="' + (get('budget', 0) || '') + '"><span>π</span></div><div class="hint num" id="bg-c"></div><button type="button" class="btn" id="bg-go">Save budget</button>' + (get('budget', 0) ? '<button type="button" class="btn ghost" id="bg-rm">Remove budget</button>' : ''));
       var i = $('#bg-i', w); i.oninput = function () { $('#bg-c', w).textContent = conv(+i.value); }; i.oninput();
       $('#bg-go', w).onclick = function () { var v = r7(i.value); if (!(v > 0)) return toast('Enter an amount'); put('budget', v); closeSheets(); render(S.tab); toast('Budget saved'); };
       var rm = $('#bg-rm', w); if (rm) rm.onclick = function () { put('budget', 0); closeSheets(); render(S.tab); };
     },
     push: function () {
       var sup = 'Notification' in window, perm = sup ? Notification.permission : 'unsupported', on = get('push', false);
-      var w = sheet('Phone notifications', '<p class="sh-sub">Get a phone alert when you receive Pi or a transfer is refunded. Alerts always appear inside FinPi too.</p>' +
+      var w = sheet('Notifications', '<p class="sh-sub">Alerts for payments, invoices, refunds and reminders.</p>' +
         '<div class="note ' + (perm === 'granted' ? 'ok' : perm === 'denied' || perm === 'unsupported' ? 'warn' : '') + '">' + ic('bell') + '<span>' + (perm === 'granted' ? 'Allowed on this phone.' : perm === 'denied' ? 'Blocked for FinPi. Allow notifications in your browser settings to turn them on.' : perm === 'unsupported' ? 'This browser does not support phone notifications. You will still see alerts in FinPi.' : 'Not allowed yet.') + '</span></div>' +
         (sup && perm !== 'denied' ? '<button type="button" class="btn" id="ps-on">' + (on && perm === 'granted' ? 'Turn off' : 'Turn on') + '</button>' : '') + (on && perm === 'granted' ? '<button type="button" class="btn ghost" id="ps-t">Send a test</button>' : ''));
       var b = $('#ps-on', w); if (b) b.onclick = function () {

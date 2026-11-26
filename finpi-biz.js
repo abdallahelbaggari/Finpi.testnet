@@ -87,13 +87,14 @@
     K.HK.bizPush = function (force) { if (force && bHas(bSnap()) && get('bizTs', 0) <= get('bizUp', 0)) put0('bizTs', Date.now()); return bPush(); };
     K.HK.bizInfo = function () { var d = bSnap(); return { up: get('bizUp', 0), items: (d.inv || []).length + (d.cust || []).length + (d.prod || []).length + (d.recur || []).length }; };
     K.HK.repair.push(bPull);
+    K.HK.dirty.push(bDirty);
     document.addEventListener('visibilitychange', function () { if (document.hidden) bPush(); });
 
     /* ── payment done: animated confirmation ── */
     function doneFx(r) {
       var o = document.createElement('div'), inn = r.dir === 'in'; o.className = 'fp-done' + (inn ? ' in' : '');
       o.innerHTML = '<div class="fp-done-c"><svg viewBox="0 0 120 120" aria-hidden="true"><circle class="r" cx="60" cy="60" r="52"/><path class="k" d="M38 62 l15 15 l30 -32"/></svg><b class="num bz-amt">' + (inn ? '+' : '−') + fpi(r.amount) + ' π</b><span>' + esc(inn ? 'Received from ' + (r.other || K.short(r.from)) : 'Sent to ' + (r.other || K.short(r.addr))) + '</span></div>';
-      o.onclick = function () { o.remove(); }; document.body.appendChild(o); setTimeout(function () { o.classList.add('out'); setTimeout(function () { o.remove(); }, 400); }, 1900);
+      o.onclick = function () { o.remove(); }; document.body.insertBefore(o, document.body.firstChild); setTimeout(function () { o.classList.add('out'); setTimeout(function () { o.remove(); }, 400); }, 1900);
     }
 
     /* ── sounds and vibration ── */
@@ -776,7 +777,7 @@
       sound: function () { put('sound', !get('sound', true)); if (get('sound', true)) { ac(); fx('in'); } toast(get('sound', true) ? 'Payment sounds on' : 'Payment sounds off'); K.rerender(); }
     });
     // Manage rows inside the invoice sheet use data-act="x-…" with a local handler; mark them so the global router ignores them
-    var _inv = invView; invView = function (id) { _inv(id); $$('.sh-wrap:last-child [data-act^="x-"]').forEach(function (b) { b.dataset.xa = b.dataset.act; b.removeAttribute('data-act'); }); var w = $$('.sh-wrap').pop(); if (w) bindManage(w, id); };
+    var _inv = invView; invView = function (id) { _inv(id); var w = $$('.sh-wrap').pop(); if (!w) return; $$('[data-act^="x-"]', w).forEach(function (b) { b.dataset.xa = b.dataset.act; b.removeAttribute('data-act'); }); bindManage(w, id); };
     function bindManage(w, id) {
       var v = invs().filter(function (x) { return x.id === id; })[0]; if (!v) return;
       function upd(fn, msg) { saveInvs(invs().map(function (x) { if (x.id === id) fn(x); return x; })); if (msg) toast(msg); K.rerender(); invView(id); }

@@ -70,12 +70,12 @@ export async function paidBefore(env, fromUid, toUid, toAddr) {
   return !!r;
 }
 /* Light abuse protection: at most `max` calls per hour per bucket from one network. The IP is never stored, only a salted one-way hash. */
-export async function rateOk(env, request, bucket, max) {
+export async function rateOk(env, request, bucket, max, who) {
   try {
     const d = DBB(env); if (!d) return true;
     await d.exec('CREATE TABLE IF NOT EXISTS rl (k TEXT PRIMARY KEY, n INTEGER, w INTEGER)');
     const ip = request.headers.get('CF-Connecting-IP') || request.headers.get('x-forwarded-for') || 'x', w = Math.floor(Date.now() / 3600000);
-    const h = [...new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(bucket + '|' + ip + '|' + (env.PI_API_KEY || 'hm'))))].map((b) => b.toString(16).padStart(2, '0')).join('').slice(0, 32);
+    const h = [...new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(bucket + '|' + ip + '|' + String(who || '').slice(-48) + '|' + (env.PI_API_KEY || 'hm'))))].map((b) => b.toString(16).padStart(2, '0')).join('').slice(0, 32);
     await d.prepare('INSERT INTO rl (k, n, w) VALUES (?, 1, ?) ON CONFLICT(k) DO UPDATE SET n = CASE WHEN rl.w = excluded.w THEN rl.n + 1 ELSE 1 END, w = excluded.w').bind(bucket + ':' + h, w).run();
     const r = await d.prepare('SELECT n FROM rl WHERE k = ?').bind(bucket + ':' + h).first();
     if (Math.random() < 0.02) await d.prepare('DELETE FROM rl WHERE w < ?').bind(w - 1).run();

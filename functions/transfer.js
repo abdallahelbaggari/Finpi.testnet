@@ -28,11 +28,11 @@ export async function onRequestGet({ request, env }) {
 export async function onRequestPost({ request, env }) {
   const b = await request.json().catch(() => ({}));
   if (b.a === 'payout') {
-    if (!(await rateOk(env, request, 'payout', 300))) return json({ ok: false, retry: true, error: 'Busy, trying again shortly' });
+    if (!(await rateOk(env, request, 'payout', 900))) return json({ ok: false, retry: true, error: 'Busy, trying again shortly' });
     return json(await payout(env, request, String(b.paymentId || '')));
   }
   if (b.a === 'check') {
-    if (!(await rateOk(env, request, 'check', 120))) return json({ ok: false, error: 'Too many attempts. Please wait a while and try again.' });
+    if (!(await rateOk(env, request, 'check', 240, b.accessToken))) return json({ ok: false, error: 'Too many attempts. Please wait a while and try again.' });
     if (!enabled(env)) return json({ ok: false, error: 'Sending Pi is not available right now' });
     const u = await me(b.accessToken); if (!u) return json({ ok: false, error: 'Sign in with Pi first' });
     const amt = Math.round(Number(b.amt) * 1e7) / 1e7, addr = String(b.addr || '').trim().toUpperCase(), to = String(b.to || '').replace(/^@/, '');
@@ -45,7 +45,7 @@ export async function onRequestPost({ request, env }) {
     return json({ ok: true, to: r.username, first: !(await paidBefore(env, u.uid, r.uid)) });
   }
   if (b.a === 'list') {
-    if (!(await rateOk(env, request, 'list', 240))) return json({ ok: false, error: 'Busy' });
+    if (!(await rateOk(env, request, 'list', 1500, b.accessToken))) return json({ ok: false, error: 'Busy' });
     if (!DBB(env)) return json({ ok: false, setup: true });
     const u = await me(b.accessToken); if (!u) return json({ ok: false, error: 'Sign in with Pi first' });
     const d = await db(env), net = { name: isTest(request) ? 'Pi Testnet' : 'Pi Mainnet' };

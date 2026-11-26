@@ -10,7 +10,7 @@ export async function onRequestPost({ request, env }) {
   const pid = String(b.paymentId || ''), txid = String(b.txid || '');
   if (!/^[A-Za-z0-9_-]{6,80}$/.test(pid) || !/^[A-Fa-f0-9]{64}$/.test(txid)) return out({ completed: false, error: 'Invalid payment details' });
   if (!piKey(env)) return out({ completed: false, error: 'Payments are not switched on yet' });
-  if (!(await rateOk(env, request, 'complete', 120))) return out({ completed: false, error: 'Too many attempts. Please wait a while.' });
+  if (!(await rateOk(env, request, 'complete', 600))) return out({ completed: false, error: 'Too many attempts. Please wait a while.' });
   try {
     const r = await piApi(env, '/payments/' + encodeURIComponent(pid) + '/complete', 'POST', { txid });
     let transfer = null;

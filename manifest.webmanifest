@@ -1,15 +1,28 @@
 {
   "name": "FinPi",
   "short_name": "FinPi",
-  "description": "Pi payments, clear and verified: live rates, send and request Pi, business links, budgets and verified receipts.",
+  "description": "Pi payments and business tools: send, receive and request Pi, quick sale, invoices, reports and verified receipts.",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",
-  "background_color": "#F2F5FA",
-  "theme_color": "#0A1F55",
+  "background_color": "#061A4F",
+  "theme_color": "#0D2E8C",
   "icons": [
-    { "src": "/icons/icon-192.png", "sizes": "192x192", "type": "image/png" },
-    { "src": "/icons/icon-512.png", "sizes": "512x512", "type": "image/png" },
-    { "src": "/icons/maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+    {
+      "src": "/icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "/icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    },
+    {
+      "src": "/icons/maskable-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
   ]
 }

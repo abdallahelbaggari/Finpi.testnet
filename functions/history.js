@@ -33,7 +33,7 @@ export async function onRequestPost({ request, env }) {
     const b = await request.json().catch(() => ({}));
     const d = await hdb(env);
     if (!d) return json({ ok: false, unavailable: true, error: 'History backup is not available right now' });
-    if (!(await rateOk(env, request, 'hist', 600))) return json({ ok: false, error: 'Too many requests. Try again in a few minutes.' });
+    if (!(await rateOk(env, request, 'hist', 900, b.accessToken))) return json({ ok: false, error: 'Too many requests. Try again in a few minutes.' });
     const u = await me(b.accessToken);
     if (!u) return json({ ok: false, auth: true, error: 'Sign in with Pi again' });
     if (b.a === 'push') {

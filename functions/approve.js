@@ -16,7 +16,7 @@ export async function onRequestPost({ request, env }) {
   const pid = String(b.paymentId || '');
   if (!/^[A-Za-z0-9_-]{6,80}$/.test(pid)) return out({ approved: false, error: 'Invalid payment id' });
   if (!piKey(env)) return out({ approved: false, error: 'Payments are not switched on yet' });
-  if (!(await rateOk(env, request, 'approve', 120))) return out({ approved: false, error: 'Too many attempts. Please wait a while and try again.' });
+  if (!(await rateOk(env, request, 'approve', 600))) return out({ approved: false, error: 'Too many attempts. Please wait a while and try again.' });
   const K = { Authorization: 'Key ' + piKey(env) };
   try {
     const chk = await fetch('https://api.minepi.com/v2/payments/' + encodeURIComponent(pid), { headers: K });

@@ -664,3 +664,6 @@ body{background:var(--bg)}
 #view>.ph+.seg{background:#fff;box-shadow:0 14px 30px -18px rgba(6,26,79,.6)}
 body{background:#EAF0FA}
 .sec h2{position:relative;padding-left:12px}.sec h2:before{content:"";position:absolute;left:0;top:18%;bottom:18%;width:4px;border-radius:4px;background:linear-gradient(180deg,#1543E0,#0A9488)}
+/* small phones */
+@media (max-width:350px){#top{padding:8px 10px}#top .brand{font-size:17px;gap:7px}#top .brand img{width:28px;height:28px}.top-r{gap:5px}#top .tbtn{width:36px;height:36px}#top .avatar{width:36px;height:36px;font-size:14px}#top .netb{font-size:10.5px;padding:3px 7px}.qa i{width:46px;height:46px}.sv i{width:42px;height:42px}.sv b{font-size:11px}}
+.li .grow{min-width:0}.li .grow b{overflow-wrap:anywhere}
