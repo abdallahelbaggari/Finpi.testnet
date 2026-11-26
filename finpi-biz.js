@@ -98,6 +98,7 @@
 
     /* ── payment done: animated confirmation ── */
     function doneFx(r) {
+      if (r.dir !== 'in' && (document.querySelector('#st-m') || document.querySelector('#wp-st'))) return; // the payment screen shows its own success mark
       var o = document.createElement('div'), inn = r.dir === 'in'; o.className = 'fp-done' + (inn ? ' in' : '');
       o.innerHTML = '<div class="fp-done-c"><svg viewBox="0 0 120 120" aria-hidden="true"><circle class="r" cx="60" cy="60" r="52"/><path class="k" d="M38 62 l15 15 l30 -32"/></svg><b class="num bz-amt">' + (inn ? '+' : '−') + fpi(r.amount) + ' π</b><span>' + esc(inn ? 'Received from ' + (r.other || K.short(r.from)) : 'Sent to ' + (r.other || K.short(r.addr))) + '</span></div>';
       o.onclick = function () { o.remove(); }; document.body.insertBefore(o, document.body.firstChild); setTimeout(function () { o.classList.add('out'); setTimeout(function () { o.remove(); }, 400); }, 1900);

@@ -374,6 +374,22 @@
   function rcName(r) { var d = new Date(r.ts); return 'FinPi-receipt-' + d.getFullYear() + String(d.getMonth() + 1).padStart(2, '0') + String(d.getDate()).padStart(2, '0') + '-' + String(r.txid || r.pid || Date.now()).slice(0, 8) + '.jpg'; }
   function rcType(r) { return r.kind === 'refund' ? 'Automatic refund' : r.kind === 'supporter' ? 'Supporter payment' : r.kind === 'wallet' ? (r.dir === 'in' ? 'Payment received' : 'Payment sent · Pi Wallet') : r.dir === 'in' ? 'Transfer received' : 'Transfer sent'; }
   /* Transaction details: every fact about the payment, then share or download the receipt image */
+  /* animated payment status: a drawn check (succeeded), a turning ring (pending), a drawn cross (not completed) */
+  function stMark(kind) {
+    var C = '<circle class="sa-c" cx="40" cy="40" r="34"/>';
+    if (kind === 'ok' || kind === 'in') return '<svg class="sa ok" viewBox="0 0 80 80" aria-hidden="true">' + C + '<path class="sa-d" d="M25 41l10 10 21-22"/></svg>';
+    if (kind === 'pending') return '<svg class="sa pend" viewBox="0 0 80 80" aria-hidden="true"><circle class="sa-t" cx="40" cy="40" r="34"/><circle class="sa-c" cx="40" cy="40" r="34"/><path class="sa-h" d="M40 24v17l11 7"/></svg>';
+    if (kind === 'refund') return '<svg class="sa rf" viewBox="0 0 80 80" aria-hidden="true">' + C + '<path class="sa-d" d="M30 32h17a10 10 0 0 1 0 20H33M30 32l7-7M30 32l7 7"/></svg>';
+    return '<svg class="sa bad" viewBox="0 0 80 80" aria-hidden="true">' + C + '<path class="sa-d" d="M29 29l22 22M51 29L29 51"/></svg>';
+  }
+  function payState(w, kind, title, sub, reset) {
+    var box = $('.pst', w); if (!box) { box = document.createElement('div'); var big = $('.big', w); if (big) big.parentNode.insertBefore(box, big.nextSibling); else $('.sh', w).appendChild(box); }
+    box.className = 'pst ' + kind; box.setAttribute('role', 'status');
+    box.innerHTML = stMark(kind) + '<b class="pst-t">' + esc(title) + '</b>' + (sub ? '<span class="pst-s">' + sub + '</span>' : '') + (reset ? '<button type="button" class="btn soft pst-r" data-act="repair">' + ic('refresh') + 'Reset now</button>' : '');
+    try { if (navigator.vibrate) navigator.vibrate(kind === 'ok' ? [40, 40, 90] : kind === 'pending' ? 30 : [120, 60, 120]); } catch (e) {}
+  }
+  var PEND_MSG = 'A payment is still pending. Go to Profile, tap Reset, then try again.';
+  function noFunds(m) { return /insufficient|not enough|balance is too low|underfunded|low balance|funds/i.test(m || ''); }
   function showRcpt(r) {
     if (!r) return;
     var inn = r.dir === 'in', v = verifyUrl(r), fee = !inn && r.kind === 'transfer' ? (r.fee || 0.01) : 0, d = new Date(r.ts);
@@ -396,7 +412,7 @@
     HK.rows.forEach(function (f) { try { f(rows, r); } catch (e) {} });
     var cls = r.kind === 'refund' ? 'rf' : r.kind === 'supporter' ? 'sp' : inn ? 'in' : '';
     var w = sheet('Transaction details',
-      '<div class="txd"><span class="ico ' + cls + '">' + ic(r.kind === 'refund' ? 'undo' : r.kind === 'supporter' ? 'heart' : inn ? 'req' : 'send') + '</span><p class="small">' + esc(rcType(r)) + '</p>' +
+      '<div class="txd"><div class="txd-st">' + stMark(r.kind === 'refund' ? 'refund' : 'ok') + '<b>' + (r.kind === 'refund' ? 'Payment refunded' : inn ? 'Payment received' : 'Payment succeeded') + '</b></div><p class="small">' + esc(rcType(r)) + '</p>' +
       '<div class="txd-v num' + (inn ? ' pos' : '') + '">' + (inn ? '+' : '−') + fpi(r.amount) + ' π</div>' +
       (r.usd ? '<p class="small muted num">≈ ' + money(r.amount * r.usd, 'USD') + (r.lr && r.lc && r.lc !== 'USD' ? ' · ' + money(r.amount * r.lr, r.lc) : '') + ' at payment time</p>' : '') +
       '<span class="txd-ok">' + ic('check', 'width:15px;height:15px') + 'Verified on the Pi blockchain</span></div>' +
@@ -767,18 +783,19 @@
       var pl = get('payees', []).filter(function (x) { return x.toLowerCase() !== to.toLowerCase(); }); pl.unshift(to); put('payees', pl.slice(0, 12));
       addNote('send', 'Transfer delivered', fpi(amt) + ' π to ' + lab + ' · ' + narr, 'out-' + row.pid);
       step(4, '✓ Delivered to ' + esc(lab) + ' and recorded on the Pi blockchain.', 'ok');
+      payState(w, 'ok', 'Payment succeeded!', fpi(amt) + ' π delivered to ' + esc(lab));
       var b = document.createElement('button'); b.type = 'button'; b.className = 'btn'; b.innerHTML = ic('rcpt') + 'View receipt';
       b.onclick = function () { var r = rcpts().filter(function (x) { return x.txid === row.txid; })[0]; showRcpt(r); };
       var d2 = document.createElement('button'); d2.type = 'button'; d2.className = 'btn ghost'; d2.textContent = 'Done'; d2.onclick = function () { closeSheets(); render(S.tab); };
       var sh = $('.sh', w); if (sh) { sh.appendChild(b); sh.appendChild(d2); }
     }
-    function refunded(row) { put('ipend', get('ipend', []).filter(function (x) { return x.pid !== row.pid; })); saveRefund(row); step(3, '↩ This transfer could not be delivered, so ' + fpi(amt) + ' π was refunded to you automatically on the Pi blockchain.', 'err'); }
+    function refunded(row) { put('ipend', get('ipend', []).filter(function (x) { return x.pid !== row.pid; })); saveRefund(row); step(3, '↩ This transfer could not be delivered, so ' + fpi(amt) + ' π was refunded to you automatically on the Pi blockchain.', 'err'); payState(w, 'refund', 'Payment refunded', fpi(amt) + ' π is back in your wallet.'); }
     try {
       Pi.createPayment({ amount: r7(amt + S.cfg.fee), memo: ('FinPi transfer to ' + lab).slice(0, 60), metadata: A ? { type: 'transfer', addr: to, amt: amt, narr: narr } : { type: 'transfer', to: to, amt: amt, narr: narr } }, {
         onReadyForServerApproval: function (pid) {
           var pend = get('pend', {}); pend[pid] = { cat: cat, to: to, amt: amt, narr: narr, ts: Date.now() }; put('pend', pend);
           curPid = pid;
-          api('/approve', { paymentId: pid }).then(function (d) { if (d && d.approved === false) { refused = true; dropPending(pid); step(1, '✕ ' + esc(d.error || 'This payment could not be sent.') + (/Nothing was charged/.test(d.error || '') ? '' : ' Nothing was charged.'), 'err'); } }).catch(function () {});
+          api('/approve', { paymentId: pid }).then(function (d) { if (d && d.approved === false) { refused = true; dropPending(pid); step(1, '✕ ' + esc(d.error || 'This payment could not be sent.') + (/Nothing was charged/.test(d.error || '') ? '' : ' Nothing was charged.'), 'err'); payState(w, 'fail', 'Payment not completed', 'No Pi was moved.'); } }).catch(function () {});
         },
         onReadyForServerCompletion: function (pid, txid) {
           var ip = get('ipend', []).filter(function (x) { return x.pid !== pid; }); ip.unshift({ pid: pid, ts: Date.now() }); put('ipend', ip.slice(0, 20));
@@ -792,16 +809,17 @@
               api('/transfer', { a: 'payout', paymentId: pid }).then(function (x) {
                 if (x && x.ok && x.row && x.row.txid) return finish(x.row);
                 if (x && x.refunded && x.row) return refunded(x.row);
-                if (++tries < 40) { step(3, 'Delivering to ' + esc(lab) + '… The receipt will appear in Activity.'); setTimeout(retry, 8000); }
-                else step(3, 'Payment processing. The receipt will appear in Activity once delivered.');
+                if (++tries < 40) { step(3, 'Delivering to ' + esc(lab) + '… The receipt will appear in Activity.'); if (tries === 2) payState(w, 'pending', 'Payment pending', 'FinPi is finishing it automatically. Your receipt appears in Activity.'); setTimeout(retry, 8000); }
+                else { step(3, 'Payment processing. The receipt will appear in Activity once delivered.'); payState(w, 'pending', 'Payment pending', 'If it stays pending, go to Profile and tap Reset.', true); }
               }).catch(function () { if (++tries < 40) setTimeout(retry, 8000); });
             })();
-          }).catch(function () { step(2, 'Connection problem. Your payment is recorded; FinPi finishes it automatically when you reopen the app.', 'err'); });
+          }).catch(function () { step(2, 'Connection problem. Your payment is recorded; FinPi finishes it automatically when you reopen the app.', 'err'); payState(w, 'pending', 'Payment pending', 'If it stays pending, go to Profile and tap Reset.', true); });
         },
-        onCancel: function (cp) { dropPending(cp || curPid); if (!refused) step(1, 'You cancelled. Nothing was paid.', 'err'); },
+        onCancel: function (cp) { dropPending(cp || curPid); if (!refused) { step(1, 'You cancelled. Nothing was paid.', 'err'); payState(w, 'fail', 'Payment cancelled', 'Nothing was paid.'); } },
         onError: function (e) { if (refused) return; var m = String((e && e.message) || 'Payment error').replace(/\.+$/, '');
-          if (/pending payment/i.test(m)) { resolvePending(); step(1, 'An earlier payment is being finished automatically. Nothing was paid. Please try again in 2 minutes.', 'err'); }
-          else step(1, '✕ ' + esc(m) + '. Nothing was paid.', 'err'); }
+          if (/pending payment|incomplete|unfinished/i.test(m)) { resolvePending(); step(1, 'Nothing was paid.', 'err'); payState(w, 'pending', 'Payment pending', PEND_MSG, true); }
+          else if (noFunds(m)) { step(1, 'Nothing was paid.', 'err'); payState(w, 'fail', 'Not enough Pi', 'Your Pi balance is too low for this payment. No Pi was moved.'); }
+          else { step(1, '✕ ' + esc(m) + '. Nothing was paid.', 'err'); payState(w, 'fail', 'Payment not completed', 'No Pi was moved.'); } }
       });
     } catch (e) { step(1, '✕ ' + esc(e.message || e), 'err'); }
   }
@@ -884,7 +902,7 @@
     var iv = setInterval(function () {
       if (!document.body.contains(w)) return clearInterval(iv);
       if (document.hidden) return;
-      findWalletPay(p).then(function (r) { if (!r || !document.body.contains(w)) return; clearInterval(iv); var rc = saveWalletPay(p, r); closeSheets(); render(S.tab); toast('Payment confirmed on the Pi blockchain'); showRcpt(rc); }).catch(function () {});
+      findWalletPay(p).then(function (r) { if (!r || !document.body.contains(w)) return; clearInterval(iv); var rc = saveWalletPay(p, r); payState(w, 'ok', 'Payment succeeded!', fpi(amt) + ' π · confirmed on the Pi blockchain'); setTimeout(function () { closeSheets(); render(S.tab); showRcpt(rc); }, 1400); }).catch(function () {});
     }, 5000);
   }
   /* add a receipt from a transaction ID (a payment made in Pi Wallet) */
@@ -1343,7 +1361,7 @@
         row('edit', 'Name on receipts', get('name', '') ? NTYPE[nType()].l + ' · ' + get('name', '') : 'Your name, business, store or shop', 'name') + row('globe', 'Currency', cname(curr()) + ' (' + curr() + ')', 'currency') + (window.FPL ? row('globe', 'Language', FPL.LANGS[FPL.lang()], 'lang') : '') + (canInstall() ? row('down', 'Install FinPi', 'Add to home screen', 'install') : '') +
         row('bell', 'Notifications', !('Notification' in window) ? 'In-app alerts on' : get('push', false) ? 'Phone and in-app alerts' : 'In-app alerts on', 'push') + row('pie', 'Monthly budget', get('budget', 0) ? fpi(get('budget', 0)) + ' π' : 'Not set', 'budget') + row('card', 'Wallet address', get('addr', '') ? short(get('addr', '')) : 'Not added', 'addr-set') + hook('settings') + '</div>' +
         '<div class="sec"><h2>Support</h2></div><div class="list">' + row('info', 'Welcome tour', 'A quick look at FinPi', 'tour') +
-        row('shield', 'Trust center', 'Payments, limits and records', 'security') + row('refresh', 'Repair app', 'Refresh FinPi and restore your data', 'repair') + row('act', 'Resolve a pending payment', 'Finishes or clears an unfinished payment', 'resolvepend') + row('heart', sup ? 'You are a Supporter' : 'Become a Supporter', sup ? 'Thank you!' : '1 π · Supporter badge', 'supporter') +
+        row('shield', 'Trust center', 'Payments, limits and records', 'security') + row('refresh', 'Reset', 'Pending payment or a problem? Reset fixes it', 'repair') + row('heart', sup ? 'You are a Supporter' : 'Become a Supporter', sup ? 'Thank you!' : '1 π · Supporter badge', 'supporter') +
         row('mail', 'Help & contact', 'Contact the FinPi team', 'help') + '</div>' +
         '<div class="sec"><h2>Legal</h2></div><div class="list">' + lrow('Terms of Service', 'terms-of-service.html') + lrow('Privacy Policy', 'privacy-policy.html') + lrow('Risk Disclosure', 'risk-disclosure.html') + '</div>' +
         (signedIn() ? '<button type="button" class="btn danger" data-act="signout" style="margin-top:18px">' + ic('out') + 'Sign out</button>' : '') +
@@ -1459,8 +1477,7 @@
     { id: 'trust', n: 'Trust center', s: 'Payments, limits, records', i: 'lock', c: 'b', g: 'sec', a: 'security' },
     { id: 'trusted', n: 'Trusted recipients', s: 'Addresses and usernames you trust', i: 'shield', c: 'g', g: 'sec', a: 'trusted' },
     { id: 'report', n: 'Report a scam', s: 'Warn other Pioneers', i: 'warn', c: 'a', g: 'sec', a: 'report' },
-    { id: 'repair', n: 'Repair app', s: 'Refresh and restore data', i: 'refresh', c: 't', g: 'help', a: 'repair' },
-    { id: 'pending', n: 'Pending payment', s: 'Finish or clear it', i: 'undo', c: 'a', g: 'help', a: 'resolvepend' },
+    { id: 'repair', n: 'Reset', s: 'Pending payment or a problem', i: 'refresh', c: 't', g: 'help', a: 'repair' },
     { id: 'help', n: 'Help & contact', s: 'Contact FinPi support', i: 'mail', c: 'n', g: 'help', a: 'help' }
   ];
   var HOME_SVC = ['sale', 'verify', 'invoice', 'myqr', 'links', 'split', 'biz', 'more'];
@@ -1529,29 +1546,36 @@
   /* Repair app: clears temporary files and cached screens, checks saved data and restores history and business
      records from the backup. Payments, receipts and business records are kept. */
   function repairSheet() {
-    var w = sheet('Repair app', '<p class="sh-sub">Refreshes FinPi and restores your data. Your payments, receipts and business records are kept.</p>' +
-      '<div class="list rp-l">' + ['Clear temporary files', 'Check saved data', 'Restore from backup', 'Restart FinPi'].map(function (t, i) { return '<div class="li" data-rs="' + i + '"><span class="ico">' + ic('refresh') + '</span><span class="grow"><b>' + t + '</b></span><span class="rp-s"></span></div>'; }).join('') + '</div>' +
-      '<button type="button" class="btn" id="rp-go">' + ic('refresh') + 'Repair now</button>');
+    var w = sheet('Reset', '<p class="sh-sub">Finishes any pending payment and fixes technical problems. Your payments, receipts and business records are kept.</p>' +
+      '<div class="list rp-l">' + ['Finish pending payments', 'Clear temporary files', 'Check saved data', 'Restore from backup', 'Restart FinPi'].map(function (t, i) { return '<div class="li" data-rs="' + i + '"><span class="ico">' + ic('refresh') + '</span><span class="grow"><b>' + t + '</b></span><span class="rp-s"></span></div>'; }).join('') + '</div>' +
+      '<button type="button" class="btn" id="rp-go">' + ic('refresh') + 'Reset now</button>');
     function step(i, st) { var r = $('[data-rs="' + i + '"]', w); if (!r) return; r.classList.toggle('busy', st === 'busy'); r.classList.toggle('done', st === 'done'); $('.ico', r).innerHTML = ic(st === 'done' ? 'check' : 'refresh'); }
     $('#rp-go', w).onclick = function () {
-      var b = this; b.disabled = true; b.textContent = 'Repairing…'; var t0 = Date.now();
+      var b = this; b.disabled = true; b.textContent = 'Resetting…'; var t0 = Date.now();
+      // 1. pending payments: ask Pi for any unfinished payment and let the server finish or cancel it
       step(0, 'busy');
-      var p0 = Promise.all([
+      var pend0 = new Promise(function (ok) {
+        try { checkPendingInApp(); checkPendingWallet(); } catch (e) {}
+        if (!signedIn() || !window.Pi || !initPi()) return setTimeout(ok, 600);
+        resolving = 0; resolvePending(); var p = authP || Promise.resolve();
+        Promise.race([p, new Promise(function (z) { setTimeout(z, 8000); })]).then(function () { setTimeout(ok, 2500); });
+      });
+      var p0 = pend0.then(function () { step(0, 'done'); step(1, 'busy'); }).then(function () { return Promise.all([
         window.caches ? caches.keys().then(function (ks) { return Promise.all(ks.map(function (k) { return caches.delete(k); })); }) : null,
         navigator.serviceWorker ? navigator.serviceWorker.getRegistrations().then(function (rs) { return Promise.all(rs.map(function (r) { return r.unregister(); })); }) : null
-      ]).catch(function () {});
+      ]).catch(function () {}); });
       p0.then(function () {
         upCache = {}; ['price', 'fx', 'errlog'].forEach(function (k) { try { localStorage.removeItem(K + k); } catch (e) {} });
-        step(0, 'done'); step(1, 'busy'); var bad = 0;
+        step(1, 'done'); step(2, 'busy'); var bad = 0;
         try { for (var i = localStorage.length - 1; i >= 0; i--) { var k = localStorage.key(i); if (k && k.indexOf(K) === 0) { try { JSON.parse(localStorage.getItem(k)); } catch (e) { localStorage.removeItem(k); bad++; } } } } catch (e) {}
         var R = rcpts(), seen = {}, clean = R.filter(function (r) { if (!r || !(Number(r.amount) > 0) || !r.ts) { bad++; return false; } var h = hKey(r) || JSON.stringify(r); if (seen[h]) { bad++; return false; } seen[h] = 1; return true; });
         if (clean.length !== R.length) put('rcpts', clean);
-        step(1, 'done'); step(2, 'busy');
+        step(2, 'done'); step(3, 'busy');
         if (!signedIn()) return null;
         hBusy = false; return Promise.all([new Promise(function (ok) { hPush().then(function () { return api('/history', { a: 'pull', accessToken: S.token, limit: 500 }); }).then(function (d) { if (d && d.ok) { S.hMore = !!d.more; hMerge(d.items || []); } }).catch(function () {}).then(ok); })].concat(HK.repair.map(function (f) { try { return f(); } catch (e) { return null; } })));
       }).then(function () {
-        step(2, 'done'); step(3, 'busy');
-        setTimeout(function () { step(3, 'done'); toast('FinPi repaired'); setTimeout(function () { location.replace(location.pathname + '?r=' + Date.now().toString(36)); }, 600); }, Math.max(300, 1400 - (Date.now() - t0)));
+        step(3, 'done'); step(4, 'busy');
+        setTimeout(function () { step(4, 'done'); toast('Reset complete'); setTimeout(function () { location.replace(location.pathname + '?r=' + Date.now().toString(36)); }, 600); }, Math.max(300, 1400 - (Date.now() - t0)));
       });
     };
   }
@@ -2020,7 +2044,7 @@
       };
       var t = $('#ps-t', w); if (t) t.onclick = function () { addNote('bell', 'FinPi notifications', 'Alerts are working.', 'test-' + Date.now()); toast('Test sent'); };
     },
-    resolvepend: function () { window.fpResolvePending(); }, backup: function () { backupSheet(); }, travel: function () { curSheet(true); }, insights: function () { S.seg = 'ins'; go('activity'); }, catsort: function () { catSort(S.month); }, repair: function () { repairSheet(); },
+    resolvepend: function () { repairSheet(); }, backup: function () { backupSheet(); }, travel: function () { curSheet(true); }, insights: function () { S.seg = 'ins'; go('activity'); }, catsort: function () { catSort(S.month); }, repair: function () { repairSheet(); },
     security: function () {
       sheet('Trust center', '<div class="trust big-t">' + trustChips() + '</div>' +
         '<div class="card" style="margin-top:12px"><h3>Payments</h3><p>Every transfer is processed through Pi Network’s official payments and delivered within seconds. If delivery is not possible, the Pi is refunded automatically. Each payment is checked on the Pi blockchain, so nothing is paid twice.</p></div>' +
