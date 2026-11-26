@@ -20,7 +20,11 @@
       store: '<path d="M3 9l1.5-5h15L21 9"/><path d="M3 9h18v2a3 3 0 0 1-6 0 3 3 0 0 1-6 0 3 3 0 0 1-6 0z"/><path d="M5 13v8h14v-8"/><path d="M10 21v-5h4v5"/>',
       sound: '<polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14"/>',
       print: '<polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/>',
-      phone: '<rect x="5" y="2" width="14" height="20" rx="2"/><line x1="12" y1="18" x2="12.01" y2="18"/>'
+      phone: '<rect x="5" y="2" width="14" height="20" rx="2"/><line x1="12" y1="18" x2="12.01" y2="18"/>',
+      exp: '<circle cx="12" cy="12" r="10"/><polyline points="8 12 12 16 16 12"/><line x1="12" y1="8" x2="12" y2="16"/>',
+      sun: '<circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/>',
+      bar: '<path d="M3 5v14M7 5v14M10 5v14M14 5v14M17 5v14M21 5v14"/>',
+      pct: '<line x1="19" y1="5" x2="5" y2="19"/><circle cx="6.5" cy="6.5" r="2.5"/><circle cx="17.5" cy="17.5" r="2.5"/>'
     });
 
     /* ── data ── */
@@ -58,10 +62,10 @@
     function invLink(v) { return K.payLink({ u: v.to, a: balance(v) || v.total, x: (v.no + ' · ' + (v.title || (v.items[0] && v.items[0].d) || 'Invoice')).slice(0, 80) }); }
 
     /* ── backup of business records to the Pi account (restored on any phone after sign-in) ── */
-    var BK = ['biz', 'inv', 'invSeq', 'cust', 'recur', 'qrO', 'prod', 'name', 'nameType'], bT = null, put0 = K.put;
+    var BK = ['biz', 'inv', 'invSeq', 'cust', 'recur', 'qrO', 'prod', 'name', 'nameType', 'exp'], bT = null, put0 = K.put;
     put = function (k, v) { var r = put0(k, v); if (BK.indexOf(k) >= 0) bDirty(); return r; };
     function bSnap() { var d = {}; BK.forEach(function (k) { var v = get(k, null); if (v !== null) d[k] = v; }); return d; }
-    function bHas(d) { return !!(d && ((d.inv || []).length || (d.cust || []).length || (d.recur || []).length || (d.prod || []).length || (d.biz && d.biz.name))); }
+    function bHas(d) { return !!(d && ((d.inv || []).length || (d.cust || []).length || (d.recur || []).length || (d.prod || []).length || (d.exp || []).length || (d.biz && d.biz.name))); }
     function bDirty() { put0('bizTs', Date.now()); clearTimeout(bT); bT = setTimeout(bPush, 2500); }
     function bPush() {
       if (!K.signedIn() || !K.token()) return Promise.resolve(); var ts = get('bizTs', 0);
@@ -186,6 +190,7 @@
       v.total = calc(v).total; var L = invs(); L.unshift(v); saveInvs(L); return v;
     }
     function checkRec() {
+      try { eodCheck(); } catch (e) {}
       var R = recs(), ch = false, now = Date.now();
       R.forEach(function (x) {
         if (x.off) return; var guard = 0;
@@ -520,30 +525,33 @@
     }
     function prodSheet(q0) {
       var P = prods().slice().sort(function (a, b) { return a.n.localeCompare(b.n); });
-      var w = sheet('Products', '<div class="bz-search">' + ic('search') + '<input class="in" id="pr-q" placeholder="Search products" value="' + esc(q0 || '') + '"></div><div class="list" id="pr-l" style="margin-top:12px"></div>' +
+      var w = sheet('Products', '<div class="qs-top"><div class="bz-search">' + ic('search') + '<input class="in" id="pr-q" placeholder="Search name or barcode" value="' + esc(q0 || '') + '"></div><button type="button" class="qs-scan" data-x="ps" aria-label="Scan a barcode">' + ic('bar') + '<span>Scan</span></button></div><div class="list" id="pr-l" style="margin-top:12px"></div>' +
         '<button type="button" class="btn" data-x="add">' + ic('plus') + 'Add product</button>');
       function draw() {
-        var t = $('#pr-q', w).value.trim().toLowerCase(), L = P.filter(function (q) { return !t || (q.n + ' ' + (q.sku || '')).toLowerCase().indexOf(t) >= 0; });
-        $('#pr-l', w).innerHTML = L.length ? L.map(function (q) { var low = typeof q.stock === 'number' && q.low != null && q.stock <= q.low; return '<button type="button" class="li" data-pe="' + q.id + '"><span class="ico ' + (low ? 'rf' : '') + '">' + ic('tag') + '</span><span class="grow"><b>' + esc(q.n) + '</b><small>' + esc([q.unit ? 'per ' + q.unit : '', q.sku ? 'SKU ' + q.sku : '', typeof q.stock === 'number' ? fpi(q.stock) + ' in stock' : ''].filter(Boolean).join(' · ') || 'No stock tracking') + '</small></span><span class="amt-r"><b class="num bz-amt">' + fpi(q.p) + ' π</b>' + (low ? '<small class="bz-due">Low stock</small>' : '') + '</span></button>'; }).join('')
+        var t = $('#pr-q', w).value.trim().toLowerCase(), L = P.filter(function (q) { return !t || (q.n + ' ' + (q.sku || '')).toLowerCase().indexOf(t) >= 0 || (q.sku && window.FPBar && FPBar.same(q.sku, t)); });
+        $('#pr-l', w).innerHTML = L.length ? L.map(function (q) { var low = typeof q.stock === 'number' && q.low != null && q.stock <= q.low; return '<button type="button" class="li" data-pe="' + q.id + '"><span class="ico ' + (low ? 'rf' : '') + '">' + ic('tag') + '</span><span class="grow"><b>' + esc(q.n) + '</b><small>' + esc([q.unit ? 'per ' + q.unit : '', q.sku ? 'Code ' + q.sku : '', typeof q.stock === 'number' ? fpi(q.stock) + ' in stock' : ''].filter(Boolean).join(' · ') || 'No stock tracking') + '</small></span><span class="amt-r"><b class="num bz-amt">' + fpi(q.p) + ' π</b>' + (low ? '<small class="bz-due">Low stock</small>' : '') + '</span></button>'; }).join('')
           : '<div class="empty">' + ic('tag') + '<div>' + (P.length ? 'No match.' : 'No products yet.') + '</div></div>';
         $$('[data-pe]', w).forEach(function (b) { b.onclick = function () { prodEdit(b.dataset.pe); }; });
       }
       $('#pr-q', w).oninput = draw; draw(); $('[data-x="add"]', w).onclick = function () { prodEdit(''); };
+      $('[data-x="ps"]', w).onclick = function () { barScan('Find a product', function (code) { var q = prods().filter(function (x) { return x.sku && window.FPBar && FPBar.same(x.sku, code); })[0]; return { stop: true, then: function () { if (q) prodEdit(q.id); else unknownCode(code, function () { prodSheet(); }); } }; }); };
     }
-    function prodEdit(id, back) {
-      var q = prods().filter(function (x) { return x.id === id; })[0] || {};
+    function prodEdit(id, back, pre) {
+      var q = prods().filter(function (x) { return x.id === id; })[0] || Object.assign({}, pre || {});
       var w = sheet(id ? 'Edit product' : 'New product', '<label class="l" for="pe-n">Product or service</label><input class="in" id="pe-n" maxlength="60" value="' + esc(q.n || '') + '" placeholder="e.g. Rice 50kg">' +
         '<div class="two bz-two"><div><label class="l" for="pe-p">Price</label><div class="amt sm"><input id="pe-p" type="number" inputmode="decimal" value="' + (q.p || '') + '" placeholder="0.00"><span>π</span></div></div><div><label class="l" for="pe-u">Unit (optional)</label><input class="in" id="pe-u" maxlength="16" value="' + esc(q.unit || '') + '" placeholder="e.g. bag, kg, hour"></div></div>' +
         '<div class="hint num" id="pe-c"></div>' +
         '<div class="two bz-two"><div><label class="l" for="pe-s">Stock (optional)</label><input class="in num" id="pe-s" type="number" inputmode="decimal" value="' + (typeof q.stock === 'number' ? q.stock : '') + '" placeholder="Not tracked"></div><div><label class="l" for="pe-lo">Low stock alert</label><input class="in num" id="pe-lo" type="number" inputmode="decimal" value="' + (q.low != null ? q.low : '') + '" placeholder="e.g. 5"></div></div>' +
-        '<label class="l" for="pe-k">SKU / code (optional)</label><input class="in" id="pe-k" maxlength="24" value="' + esc(q.sku || '') + '">' +
+        '<label class="l" for="pe-k">Barcode or SKU (optional)</label><div class="qs-top"><input class="in" id="pe-k" maxlength="40" value="' + esc(q.sku || '') + '" placeholder="Scan or type"><button type="button" class="qs-scan" data-x="pk" aria-label="Scan a barcode">' + ic('bar') + '<span>Scan</span></button></div>' +
         '<button type="button" class="btn" id="pe-go">' + ic('check') + 'Save product</button>' + (id ? '<button type="button" class="btn danger" id="pe-rm">' + ic('trash') + 'Delete product</button>' : ''), { stack: true });
       var pi = $('#pe-p', w); pi.oninput = function () { $('#pe-c', w).textContent = conv(r7(pi.value)); }; pi.oninput();
+      $('[data-x="pk"]', w).onclick = function () { barScan('Scan barcode', function (code) { $('#pe-k', w).value = code; toast('Barcode added'); return { stop: true }; }); };
       $('#pe-go', w).onclick = function () {
         var n = $('#pe-n', w).value.trim(), pr = r7(pi.value), st = $('#pe-s', w).value.trim(), lo = $('#pe-lo', w).value.trim();
         if (!n) return toast('Enter the product name'); if (!(pr >= 0.01)) return toast('The price must be at least 0.01 π');
         if (st !== '' && !(Number(st) >= 0)) return toast('Stock cannot be negative'); if (lo !== '' && !(Number(lo) >= 0)) return toast('Low stock alert cannot be negative');
         var L = prods(); if (L.some(function (x) { return x.id !== id && x.n.toLowerCase() === n.toLowerCase(); })) return toast('A product with this name already exists');
+        var sk = $('#pe-k', w).value.trim(); if (sk && L.some(function (x) { return x.id !== id && x.sku && window.FPBar && FPBar.same(x.sku, sk); })) return toast('Another product already uses this barcode');
         var d = { id: id || uid(), n: n, p: pr, unit: $('#pe-u', w).value.trim(), sku: $('#pe-k', w).value.trim(), stock: st === '' ? null : r7(st), low: lo === '' ? null : r7(lo), ts: q.ts || Date.now() };
         L = L.filter(function (x) { return x.id !== d.id; }); L.unshift(d); put('prod', L.slice(0, 500)); toast('Product saved'); if (back) back(); else prodSheet();
       };
@@ -551,12 +559,14 @@
     }
 
     /* ── quick sale: build the sale, show one QR, and it turns Paid by itself when the payment arrives ── */
-    function saleSheet() {
+    function saleSheet(c0) {
       if (K.needTarget('Quick sale')) return;
-      var cart = {}, P = prods().slice().sort(function (a, b) { return a.n.localeCompare(b.n); });
-      var w = sheet('Quick sale', (P.length ? '<div class="bz-search">' + ic('search') + '<input class="in" id="qs-q" placeholder="Search products"></div><div class="qs-grid" id="qs-g"></div>' : '<button type="button" class="btn soft" data-x="pa">' + ic('plus') + 'Add products</button>') +
+      var cart = c0 || {}, P = prods().slice().sort(function (a, b) { return a.n.localeCompare(b.n); }), dm = 'pi', tp = 0;
+      var w = sheet('Quick sale', (P.length ? '<div class="qs-top"><div class="bz-search">' + ic('search') + '<input class="in" id="qs-q" placeholder="Search products"></div><button type="button" class="qs-scan" data-x="scan" aria-label="Scan a barcode">' + ic('bar') + '<span>Scan</span></button></div><div class="qs-grid" id="qs-g"></div>' : '<button type="button" class="btn soft" data-x="pa">' + ic('plus') + 'Add products</button>') +
         '<label class="l" for="qs-a">' + (P.length ? 'Other amount' : 'Amount') + '</label><div class="amt sm"><input id="qs-a" type="number" inputmode="decimal" placeholder="0.00"><span>π</span></div>' +
         '<label class="l" for="qs-x">Note (optional)</label><input class="in" id="qs-x" maxlength="40" placeholder="e.g. Table 4, delivery">' +
+        '<div class="qs-adj"><div><label class="l" for="qs-d">Discount</label><div class="qs-dw"><input class="in num" id="qs-d" type="number" inputmode="decimal" min="0" placeholder="0"><div class="seg qs-du" role="tablist"><button type="button" data-du="pi" class="on">π</button><button type="button" data-du="pc">%</button></div></div></div>' +
+        '<div><label class="l">Tip</label><div class="chips qs-tip">' + [[0, 'None'], [5, '5%'], [10, '10%'], [15, '15%']].map(function (x) { return '<button type="button" class="chip' + (x[0] ? '' : ' on') + '" data-tp="' + x[0] + '">' + x[1] + '</button>'; }).join('') + '</div></div></div>' +
         '<div class="sum" id="qs-s"></div><button type="button" class="btn" id="qs-go">' + ic('qr') + 'Charge</button>');
       function draw() {
         var g = $('#qs-g', w); if (!g) return; var t = ($('#qs-q', w).value || '').trim().toLowerCase();
@@ -564,15 +574,37 @@
         $$('[data-qa]', w).forEach(function (b) { b.onclick = function () { var q = P.filter(function (x) { return x.id === b.dataset.qa; })[0], n = r7((cart[b.dataset.qa] || 0) + 1); if (q && typeof q.stock === 'number' && n > q.stock) return toast('Only ' + fpi(q.stock) + ' in stock'); cart[b.dataset.qa] = n; draw(); tot(); }; });
         $$('[data-qm]', w).forEach(function (b) { b.onclick = function () { cart[b.dataset.qm] = r7((cart[b.dataset.qm] || 0) - 1); if (cart[b.dataset.qm] <= 0) delete cart[b.dataset.qm]; draw(); tot(); }; });
       }
-      function lines() { var L = []; Object.keys(cart).forEach(function (id) { var q = P.filter(function (x) { return x.id === id; })[0]; if (q) L.push({ d: q.n, q: cart[id], p: q.p, pid: q.id }); }); var a = r7($('#qs-a', w).value); if (a > 0) L.push({ d: $('#qs-x', w).value.trim() || 'Sale', q: 1, p: a }); return L; }
-      function tot() { var L = lines(), t = calc({ items: L }).total, n = L.reduce(function (s0, it) { return s0 + Number(it.q); }, 0); $('#qs-s', w).innerHTML = '<div><span>Items</span><b>' + fpi(r7(n)) + '</b></div><div class="tot"><span>Total</span><b>' + fpi(t) + ' π</b></div>' + (conv(t) ? '<div><span></span><b class="small muted">' + esc(conv(t)) + '</b></div>' : ''); return t; }
-      var qq = $('#qs-q', w); if (qq) qq.oninput = draw; $('#qs-a', w).oninput = tot; $('#qs-x', w).oninput = tot; draw(); tot();
-      var pa = $('[data-x="pa"]', w); if (pa) pa.onclick = function () { prodEdit('', saleSheet); };
+      function goods() { var L = []; Object.keys(cart).forEach(function (id) { var q = P.filter(function (x) { return x.id === id; })[0]; if (q) L.push({ d: q.n, q: cart[id], p: q.p, pid: q.id }); }); var a = r7($('#qs-a', w).value); if (a > 0) L.push({ d: $('#qs-x', w).value.trim() || 'Sale', q: 1, p: a }); return L; }
+      // discount on the goods; tip on the amount after discount
+      function adj() {
+        var G = goods(), sub = calc({ items: G }).sub, dv = Math.max(0, Number($('#qs-d', w).value) || 0);
+        var disc = r7(Math.min(sub, dm === 'pc' ? sub * Math.min(100, dv) / 100 : dv)), tip = tp ? r7((sub - disc) * tp / 100) : 0;
+        var L = G.slice(); if (tip > 0) L.push({ d: 'Tip', q: 1, p: tip, tip: 1 });
+        return { G: G, L: L, sub: sub, disc: disc, tip: tip, total: calc({ items: L, disc: disc }).total };
+      }
+      function tot() {
+        var A = adj(), n = A.G.reduce(function (s0, it) { return s0 + Number(it.q); }, 0);
+        $('#qs-s', w).innerHTML = '<div><span>Items</span><b>' + fpi(r7(n)) + '</b></div>' + (A.disc || A.tip ? '<div><span>Subtotal</span><b class="num">' + fpi(A.sub) + ' π</b></div>' : '') + (A.disc ? '<div><span>Discount</span><b class="num">−' + fpi(A.disc) + ' π</b></div>' : '') + (A.tip ? '<div><span>Tip ' + tp + '%</span><b class="num">+' + fpi(A.tip) + ' π</b></div>' : '') +
+          '<div class="tot"><span>Total</span><b>' + fpi(A.total) + ' π</b></div>' + (conv(A.total) ? '<div><span></span><b class="small muted">' + esc(conv(A.total)) + '</b></div>' : ''); return A.total;
+      }
+      var qq = $('#qs-q', w); if (qq) qq.oninput = draw; $('#qs-a', w).oninput = tot; $('#qs-x', w).oninput = tot; $('#qs-d', w).oninput = tot; draw(); tot();
+      $$('[data-du]', w).forEach(function (b) { b.onclick = function () { dm = b.dataset.du; $$('[data-du]', w).forEach(function (x) { x.classList.toggle('on', x === b); }); tot(); }; });
+      $$('[data-tp]', w).forEach(function (b) { b.onclick = function () { tp = Number(b.dataset.tp) || 0; $$('[data-tp]', w).forEach(function (x) { x.classList.toggle('on', x === b); }); tot(); }; });
+      var pa = $('[data-x="pa"]', w); if (pa) pa.onclick = function () { prodEdit('', function () { saleSheet(cart); }); };
+      var sc = $('[data-x="scan"]', w); if (sc) sc.onclick = function () {
+        barScan('Scan products', function (code) {
+          var q = P.filter(function (x) { return x.sku && window.FPBar && FPBar.same(x.sku, code); })[0];
+          if (!q) return { stop: true, then: function () { unknownCode(code, function () { saleSheet(cart); }); } };
+          var n = r7((cart[q.id] || 0) + 1); if (typeof q.stock === 'number' && n > q.stock) { toast('Only ' + fpi(q.stock) + ' ' + q.n + ' in stock'); return { msg: 'Out of stock · ' + q.n }; }
+          cart[q.id] = n; draw(); tot(); return { msg: q.n + ' · ' + fpi(n) + ' in this sale' };
+        }, true);
+      };
       $('#qs-go', w).onclick = function () {
-        var L = lines(), t = calc({ items: L }).total; if (!L.length || !(t >= 0.01)) return toast('Add a product or enter an amount');
+        var A = adj(), L = A.L, t = A.total; if (!A.G.length || !(t >= 0.01)) return toast('Add a product or enter an amount');
+        if (Number($('#qs-d', w).value) < 0) return toast('Discount cannot be negative');
         if (L.length > 12) return toast('Up to 12 different items per sale');
         var note = $('#qs-x', w).value.trim();
-        var v = issue({ to: K.myTarget(), cname: note ? 'Sale · ' + note : 'Walk-in customer', cto: '', items: L, term: 0, title: L.length === 1 ? L[0].d : 'Sale' }, '');
+        var v = issue({ to: K.myTarget(), cname: note ? 'Sale · ' + note : 'Walk-in customer', cto: '', items: L, disc: A.disc, term: 0, title: A.G.length === 1 ? A.G[0].d : 'Sale' }, '');
         var all = invs(); all.forEach(function (x) { if (x.id === v.id) x.sale = true; }); saveInvs(all); K.rerender(); saleView(v.id);
       };
     }
@@ -594,6 +626,171 @@
       $('[data-x="lk"]', w).onclick = function () { K.shareText('Payment request ' + v.no, bizName() + ' · ' + fpi(v.total) + ' π · ' + v.no + '\nPay with FinPi:\n' + link); };
       $('[data-x="inv"]', w).onclick = function () { stopT(); invView(id); };
       $('[data-x="new"]', w).onclick = function () { stopT(); saleSheet(); };
+    }
+
+    /* ── barcode scanner: phone's built-in reader when it supports product codes, otherwise FinPi's reader ── */
+    var BDB = null, bdbP = null;
+    function bdbReady() {
+      if (bdbP) return bdbP;
+      bdbP = Promise.resolve().then(function () { if (!('BarcodeDetector' in window)) return null; return BarcodeDetector.getSupportedFormats().then(function (f) { var want = ['ean_13', 'ean_8', 'upc_a', 'upc_e', 'code_128'].filter(function (x) { return f.indexOf(x) >= 0; }); if (want.indexOf('ean_13') >= 0) BDB = new BarcodeDetector({ formats: want }); return BDB; }); }).catch(function () { return null; });
+      return bdbP;
+    }
+    // onCode(code) → { stop: true, then: fn } closes the scanner; { msg } shows a line and keeps scanning
+    function barScan(title, onCode, multi) {
+      var stream = null, raf = 0, done = false, busy = false, last = 0, prev = '', prevN = 0, lastHit = '', lastT = 0, then = null;
+      var w = sheet(title, K.scanBox('bs-box').replace('class="scan"', 'class="scan bar"') + '<div class="bs-msg" id="bs-msg">' + (multi ? 'Scan each item. Tap Done when finished.' : 'Hold the barcode inside the frame.') + '</div>' +
+        '<label class="l" for="bs-k">Or type the code</label><div class="qs-top"><input class="in num" id="bs-k" maxlength="40" inputmode="text" placeholder="e.g. 5901234123457"><button type="button" class="btn soft bs-ok" data-x="ok">' + ic('check') + 'Use</button></div>' +
+        (multi ? '<button type="button" class="btn" data-x="done">' + ic('check') + 'Done</button>' : ''), { stack: true, onClose: stop });
+      var box = $('#bs-box', w), v = $('video', box), msg = $('.scan-m', box), tb = $('.scan-t', box);
+      var cv = document.createElement('canvas'), cx = cv.getContext('2d', { willReadFrequently: true });
+      function stop() { done = true; cancelAnimationFrame(raf); if (stream) stream.getTracks().forEach(function (t) { t.stop(); }); }
+      function close() { stop(); w.remove(); if (then) then(); }
+      function hit(code) {
+        code = String(code || '').trim(); if (!code || done) return;
+        // the same code counts again only after it has left the camera for a moment
+        var now = Date.now(); if (code === lastHit && now - lastT < 1200) { lastT = now; return; } lastHit = code; lastT = now;
+        K.scanOk(); box.classList.add('ok'); setTimeout(function () { box.classList.remove('ok'); }, 450);
+        var r = onCode(code) || {}; if (r.msg) $('#bs-msg', w).textContent = r.msg;
+        if (r.stop) { then = r.then || null; setTimeout(close, 250); }
+      }
+      $('[data-x="ok"]', w).onclick = function () { var c = $('#bs-k', w).value.trim(); if (!c) return toast('Enter the code'); lastHit = ''; hit(c); $('#bs-k', w).value = ''; };
+      var dn = $('[data-x="done"]', w); if (dn) dn.onclick = close;
+      function frame() {
+        var W = v.videoWidth, H = v.videoHeight; if (!W) return '';
+        var k = Math.min(1, 1280 / W); cv.width = Math.round(W * k); cv.height = Math.round(H * k); cx.drawImage(v, 0, 0, cv.width, cv.height);
+        try { return FPBar.decode(cx.getImageData(0, 0, cv.width, cv.height), false); } catch (e) { return ''; }
+      }
+      // FinPi's reader accepts a code only when two readings in a row agree
+      function agree(c) { if (!c) { prevN = 0; return; } if (c === prev) prevN++; else { prev = c; prevN = 1; } if (prevN >= 2) { prevN = 0; hit(c); } }
+      bdbReady().then(function () {
+        if (done) return;
+        if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) { msg.textContent = 'Camera is not available here. Type the code instead.'; return; }
+        return navigator.mediaDevices.getUserMedia({ video: { facingMode: { ideal: 'environment' }, width: { ideal: 1920 }, height: { ideal: 1080 } }, audio: false }).then(function (st) {
+          if (done) { st.getTracks().forEach(function (t) { t.stop(); }); return; }
+          stream = st; var track = st.getVideoTracks()[0]; v.srcObject = st; v.play().catch(function () {});
+          try { var cap = track.getCapabilities ? track.getCapabilities() : {}; if (cap.focusMode && cap.focusMode.indexOf('continuous') >= 0) track.applyConstraints({ advanced: [{ focusMode: 'continuous' }] }).catch(function () {}); if (cap.torch && tb) { tb.hidden = false; var on = false; tb.onclick = function () { on = !on; track.applyConstraints({ advanced: [{ torch: on }] }).catch(function () {}); tb.classList.toggle('on', on); }; } } catch (e) {}
+          box.classList.add('scanning'); msg.textContent = 'Point the camera at the barcode';
+          (function tick(ts) {
+            if (done) return; raf = requestAnimationFrame(tick);
+            if (!document.body.contains(w)) return stop();
+            if (busy || ts - last < 140 || v.readyState < 2) return; last = ts;
+            if (BDB) { busy = true; BDB.detect(v).then(function (c) { busy = false; if (c && c[0] && c[0].rawValue) hit(c[0].rawValue); }).catch(function () { busy = false; BDB = null; }); }
+            else if (window.FPBar) agree(frame());
+          })(0);
+        });
+      }).catch(function (e) { msg.textContent = e && e.name === 'NotAllowedError' ? 'Allow camera access, or type the code.' : 'The camera could not start. Type the code instead.'; });
+      return w;
+    }
+    function unknownCode(code, back) {
+      var w = sheet('New barcode', '<div class="card bz-card"><div class="row"><span class="muted">Code</span><b class="num">' + esc(code) + '</b></div></div><p class="small muted" style="margin:10px 2px">No product uses this code yet.</p>' +
+        '<button type="button" class="btn" data-x="add">' + ic('plus') + 'Add as new product</button><button type="button" class="btn ghost" data-x="back">' + ic('undo') + 'Back</button>', { stack: true });
+      $('[data-x="add"]', w).onclick = function () { w.remove(); prodEdit('', back, { sku: code }); };
+      $('[data-x="back"]', w).onclick = function () { w.remove(); if (back) back(); };
+    }
+
+    /* ── expenses and profit ── */
+    var ECAT = ['Stock', 'Rent', 'Salaries', 'Transport', 'Utilities', 'Marketing', 'Fees', 'Other'];
+    function exps() { return get('exp', []); }
+    function expIn(a, b) { return exps().filter(function (e) { return e.ts >= a && e.ts < b; }); }
+    function esum(L) { return r7(L.reduce(function (s0, e) { return s0 + Number(e.a || 0); }, 0)); }
+    function salesIn(a, b) { return sales().filter(function (r) { return r.ts >= a && r.ts < b; }); }
+    function expSheet(p) {
+      p = p || get('exP', 'month'); put('exP', p);
+      var rg = range(p), L = expIn(rg[0], rg[1]).sort(function (a, b) { return b.ts - a.ts; }), et = esum(L), st = sum(salesIn(rg[0], rg[1])), pr = r7(st - et);
+      var bc = {}; L.forEach(function (e) { bc[e.cat] = r7((bc[e.cat] || 0) + Number(e.a)); });
+      var C = Object.keys(bc).map(function (k) { return [k, bc[k]]; }).sort(function (a, b) { return b[1] - a[1]; }), top = C.length ? C[0][1] : 0;
+      var w = sheet('Expenses', '<div class="seg bz-seg" role="tablist">' + [['today', 'Today'], ['7d', '7 days'], ['30d', '30 days'], ['month', 'Month']].map(function (x) { return '<button type="button" data-ep="' + x[0] + '" class="' + (p === x[0] ? 'on' : '') + '">' + x[1] + '</button>'; }).join('') + '</div>' +
+        '<div class="bz-kpi"><div class="bz-k1"><small>Profit · ' + esc(rg[2]) + '</small><b class="num bz-amt">' + (pr < 0 ? '−' : '') + fpi(Math.abs(pr)) + ' π</b><span class="bz-amt">' + esc(conv(Math.abs(pr)) || ' ') + '</span></div>' +
+        '<div><small>Sales</small><b class="num bz-amt">' + fpi(st) + ' π</b></div><div class="' + (et > st && et ? 'bad' : '') + '"><small>Expenses</small><b class="num bz-amt">' + fpi(et) + ' π</b></div><div><small>Entries</small><b class="num">' + L.length + '</b></div></div>' +
+        (C.length ? '<div class="day">By category</div><div class="card bz-card">' + C.map(function (x) { return '<div class="cat"><div class="row"><span>' + esc(x[0]) + '</span><b class="num bz-amt">' + fpi(x[1]) + ' π</b></div><div class="bar"><i style="width:' + Math.max(4, x[1] / top * 100) + '%"></i></div></div>'; }).join('') + '</div>' : '') +
+        '<div class="day">Entries</div><div class="list">' + (L.length ? L.slice(0, 80).map(function (e) { return '<button type="button" class="li" data-ee="' + e.id + '"><span class="ico rf">' + ic('exp') + '</span><span class="grow"><b>' + esc(e.cat) + (e.note ? ' · ' + esc(e.note) : '') + '</b><small>' + dstr(e.ts) + (e.lv ? ' · ' + esc(K.money(e.lv, e.lc, 2)) : '') + '</small></span><span class="amt-r"><b class="num bz-amt">−' + fpi(e.a) + ' π</b></span></button>'; }).join('') : '<div class="empty">' + ic('exp') + '<div>No expenses in this period. Record what the business spends to see its profit.</div></div>') + '</div>' +
+        '<button type="button" class="btn" data-x="add">' + ic('plus') + 'Add expense</button>');
+      $$('[data-ep]', w).forEach(function (b) { b.onclick = function () { expSheet(b.dataset.ep); }; });
+      $$('[data-ee]', w).forEach(function (b) { b.onclick = function () { expEdit(b.dataset.ee); }; });
+      $('[data-x="add"]', w).onclick = function () { expEdit(''); };
+    }
+    function expEdit(id) {
+      var e = exps().filter(function (x) { return x.id === id; })[0] || { cat: 'Stock', ts: Date.now() }, c = K.curr(), mode = e.lv && e.lc === c ? 'loc' : 'pi', cat = e.cat;
+      var w = sheet(id ? 'Edit expense' : 'New expense', '<label class="l" for="ex-a">Amount</label><div class="qs-top"><div class="amt sm" style="flex:1"><input id="ex-a" type="number" inputmode="decimal" placeholder="0.00" value="' + (mode === 'loc' ? e.lv : (e.a || '')) + '"><span id="ex-u">' + (mode === 'loc' ? esc(c) : 'π') + '</span></div>' +
+        (c !== 'PI' && K.rateIn(c) ? '<div class="seg qs-du" role="tablist"><button type="button" data-em="pi" class="' + (mode === 'pi' ? 'on' : '') + '">π</button><button type="button" data-em="loc" class="' + (mode === 'loc' ? 'on' : '') + '">' + esc(c) + '</button></div>' : '') + '</div><div class="hint num" id="ex-c"></div>' +
+        '<label class="l">Category</label><div class="chips" id="ex-cat">' + ECAT.map(function (k) { return '<button type="button" class="chip' + (k === cat ? ' on' : '') + '" data-ec="' + k + '">' + k + '</button>'; }).join('') + '</div>' +
+        '<label class="l" for="ex-n">Note (optional)</label><input class="in" id="ex-n" maxlength="60" value="' + esc(e.note || '') + '" placeholder="e.g. 10 bags of rice">' +
+        '<label class="l" for="ex-d">Date</label><input class="in" id="ex-d" type="date" max="' + iso(Date.now()) + '" value="' + iso(e.ts) + '">' +
+        '<button type="button" class="btn" id="ex-go">' + ic('check') + 'Save expense</button>' + (id ? '<button type="button" class="btn danger" id="ex-rm">' + ic('trash') + 'Delete expense</button>' : ''), { stack: true });
+      var ai = $('#ex-a', w);
+      function piVal() { var v = Number(ai.value) || 0, r = K.rateIn(c); return mode === 'loc' ? (r ? Math.round(v / r * 100) / 100 : 0) : r7(v); }
+      function hint() { var v = Number(ai.value) || 0; $('#ex-c', w).textContent = mode === 'loc' ? (v > 0 ? '= ' + fpi(piVal()) + ' π at today’s rate' : '') : conv(r7(v)); }
+      ai.oninput = hint; hint();
+      $$('[data-em]', w).forEach(function (b) { b.onclick = function () { var pv = piVal(); mode = b.dataset.em; $$('[data-em]', w).forEach(function (x) { x.classList.toggle('on', x === b); }); $('#ex-u', w).textContent = mode === 'loc' ? c : 'π'; if (pv > 0) ai.value = mode === 'loc' ? Math.round(pv * K.rateIn(c) * 100) / 100 : pv; hint(); }; });
+      $$('[data-ec]', w).forEach(function (b) { b.onclick = function () { cat = b.dataset.ec; $$('[data-ec]', w).forEach(function (x) { x.classList.toggle('on', x === b); }); }; });
+      $('#ex-go', w).onclick = function () {
+        var a = piVal(), dv = $('#ex-d', w).value, t = dv ? new Date(dv + 'T12:00:00').getTime() : Date.now();
+        if (!(a >= 0.01)) return toast(mode === 'loc' && !K.rateIn(c) ? 'Rate unavailable right now. Enter the amount in π.' : 'Enter an amount of at least 0.01 π');
+        if (a > 1e9) return toast('Check the amount');
+        if (!(t > 0) || day0(t) > day0()) return toast('The date cannot be in the future');
+        if (day0(t) === day0()) t = e.ts && day0(e.ts) === day0() ? e.ts : Date.now();
+        var d = { id: id || uid(), a: a, cat: cat, note: $('#ex-n', w).value.trim(), ts: t };
+        if (mode === 'loc') { d.lv = Number(ai.value); d.lc = c; }
+        put('exp', [d].concat(exps().filter(function (x) { return x.id !== d.id; })).sort(function (x, y) { return y.ts - x.ts; }).slice(0, 2000));
+        toast('Expense saved'); K.rerender(); expSheet();
+      };
+      var rm = $('#ex-rm', w); if (rm) rm.onclick = function () { put('exp', exps().filter(function (x) { return x.id !== id; })); toast('Expense deleted'); K.rerender(); expSheet(); };
+    }
+
+    /* ── end-of-day summary ── */
+    function dayData(t) {
+      var a = day0(t), b = a + 864e5, S = salesIn(a, b), E = expIn(a, b), st = sum(S), et = esum(E), V = invs();
+      var paid = V.filter(function (v) { return !v.void && status(v) === 'Paid' && (v.pts || v.ts) >= a && (v.pts || v.ts) < b; }), issued = V.filter(function (v) { return !v.void && v.ts >= a && v.ts < b; });
+      var items = {}; paid.forEach(function (v) { v.items.forEach(function (it) { if (it.tip) return; var k = it.d.trim(); items[k] = items[k] || [0, 0]; items[k][0] += r7(it.q * it.p); items[k][1] += Number(it.q); }); });
+      var TI = Object.keys(items).map(function (k) { return [k, r7(items[k][0]), items[k][1]]; }).sort(function (x, y) { return y[1] - x[1]; }).slice(0, 5);
+      var n = TI.reduce(function (s0, x) { return s0 + x[2]; }, 0), tips = r7(paid.reduce(function (s0, v) { return s0 + v.items.filter(function (it) { return it.tip; }).reduce(function (q, it) { return q + it.p; }, 0); }, 0));
+      return { a: a, S: S, E: E, st: st, et: et, pr: r7(st - et), paid: paid, issued: issued, TI: TI, n: n, tips: tips, avg: S.length ? Math.round(st / S.length * 100) / 100 : 0 };
+    }
+    function dayName(t) { return new Date(t).toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }); }
+    function dayCanvas(t) {
+      var D = dayData(t), b = biz(), FR = window.FPReceipt || {};
+      return loadImg(b.logo || 'icons/icon-512.png').then(function (logo) {
+        var W = 1080, H = 1350, X = 70, cv = document.createElement('canvas'); cv.width = W; cv.height = H; var x = cv.getContext('2d');
+        x.fillStyle = '#fff'; x.fillRect(0, 0, W, H); if (FR.guilloche) FR.guilloche(x, 0, 300, W, H - 300, '#1D4ED8', .03);
+        var g = x.createLinearGradient(0, 0, W, 300); g.addColorStop(0, '#061A4F'); g.addColorStop(.6, '#1543E0'); g.addColorStop(1, '#0A9488'); x.fillStyle = g; x.fillRect(0, 0, W, 280);
+        if (FR.guilloche) FR.guilloche(x, 0, 0, W, 280, '#FFFFFF', .1);
+        if (logo) { x.save(); rr(x, X, 60, 96, 96, 22); x.clip(); x.fillStyle = '#fff'; x.fillRect(X, 60, 96, 96); x.drawImage(logo, X, 60, 96, 96); x.restore(); }
+        x.font = '700 38px ' + FONT; T(x, fit(x, bizName(), W - X * 2 - 130), X + 122, 104, '700 38px ' + FONT, '#fff');
+        T(x, 'END-OF-DAY SUMMARY', X + 122, 142, '700 20px ' + FONT, '#99F6E4');
+        T(x, dayName(D.a), X, 228, '700 30px ' + FONT, '#fff');
+        var y = 320, cw = (W - 2 * X - 20) / 2;
+        [['SALES', fpi(D.st) + ' π', D.S.length + ' payment' + (D.S.length === 1 ? '' : 's')], ['EXPENSES', fpi(D.et) + ' π', D.E.length + ' entr' + (D.E.length === 1 ? 'y' : 'ies')], ['PROFIT', (D.pr < 0 ? '−' : '') + fpi(Math.abs(D.pr)) + ' π', conv(Math.abs(D.pr))], ['AVERAGE SALE', fpi(D.avg) + ' π', D.tips ? 'Tips ' + fpi(D.tips) + ' π' : '']].forEach(function (k, i) {
+          var cx = X + (i % 2) * (cw + 20), cy = y + Math.floor(i / 2) * 170; x.fillStyle = i === 2 ? (D.pr < 0 ? '#FDECEC' : '#EAFBF6') : '#F5F7FB'; rr(x, cx, cy, cw, 150, 20); x.fill();
+          T(x, k[0], cx + 24, cy + 42, '700 18px ' + FONT, '#64748B'); x.font = '800 40px ' + MONO; T(x, fit(x, k[1], cw - 48), cx + 24, cy + 94, '800 40px ' + MONO, i === 2 ? (D.pr < 0 ? '#B42318' : '#047857') : '#0B1B33');
+          if (k[2]) { x.font = '500 18px ' + FONT; T(x, fit(x, k[2], cw - 48), cx + 24, cy + 128, '500 18px ' + FONT, '#64748B'); }
+        });
+        y = 680; T(x, 'TOP ITEMS', X, y, '700 20px ' + FONT, '#64748B');
+        if (!D.TI.length) T(x, 'No paid items on this day', X, y + 56, '500 22px ' + FONT, '#94A3B8');
+        D.TI.forEach(function (rw, i) { var yy = y + 56 + i * 56; x.font = '600 24px ' + FONT; T(x, fit(x, rw[0], 560), X, yy, '600 24px ' + FONT, '#0B1B33'); T(x, '× ' + fpi(rw[2]), W - X - 240, yy, '500 22px ' + MONO, '#334155', 'right'); T(x, fpi(rw[1]) + ' π', W - X, yy, '700 22px ' + MONO, '#0B2A6F', 'right'); x.fillStyle = '#EEF2F7'; x.fillRect(X, yy + 20, W - 2 * X, 2); });
+        y = 1020; x.fillStyle = '#F5F7FB'; rr(x, X, y, W - 2 * X, 120, 20); x.fill();
+        [['Invoices paid', D.paid.length], ['Invoices issued', D.issued.length], ['Items sold', fpi(r7(D.n))]].forEach(function (k, i) { var cx = X + 30 + i * ((W - 2 * X - 60) / 3); T(x, k[0], cx, y + 46, '600 19px ' + FONT, '#64748B'); T(x, String(k[1]), cx, y + 92, '800 32px ' + MONO, '#0B1B33'); });
+        x.fillStyle = '#E2E8F0'; x.fillRect(X, H - 130, W - 2 * X, 2);
+        T(x, 'Values in Pi. Local values are at today’s rate.', X, H - 92, '500 19px ' + FONT, '#64748B');
+        T(x, 'Created with FinPi · ' + K.NETN, X, H - 58, '500 19px ' + FONT, '#94A3B8');
+        if (FR.microline) FR.microline(x, 'FINPI•END-OF-DAY SUMMARY•' + bizName().toUpperCase() + '•' + iso(D.a) + '•', X, H - 26, W - 2 * X);
+        return cv;
+      });
+    }
+    function daySheet(t) {
+      t = day0(t || Date.now()); var D = dayData(t), today = t === day0();
+      var w = sheet('Day summary', '<div class="bz-dnav"><button type="button" class="tbtn" data-dn="-1" aria-label="Previous day">' + ic('chev') + '</button><b>' + esc(today ? 'Today · ' + dstr(t) : dayName(t)) + '</b><button type="button" class="tbtn" data-dn="1" aria-label="Next day"' + (today ? ' disabled' : '') + '>' + ic('chev') + '</button></div>' +
+        '<div class="bz-kpi"><div class="bz-k1"><small>Sales</small><b class="num bz-amt">' + fpi(D.st) + ' π</b><span class="bz-amt">' + D.S.length + ' payment' + (D.S.length === 1 ? '' : 's') + (conv(D.st) ? ' · ' + esc(conv(D.st)) : '') + '</span></div>' +
+        '<div><small>Expenses</small><b class="num bz-amt">' + fpi(D.et) + ' π</b></div><div class="' + (D.pr < 0 ? 'bad' : '') + '"><small>Profit</small><b class="num bz-amt">' + (D.pr < 0 ? '−' : '') + fpi(Math.abs(D.pr)) + ' π</b></div><div><small>Invoices paid</small><b class="num">' + D.paid.length + '</b></div></div>' +
+        '<div class="day">Top items</div>' + (D.TI.length ? '<div class="card bz-card">' + D.TI.map(function (x) { return '<div class="cat"><div class="row"><span>' + esc(x[0]) + ' <small class="muted">× ' + fpi(x[2]) + '</small></span><b class="num bz-amt">' + fpi(x[1]) + ' π</b></div></div>'; }).join('') + '</div>' : '<div class="list"><div class="empty">No paid items on this day.</div></div>') +
+        '<div class="bz-prev">Preparing summary…</div>' + fileBtns(''));
+      $$('[data-dn]', w).forEach(function (b) { b.onclick = function () { var n = t + Number(b.dataset.dn) * 864e5 + 3600e3; if (day0(n) <= day0()) daySheet(n); }; });
+      fileActions(w, function () { return dayCanvas(t); }, 'FinPi-day-summary-' + iso(t), 'day summary', 'FinPi day summary ' + dstr(t), function () { return bizName() + ' · day summary · ' + dstr(t); });
+    }
+    // after 8 pm, one notification with the day's figures
+    function eodCheck() {
+      var now = new Date(); if (now.getHours() < 20) return; var key = iso(now); if (get('eodN', '') === key) return;
+      var D = dayData(Date.now()); if (!D.S.length && !D.E.length) return;
+      put('eodN', key); K.addNote('bars', 'Today’s summary', 'Sales ' + fpi(D.st) + ' π · Expenses ' + fpi(D.et) + ' π · Profit ' + (D.pr < 0 ? '−' : '') + fpi(Math.abs(D.pr)) + ' π', 'eod-' + key);
     }
 
     /* ── recurring requests ── */
@@ -625,26 +822,26 @@
     }
     function bizSheet(p) {
       p = p || get('bzP', '7d'); put('bzP', p);
-      var rg = range(p), S = sales().filter(function (r) { return r.ts >= rg[0] && r.ts < rg[1]; }), tot = sum(S), V = invs();
+      var rg = range(p), S = sales().filter(function (r) { return r.ts >= rg[0] && r.ts < rg[1]; }), tot = sum(S), V = invs(), etot = esum(expIn(rg[0], rg[1])), prof = r7(tot - etot);
       var open = V.filter(function (v) { return /Unpaid|Part paid|Overdue/.test(status(v)); }), od = open.filter(function (v) { return status(v) === 'Overdue'; }), out = r7(open.reduce(function (a, v) { return a + balance(v); }, 0));
-      var items = {}; V.forEach(function (v) { if (status(v) === 'Paid' && (v.pts || v.ts) >= rg[0] && (v.pts || v.ts) < rg[1]) v.items.forEach(function (it) { var k = it.d.trim(); items[k] = items[k] || [0, 0]; items[k][0] += r7(it.q * it.p); items[k][1] += Number(it.q); }); });
+      var items = {}; V.forEach(function (v) { if (status(v) === 'Paid' && (v.pts || v.ts) >= rg[0] && (v.pts || v.ts) < rg[1]) v.items.forEach(function (it) { if (it.tip) return; var k = it.d.trim(); items[k] = items[k] || [0, 0]; items[k][0] += r7(it.q * it.p); items[k][1] += Number(it.q); }); });
       var TI = Object.keys(items).map(function (k) { return [k, r7(items[k][0]), items[k][1]]; }).sort(function (a, b) { return b[1] - a[1]; }).slice(0, 5);
       var cu = {}; S.forEach(function (r) { var k = payer(r) || '—'; cu[k] = r7((cu[k] || 0) + Number(r.amount)); });
       var TC = Object.keys(cu).map(function (k) { return [k, cu[k]]; }).sort(function (a, b) { return b[1] - a[1]; }).slice(0, 5), topv = TC.length ? TC[0][1] : 0, topi = TI.length ? TI[0][1] : 0;
       var b = biz();
       var w = sheet('FinPi Business', '<div class="bz-head"><div class="bz-lg sm">' + (b.logo ? '<img alt="" src="' + esc(b.logo) + '">' : ic('store')) + '</div><div class="grow"><b>' + esc(bizName()) + '</b><small>' + (b.name ? esc(b.addr || K.NETN) : '<button type="button" class="lnk small" data-x="prof">Add your business profile</button>') + '</small></div><button type="button" class="tbtn" data-x="prof" aria-label="Business profile">' + ic('edit') + '</button></div>' +
         '<div class="seg bz-seg" role="tablist">' + [['today', 'Today'], ['7d', '7 days'], ['30d', '30 days'], ['month', 'Month']].map(function (x) { return '<button type="button" data-bp="' + x[0] + '" class="' + (p === x[0] ? 'on' : '') + '">' + x[1] + '</button>'; }).join('') + '</div>' +
-        '<div class="bz-kpi"><div class="bz-k1"><small>Sales · ' + esc(rg[2]) + '</small><b class="num bz-amt">' + fpi(tot) + ' π</b><span class="bz-amt">' + esc(conv(tot) || ' ') + '</span></div>' +
-        '<div><small>Payments</small><b class="num">' + S.length + '</b></div><div><small>Average</small><b class="num bz-amt">' + fpi(S.length ? Math.round(tot / S.length * 100) / 100 : 0) + ' π</b></div><div class="' + (od.length ? 'bad' : '') + '"><small>Outstanding</small><b class="num bz-amt">' + fpi(out) + ' π</b><span>' + open.length + ' open' + (od.length ? ' · ' + od.length + ' overdue' : '') + '</span></div></div>' +
+        '<div class="bz-kpi"><div class="bz-k1"><small>Sales · ' + esc(rg[2]) + '</small><b class="num bz-amt">' + fpi(tot) + ' π</b><span class="bz-amt">' + S.length + ' payment' + (S.length === 1 ? '' : 's') + (S.length ? ' · average ' + fpi(Math.round(tot / S.length * 100) / 100) + ' π' : '') + (conv(tot) ? ' · ' + esc(conv(tot)) : '') + '</span></div>' +
+        '<button type="button" class="bz-kb" data-x="b-exp"><small>Expenses</small><b class="num bz-amt">' + fpi(etot) + ' π</b></button><button type="button" class="bz-kb' + (prof < 0 ? ' bad' : '') + '" data-x="b-pro"><small>Profit</small><b class="num bz-amt">' + (prof < 0 ? '−' : '') + fpi(Math.abs(prof)) + ' π</b></button><div class="' + (od.length ? 'bad' : '') + '"><small>Outstanding</small><b class="num bz-amt">' + fpi(out) + ' π</b><span>' + open.length + ' open' + (od.length ? ' · ' + od.length + ' overdue' : '') + '</span></div></div>' +
         '<div class="card bz-card">' + chart(p) + '</div>' +
-        '<div class="bz-grid">' + [['card', 'Quick sale', 'b-sale'], ['inv', 'New invoice', 'b-new'], ['rcpt', 'Invoices', 'b-inv'], ['tag', 'Products', 'b-prod'], ['users', 'Customers', 'b-cus'], ['repeat', 'Recurring', 'b-rec'], ['store', 'My Pi QR', 'b-qr'], ['bars', 'Reports', 'b-rep']].map(function (x, i) { return '<button type="button" class="bz-a c' + i + '" data-x="' + x[2] + '"><i>' + ic(x[0]) + '</i><span>' + x[1] + '</span></button>'; }).join('') + '</div>' +
+        '<div class="bz-grid">' + [['card', 'Quick sale', 'b-sale'], ['inv', 'New invoice', 'b-new'], ['rcpt', 'Invoices', 'b-inv'], ['tag', 'Products', 'b-prod'], ['users', 'Customers', 'b-cus'], ['exp', 'Expenses', 'b-exp'], ['sun', 'Day summary', 'b-day'], ['repeat', 'Recurring', 'b-rec'], ['store', 'My Pi QR', 'b-qr'], ['bars', 'Reports', 'b-rep']].map(function (x, i) { return '<button type="button" class="bz-a c' + i + '" data-x="' + x[2] + '"><i>' + ic(x[0]) + '</i><span>' + x[1] + '</span></button>'; }).join('') + '</div>' +
         (open.length ? '<div class="day">Open invoices</div><div class="list">' + open.slice(0, 4).map(invRow).join('') + '</div>' : '') +
         '<div class="day">Top customers</div>' + (TC.length ? '<div class="card bz-card">' + TC.map(function (x) { return '<div class="cat"><div class="row"><span>' + esc(K.isG(x[0]) ? K.short(x[0]) : who(x[0])) + '</span><b class="num bz-amt">' + fpi(x[1]) + ' π</b></div><div class="bar"><i style="width:' + Math.max(4, x[1] / topv * 100) + '%"></i></div></div>'; }).join('') + '</div>' : '<div class="list"><div class="empty">No payments received in this period.</div></div>') +
         '<div class="day">Top items</div>' + (TI.length ? '<div class="card bz-card">' + TI.map(function (x) { return '<div class="cat"><div class="row"><span>' + esc(x[0]) + ' <small class="muted">× ' + fpi(x[2]) + '</small></span><b class="num bz-amt">' + fpi(x[1]) + ' π</b></div><div class="bar"><i style="width:' + Math.max(4, x[1] / topi * 100) + '%"></i></div></div>'; }).join('') + '</div>' : '<div class="list"><div class="empty">Items from paid invoices appear here.</div></div>'));
       $$('[data-bp]', w).forEach(function (q) { q.onclick = function () { bizSheet(q.dataset.bp); }; });
       $$('[data-x="prof"]', w).forEach(function (q) { q.onclick = profSheet; });
-      var go = { 'b-sale': function () { saleSheet(); }, 'b-prod': function () { prodSheet(); }, 'b-new': function () { invEdit(''); }, 'b-inv': function () { invList(); }, 'b-cus': function () { custSheet(); }, 'b-rec': recSheet, 'b-qr': qrSheet, 'b-rep': repSheet };
-      Object.keys(go).forEach(function (k) { $('[data-x="' + k + '"]', w).onclick = go[k]; });
+      var go = { 'b-exp': function () { expSheet(p === '7d' || p === '30d' || p === 'today' ? p : 'month'); }, 'b-pro': function () { expSheet(p); }, 'b-day': function () { daySheet(); }, 'b-sale': function () { saleSheet(); }, 'b-prod': function () { prodSheet(); }, 'b-new': function () { invEdit(''); }, 'b-inv': function () { invList(); }, 'b-cus': function () { custSheet(); }, 'b-rec': recSheet, 'b-qr': qrSheet, 'b-rep': repSheet };
+      Object.keys(go).forEach(function (k) { $$('[data-x="' + k + '"]', w).forEach(function (q) { q.onclick = go[k]; }); });
       bindInvRows(w);
     }
 
@@ -657,7 +854,7 @@
       var r = perRg(per), S = sales().filter(function (x) { return x.ts >= r[0] && x.ts < r[1]; }), tot = sum(S);
       var V = invs().filter(function (v) { return !v.void && v.ts >= r[0] && v.ts < r[1]; });
       var paid = V.filter(function (v) { return status(v) === 'Paid'; }), open = invs().filter(function (v) { return /Unpaid|Part paid|Overdue/.test(status(v)); }), od = open.filter(function (v) { return status(v) === 'Overdue'; });
-      var items = {}; invs().forEach(function (v) { if (status(v) === 'Paid' && (v.pts || v.ts) >= r[0] && (v.pts || v.ts) < r[1]) v.items.forEach(function (it) { var k = it.d.trim(); items[k] = items[k] || [0, 0]; items[k][0] += r7(it.q * it.p); items[k][1] += Number(it.q); }); });
+      var items = {}; invs().forEach(function (v) { if (status(v) === 'Paid' && (v.pts || v.ts) >= r[0] && (v.pts || v.ts) < r[1]) v.items.forEach(function (it) { if (it.tip) return; var k = it.d.trim(); items[k] = items[k] || [0, 0]; items[k][0] += r7(it.q * it.p); items[k][1] += Number(it.q); }); });
       var TI = Object.keys(items).map(function (k) { return [k, r7(items[k][0]), items[k][1]]; }).sort(function (a, b) { return b[1] - a[1]; }).slice(0, 6);
       var cu = {}, cn = {}; S.forEach(function (x) { var k = payer(x) || '—'; cu[k] = r7((cu[k] || 0) + Number(x.amount)); cn[k] = (cn[k] || 0) + 1; });
       var TC = Object.keys(cu).map(function (k) { return [K.isG(k) ? K.short(k) : who(k), cu[k], cn[k]]; }).sort(function (a, b) { return b[1] - a[1]; }).slice(0, 6);
@@ -665,14 +862,15 @@
       var B = [], L = [];
       if (per === 'all') { var d0 = new Date(day0()); d0.setDate(1); d0.setMonth(d0.getMonth() - 11); for (var m = 0; m < 12; m++) { var a = new Date(d0); a.setMonth(a.getMonth() + m); var e = new Date(a); e.setMonth(e.getMonth() + 1); B.push(sum(S.filter(function (x) { return x.ts >= a.getTime() && x.ts < e.getTime(); }))); L.push(a.toLocaleDateString('en-GB', { month: 'short' })); } }
       else { var end = Math.min(r[1], Date.now()), n = Math.max(1, Math.round((day0(end) - r[0]) / 864e5) + 1); for (var i = 0; i < n; i++) { var t = r[0] + i * 864e5; B.push(sum(S.filter(function (x) { return day0(x.ts) === day0(t + 3600e3); }))); L.push(String(new Date(t + 3600e3).getDate())); } }
-      return { S: S, tot: tot, V: V, paid: paid, open: open, od: od, TI: TI, TC: TC, B: B, L: L, out: r7(open.reduce(function (a, v) { return a + balance(v); }, 0)) };
+      var E = expIn(r[0], r[1]), et = esum(E);
+      return { S: S, tot: tot, E: E, et: et, pr: r7(tot - et), V: V, paid: paid, open: open, od: od, TI: TI, TC: TC, B: B, L: L, out: r7(open.reduce(function (a, v) { return a + balance(v); }, 0)) };
     }
     function docIdOf(str) {
       try { return crypto.subtle.digest('SHA-256', new TextEncoder().encode(str)).then(function (b) { var u = new Uint8Array(b), A = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789', c = ''; for (var k = 0; k < 10; k++) c += A[u[k] % 32]; return 'FPR-' + c.slice(0, 5) + '-' + c.slice(5); }).catch(function () { return ''; }); } catch (e) { return Promise.resolve(''); }
     }
     function reportCanvas(per) {
       var b = biz(), D = repData(per), FR = window.FPReceipt || {}, me = K.myTarget();
-      var src = ['finpi-report', K.NETN, me, per, perName(per), D.tot, D.S.length].concat(D.S.map(function (x) { return (x.txid || x.pid) + '|' + x.amount; })).join('\n');
+      var src = ['finpi-report', K.NETN, me, per, perName(per), D.tot, D.S.length, D.et].concat(D.S.map(function (x) { return (x.txid || x.pid) + '|' + x.amount; })).join('\n');
       return Promise.all([loadImg(b.logo || 'icons/icon-512.png'), docIdOf(src)]).then(function (res) {
         var logo = res[0], DOC = res[1], W = 1240, H = 1754, X = 80, cv = document.createElement('canvas'); cv.width = W; cv.height = H; var x = cv.getContext('2d');
         x.fillStyle = '#FFFFFF'; x.fillRect(0, 0, W, H);
@@ -687,7 +885,7 @@
         T(x, 'Generated ' + dstr(Date.now()) + ' · ' + K.NETN, W - X, 186, '500 20px ' + FONT, 'rgba(255,255,255,.8)', 'right');
         // KPI cards
         var avg = D.S.length ? Math.round(D.tot / D.S.length * 100) / 100 : 0, cw = (W - 2 * X - 3 * 20) / 4, y = 330;
-        [['SALES', fpi(D.tot) + ' π', conv(D.tot), '#0B2A6F'], ['PAYMENTS', String(D.S.length), D.S.length ? 'received' : '', '#0B1B33'], ['AVERAGE SALE', fpi(avg) + ' π', conv(avg), '#0B1B33'], ['OUTSTANDING', fpi(D.out) + ' π', D.open.length + ' open' + (D.od.length ? ' · ' + D.od.length + ' overdue' : ''), D.od.length ? '#B42318' : '#0B1B33']].forEach(function (k, i) {
+        [['SALES', fpi(D.tot) + ' π', D.S.length + ' payment' + (D.S.length === 1 ? '' : 's') + (D.S.length ? ' · avg ' + fpi(avg) + ' π' : ''), '#0B2A6F'], ['EXPENSES', fpi(D.et) + ' π', D.E.length + ' entr' + (D.E.length === 1 ? 'y' : 'ies'), '#0B1B33'], ['PROFIT', (D.pr < 0 ? '−' : '') + fpi(Math.abs(D.pr)) + ' π', conv(Math.abs(D.pr)), D.pr < 0 ? '#B42318' : '#047857'], ['OUTSTANDING', fpi(D.out) + ' π', D.open.length + ' open' + (D.od.length ? ' · ' + D.od.length + ' overdue' : ''), D.od.length ? '#B42318' : '#0B1B33']].forEach(function (k, i) {
           var cx = X + i * (cw + 20); x.fillStyle = i === 0 ? '#EEF3FF' : '#F5F7FB'; rr(x, cx, y, cw, 150, 20); x.fill(); x.strokeStyle = i === 0 ? 'rgba(21,67,224,.3)' : '#E2E8F0'; x.lineWidth = 2; x.stroke();
           T(x, k[0], cx + 22, y + 40, '700 17px ' + FONT, '#64748B'); x.font = '800 32px ' + MONO; T(x, fit(x, k[1], cw - 40), cx + 22, y + 88, '800 32px ' + MONO, k[3]);
           if (k[2]) { x.font = '500 16px ' + FONT; T(x, fit(x, k[2], cw - 40), cx + 22, y + 124, '500 16px ' + FONT, '#64748B'); }
@@ -737,9 +935,9 @@
       var per = 'month';
       var w = sheet('Business reports', '<label class="l">Period</label><div class="chips" id="rp-p">' + [['month', 'This month'], ['last', 'Last month'], ['30d', 'Last 30 days'], ['all', 'All time']].map(function (x) { return '<button type="button" class="chip' + (x[0] === per ? ' on' : '') + '" data-rp="' + x[0] + '">' + x[1] + '</button>'; }).join('') + '</div>' +
         '<div class="card" id="rp-s"></div>' +
-        '<div class="list" style="margin-top:12px">' + row('bars', 'Business report (PDF)', 'Sales, invoices, products and customers on one page', 'x', ' data-xr="pdf"') + row('down', 'Sales report (CSV)', 'Every payment received, with values', 'x', ' data-xr="sales"') + row('inv', 'Invoices report (CSV)', 'Numbers, customers, status and balances', 'x', ' data-xr="inv"') + row('rcpt', 'Monthly statement (PDF)', 'All payments for a month', 'x', ' data-xr="st"') + '</div>');
+        '<div class="list" style="margin-top:12px">' + row('bars', 'Business report (PDF)', 'Sales, invoices, products and customers on one page', 'x', ' data-xr="pdf"') + row('down', 'Sales report (CSV)', 'Every payment received, with values', 'x', ' data-xr="sales"') + row('inv', 'Invoices report (CSV)', 'Numbers, customers, status and balances', 'x', ' data-xr="inv"') + row('exp', 'Expenses report (CSV)', 'Every expense with its category', 'x', ' data-xr="exp"') + row('sun', 'Day summary', 'Sales, expenses and profit for any day', 'x', ' data-xr="day"') + row('rcpt', 'Monthly statement (PDF)', 'All payments for a month', 'x', ' data-xr="st"') + '</div>');
       function rg() { var n = Date.now(); if (per === 'all') return [0, n + 1, 'all']; if (per === '30d') return [day0() - 29 * 864e5, n + 1, 'last-30-days']; var d = new Date(day0()); d.setDate(1); if (per === 'last') { var e = d.getTime(); d.setMonth(d.getMonth() - 1); return [d.getTime(), e, d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0')]; } return [d.getTime(), n + 1, d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0')]; }
-      function info() { var r = rg(), S = sales().filter(function (x) { return x.ts >= r[0] && x.ts < r[1]; }), V = invs().filter(function (v) { return v.ts >= r[0] && v.ts < r[1]; }); $('#rp-s', w).innerHTML = '<div class="stats" style="margin-top:0"><div><small>Sales</small><b class="bz-amt">' + fpi(sum(S)) + ' π</b></div><div><small>Payments</small><b>' + S.length + '</b></div><div><small>Invoices</small><b>' + V.length + '</b></div></div>'; }
+      function info() { var r = rg(), S = sales().filter(function (x) { return x.ts >= r[0] && x.ts < r[1]; }), V = invs().filter(function (v) { return v.ts >= r[0] && v.ts < r[1]; }); var et = esum(expIn(r[0], r[1])), pr = r7(sum(S) - et); $('#rp-s', w).innerHTML = '<div class="stats" style="margin-top:0"><div><small>Sales</small><b class="bz-amt">' + fpi(sum(S)) + ' π</b></div><div><small>Expenses</small><b class="bz-amt">' + fpi(et) + ' π</b></div><div><small>Profit</small><b class="bz-amt' + (pr < 0 ? ' neg' : '') + '">' + (pr < 0 ? '−' : '') + fpi(Math.abs(pr)) + ' π</b></div></div><div class="small muted" style="margin-top:8px">' + S.length + ' payment' + (S.length === 1 ? '' : 's') + ' · ' + V.length + ' invoice' + (V.length === 1 ? '' : 's') + '</div>'; }
       $$('[data-rp]', w).forEach(function (b) { b.onclick = function () { per = b.dataset.rp; $$('[data-rp]', w).forEach(function (x) { x.classList.toggle('on', x === b); }); info(); }; });
       info();
       $$('[data-xr]', w).forEach(function (b) {
@@ -748,6 +946,11 @@
           var r = rg(), k = b.dataset.xr;
           if (k === 'st') return K.A.statement();
           if (k === 'pdf') return reportSheet(per);
+          if (k === 'day') return daySheet();
+          if (k === 'exp') {
+            var X = expIn(r[0], r[1]).sort(function (a, c) { return a.ts - c.ts; }); if (!X.length) return toast('No expenses in this period');
+            return csvOut([['date', 'category', 'note', 'amount_pi', 'amount_local', 'currency']].concat(X.map(function (e) { return [iso(e.ts), e.cat, e.note || '', e.a, e.lv || '', e.lc || '']; })), 'FinPi-expenses-' + r[2] + '.csv', 'FinPi expenses report');
+          }
           if (k === 'sales') {
             var S = sales().filter(function (x) { return x.ts >= r[0] && x.ts < r[1]; }).sort(function (a, c) { return a.ts - c.ts; });
             if (!S.length) return toast('No sales in this period');
@@ -777,11 +980,11 @@
       var b = biz(), open = invs().filter(function (v) { return /Unpaid|Part paid|Overdue/.test(status(v)); }).length;
       return '<div class="sec"><h2>Business</h2></div><div class="list">' + row('store', 'FinPi Business', 'Sales, invoices and reports', 'biz') + row('edit', 'Business profile', b.name || 'Name, address and tax ID', 'bizprof') +
         row('inv', 'Invoices', open ? open + ' open' : 'Create and track invoices', 'invs') + row('users', 'Customers', custs().length ? custs().length + ' saved' : 'People and businesses who pay you', 'cust') +
-        row('repeat', 'Recurring requests', recs().length ? recs().length + ' active' : 'Weekly or monthly invoices', 'recur') + row('qr', 'My Pi QR', 'Poster to print or share', 'myqr') + '</div>';
+        row('exp', 'Expenses', 'What the business spends, and its profit', 'expenses') + row('sun', 'Day summary', 'Today’s sales, expenses and profit', 'daysum') + row('repeat', 'Recurring requests', recs().length ? recs().length + ' active' : 'Weekly or monthly invoices', 'recur') + row('qr', 'My Pi QR', 'Poster to print or share', 'myqr') + '</div>';
     };
     K.HK.html.settings = function () { return row('store', 'Business profile', biz().name ? K.NTYPE[K.nType() === 'name' ? 'business' : K.nType()].l + ' · ' + biz().name : 'Name, logo, address, tax ID', 'bizprof') + row('sound', 'Payment sounds', get('sound', true) ? 'On · sound and vibration' : 'Off', 'sound') + row(get('hide', false) ? 'eyeoff' : 'eye', 'Hide amounts', get('hide', false) ? 'On' : 'Off', 'hide'); };
     Object.assign(K.A, {
-      biz: function () { bizSheet(); }, bizreport: function () { reportSheet(); }, sale: function () { saleSheet(); }, prods: function () { prodSheet(); }, 'inv-new': function () { invEdit(''); }, invs: function () { invList(); }, cust: function () { custSheet(); }, recur: recSheet, myqr: qrSheet, bizprof: profSheet, reports: repSheet,
+      biz: function () { bizSheet(); }, bizreport: function () { reportSheet(); }, expenses: function () { expSheet(); }, daysum: function () { daySheet(); }, sale: function () { saleSheet(); }, prods: function () { prodSheet(); }, 'inv-new': function () { invEdit(''); }, invs: function () { invList(); }, cust: function () { custSheet(); }, recur: recSheet, myqr: qrSheet, bizprof: profSheet, reports: repSheet,
       hide: toggleHide,
       sound: function () { put('sound', !get('sound', true)); if (get('sound', true)) { ac(); fx('in'); } toast(get('sound', true) ? 'Payment sounds on' : 'Payment sounds off'); K.rerender(); }
     });

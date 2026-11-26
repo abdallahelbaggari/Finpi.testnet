@@ -80,6 +80,8 @@
 
   /* ── icons (Feather, MIT) ── */
   var P = {
+    exp: '<circle cx="12" cy="12" r="10"/><polyline points="8 12 12 16 16 12"/><line x1="12" y1="8" x2="12" y2="16"/>',
+    sun: '<circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/>',
     home: '<path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/>',
     send: '<line x1="7" y1="17" x2="17" y2="7"/><polyline points="7 7 17 7 17 17"/>',
     req: '<line x1="17" y1="7" x2="7" y2="17"/><polyline points="17 17 7 17 7 7"/>',
@@ -1283,6 +1285,7 @@
     { id: 'scan', n: 'Scan to pay', s: 'Payment code or wallet QR', i: 'qr', c: 'n', g: 'pay', a: 'scan' },
     { id: 'receive', n: 'Receive Pi', s: 'Your @username and address', i: 'card', c: 'a', g: 'pay', a: 'receive' },
     { id: 'contacts', n: 'Contacts', s: 'People you pay often', i: 'user', c: 'b', g: 'pay', a: 'contacts' },
+    { id: 'pidomain', n: 'Pay a .pi name', s: 'Coming soon', i: 'globe', c: 'n', g: 'pay', a: 'pi-domain', soon: 1 },
     { id: 'links', n: 'Payment links', s: 'Share a link to get paid', i: 'link', c: 'b', g: 'get', a: 'links' },
     { id: 'myqr', n: 'My Pi QR', s: 'Poster to print or share', i: 'qr', c: 't', g: 'get', a: 'myqr' },
     { id: 'invoice', n: 'Invoices', s: 'Paid automatically on arrival', i: 'inv', c: 'n', g: 'get', a: 'invs' },
@@ -1293,6 +1296,8 @@
     { id: 'newinv', n: 'New invoice', s: 'Items, tax and due date', i: 'plus', c: 'n', g: 'biz', a: 'inv-new' },
     { id: 'cust', n: 'Customers', s: 'Who pays you', i: 'users', c: 't', g: 'biz', a: 'cust' },
     { id: 'recur', n: 'Recurring', s: 'Weekly or monthly invoices', i: 'repeat', c: 'a', g: 'biz', a: 'recur' },
+    { id: 'expenses', n: 'Expenses', s: 'Spending and profit', i: 'exp', c: 'a', g: 'biz', a: 'expenses' },
+    { id: 'daysum', n: 'Day summary', s: 'Sales, expenses and profit', i: 'sun', c: 'g', g: 'biz', a: 'daysum' },
     { id: 'bizreport', n: 'Business report', s: 'One-page PDF for any period', i: 'bars', c: 'n', g: 'biz', a: 'bizreport' },
     { id: 'reports', n: 'Reports', s: 'Sales and invoices CSV', i: 'down', c: 'b', g: 'biz', a: 'reports' },
     { id: 'bizprof', n: 'Business profile', s: 'Name, logo, tax ID, store, shop', i: 'store', c: 'n', g: 'biz', a: 'bizprof' },
@@ -1320,8 +1325,14 @@
   function svcById(id) { return id === 'more' ? { id: 'more', n: 'All services', i: 'grid', c: 'k', tab: 'pay' } : SVC.filter(function (x) { return x.id === id; })[0]; }
   function svcGrid(L, kind) {
     return '<div class="sv-grid' + (kind ? ' ' + kind : '') + '">' + L.filter(Boolean).map(function (x) {
-      return '<button type="button" class="sv c-' + x.c + '" ' + (x.tab ? 'data-tab="' + x.tab + '"' : 'data-act="' + x.a + '"') + ' data-k="' + esc((x.n + ' ' + (x.s || '') + ' ' + x.g).toLowerCase()) + '"><i>' + ic(x.i) + '</i><b>' + esc(x.n) + '</b></button>';
+      return '<button type="button" class="sv c-' + x.c + '" ' + (x.tab ? 'data-tab="' + x.tab + '"' : 'data-act="' + x.a + '"') + ' data-k="' + esc((x.n + ' ' + (x.s || '') + ' ' + x.g).toLowerCase()) + '"><i>' + ic(x.i) + '</i><b>' + esc(x.n) + '</b>' + (x.soon ? '<em class="sv-soon">Soon</em>' : '') + '</button>';
     }).join('') + '</div>';
+  }
+  function piDomainSheet() {
+    var w = sheet('Pay a .pi name', '<div class="pd-hero">' + ic('globe') + '<b>Pay anyone by their .pi name</b><span>Send Pi to names such as shop.pi, with the same verified receipt.</span><em class="sv-soon">Coming soon</em></div>' +
+      '<label class="l" for="pd-i">.pi name</label><div class="pd-in"><input class="in" id="pd-i" placeholder="name" disabled><span>.pi</span></div>' +
+      '<button type="button" class="btn" disabled>' + ic('send') + 'Coming soon</button><button type="button" class="btn ghost" data-pd="send">' + ic('send') + 'Send by @username or address</button>');
+    $('[data-pd="send"]', w).onclick = function () { A.send(); };
   }
   function svcFilter(q) {
     q = String(q || '').trim().toLowerCase(); var any = false;
@@ -1817,7 +1828,7 @@
     signin: function () { signIn(); },
     price: function () { go('wallet'); }, 'price-retry': function (el, e) { e.stopPropagation(); loadPrice(true); paintPrice(); },
     currency: function (el, e) { e && e.stopPropagation(); curSheet(); },
-    'check-addr': function () { addrSheet(false); }, verify: function () { verifySheet(); },
+    'pi-domain': piDomainSheet, 'check-addr': function () { addrSheet(false); }, verify: function () { verifySheet(); },
     'addr-set': function () { addrSheet(true); }, 'addr-use': function () { var s = get('addrSug', ''); if (validG(s)) { put('addr', s); put('addrSug', ''); render(S.tab); loadWal(); toast('Address saved'); } },
     'wal-load': function () { S.wal = null; loadWal(); },
     notifs: function () {
@@ -1932,7 +1943,7 @@
     kit: { HK: HK, P: P, A: A, T: T, get: get, put: put, esc: esc, ic: ic, toast: toast, sheet: sheet, closeSheets: closeSheets, copy: copy, fpi: fpi, conv: conv, money: money, rateIn: rateIn, curr: curr, short: short, r7: r7,
       rcpts: rcpts, me: me, signedIn: signedIn, myTarget: myTarget, needTarget: needTarget, payLink: payLink, isG: isG, validG: validG, cName: cName, contacts: contacts, toLabel: toLabel,
       shareText: shareText, shareImage: shareImage, shareLink: shareLink, shareFile: shareFile, saveFile: saveFile, canShareFile: canShareFile, makePdf: makePdf, fontsReady: fontsReady, addNote: addNote,
-      go: go, rerender: rerender, nType: nType, NTYPE: NTYPE, setName: setName, curSheet: curSheet, api: api, token: function () { return S.token; }, NETN: NETN, TEST: TEST, USER_RE: USER_RE, rcptTitle: rcptTitle } };
+      go: go, rerender: rerender, scanBox: scanBox, scanOk: scanOk, nType: nType, NTYPE: NTYPE, setName: setName, curSheet: curSheet, api: api, token: function () { return S.token; }, NETN: NETN, TEST: TEST, USER_RE: USER_RE, rcptTitle: rcptTitle } };
   try { document.dispatchEvent(new Event('finpi:ready')); } catch (e) {}
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', start); else start();
 })();
