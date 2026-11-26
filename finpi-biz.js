@@ -126,6 +126,61 @@
     }
     F.fx = fx; K.bizPut = function (b) { put('biz', b); };
 
+    /* ── FinPi voice: "FinPi! You have received 25 Pi." Spoken only after FinPi itself has checked the
+       transaction on the Pi blockchain (never from a screenshot, a link or a message). ── */
+    var VTXT = { en: 'Fin Pi! You have received {a} Pi.', fr: 'Fin Pi ! Vous avez reçu {a} Pi.', es: '¡Fin Pi! Has recibido {a} Pi.', pt: 'Fin Pi! Você recebeu {a} Pi.', ar: 'فين باي! لقد استلمت {a} باي.', ha: 'Fin Pi! Ka karɓi Pi {a}.' };
+    var VLOC = { en: 'en', fr: 'fr', es: 'es', pt: 'pt', ar: 'ar', ha: 'ha' };
+    function vLang() { var l = window.FPL ? FPL.lang() : 'en'; return VTXT[l] ? l : 'en'; }
+    function voices() { try { return (window.speechSynthesis && speechSynthesis.getVoices()) || []; } catch (e) { return []; } }
+    function pickVoice(l) {
+      var V = voices().filter(function (v) { return String(v.lang || '').toLowerCase().indexOf(VLOC[l]) === 0; }); if (!V.length) return null;
+      function sc(v) { var n = String(v.name || ''); return (/natural|neural|enhanced|premium|google/i.test(n) ? 4 : 0) + (v.localService ? 1 : 0) + (/female|samantha|karen|amelie|monica|joana|zira|aria|jenny/i.test(n) ? 1 : 0); }
+      return V.sort(function (a, b) { return sc(b) - sc(a); })[0];
+    }
+    function canSpeak() { return !!(window.speechSynthesis && window.SpeechSynthesisUtterance); }
+    function amtWords(a, l) { a = String(Math.round(Number(a) * 100) / 100); return /^(fr|es|pt)$/.test(l) ? a.replace('.', ',') : a; }
+    function chime() {
+      var c = ac(); if (!c) return 0; var t = c.currentTime + 0.03;
+      try { tone(c, 1046.5, t, 0.5, 0.16); tone(c, 1318.5, t + 0.13, 0.5, 0.15); tone(c, 1568, t + 0.26, 0.9, 0.15); tone(c, 2093, t + 0.26, 0.9, 0.05); } catch (e) {}
+      try { if (navigator.vibrate) navigator.vibrate([60, 50, 120]); } catch (e) {}
+      return 700;
+    }
+    // speak in the app language; if the phone has no voice for it, English is used
+    function say(a, test) {
+      var l = vLang(), v = pickVoice(l); if (!v && l !== 'en') { l = 'en'; v = pickVoice('en'); }
+      var txt = VTXT[l].replace('{a}', amtWords(a, l)), wait = chime();
+      if (!canSpeak()) return { spoken: false, text: txt };
+      setTimeout(function () {
+        try { var u = new SpeechSynthesisUtterance(txt); u.lang = v ? v.lang : (l === 'en' ? 'en-US' : l); if (v) u.voice = v; u.rate = 0.98; u.pitch = 1.02; u.volume = 1; speechSynthesis.speak(u); } catch (e) {}
+      }, wait);
+      return { spoken: true, text: txt, voice: v ? v.name : '' };
+    }
+    // Android browsers only speak after the first touch on the page
+    document.addEventListener('pointerdown', function () { try { if (canSpeak() && get('voice', true)) { var u = new SpeechSynthesisUtterance(' '); u.volume = 0; speechSynthesis.speak(u); } } catch (e) {} }, { once: true, passive: true });
+    try { if (canSpeak()) speechSynthesis.onvoiceschanged = function () {}; } catch (e) {}
+    function vAnnounce(r, tries) {
+      if (!get('voice', true) || !r || r.dir !== 'in' || r.kind === 'refund' || r.kind === 'supporter') return;
+      var tx = String(r.txid || '').toLowerCase(); if (!/^[a-f0-9]{64}$/.test(tx)) return;
+      var done = get('vAnn', []); if (done.indexOf(tx) >= 0) return;
+      K.api('/verify?tx=' + tx + '&net=' + (K.TEST ? 'test' : 'main')).then(function (d) {
+        if (!d || !d.ok) { if ((tries || 0) < 2) setTimeout(function () { vAnnounce(r, (tries || 0) + 1); }, 8000); return; }
+        var me = get('addr', ''), P = (d.tx && d.tx.ok && d.tx.payments) || [];
+        var hit = P.filter(function (p) { return Math.abs(parseFloat(p.amount) - Number(r.amount)) < 1e-6 && (!me || !P.some(function (q) { return q.to === me; }) || p.to === me); })[0];
+        if (!hit) return; // not confirmed on the blockchain: stay silent
+        put('vAnn', [tx].concat(get('vAnn', [])).slice(0, 200));
+        say(r.amount);
+      }).catch(function () { if ((tries || 0) < 2) setTimeout(function () { vAnnounce(r, (tries || 0) + 1); }, 8000); });
+    }
+    F.say = say;
+    function voiceSheet() {
+      var on = get('voice', true), l = vLang(), v = pickVoice(l), fb = !v && l !== 'en';
+      var w = sheet('Voice announcements', '<div class="pd-hero">' + ic('sound') + '<b>“FinPi! You have received 25 Pi.”</b><span>Spoken when Pi arrives, after FinPi confirms the payment on the Pi blockchain.</span></div>' +
+        '<div class="list" style="margin-top:12px">' + row(on ? 'check' : 'x', on ? 'Voice on' : 'Voice off', on ? 'Tap to turn off' : 'Tap to turn on', 'x', ' data-vx="tog"') + '</div>' +
+        '<div class="card vc-info"><div class="row small"><span class="grow muted">Language</span><b>' + esc(window.FPL ? FPL.LANGS[window.FPL.lang()] : 'English') + '</b></div><div class="row small"><span class="grow muted">Voice</span><b>' + esc(!canSpeak() ? 'Tone only on this browser' : v ? v.name : fb ? 'English voice' : 'Phone voice') + '</b></div></div>' +
+        '<button type="button" class="btn" data-vx="play"' + (on ? '' : ' disabled') + '>' + ic('sound') + 'Play sample</button>');
+      $$('[data-vx]', w).forEach(function (b) { b.removeAttribute('data-act'); b.onclick = function () { if (b.dataset.vx === 'tog') { put('voice', !get('voice', true)); toast(get('voice', true) ? 'Voice announcements on' : 'Voice announcements off'); return voiceSheet(); } ac(); say(25, true); }; });
+    }
+
     /* ── hide amounts ── */
     function applyHide() { document.documentElement.classList.toggle('fp-hide', !!get('hide', false)); var b = $('#hide-b'); if (b) { b.innerHTML = ic(get('hide', false) ? 'eyeoff' : 'eye'); b.setAttribute('aria-label', get('hide', false) ? 'Show amounts' : 'Hide amounts'); } }
     function toggleHide() { put('hide', !get('hide', false)); applyHide(); toast(get('hide', false) ? 'Amounts hidden' : 'Amounts shown'); K.rerender(); }
@@ -168,7 +223,9 @@
     function matchAll() { var L = invs(), M = invIndex(L), n = 0; if (!L.length) return 0; sales().forEach(function (r) { if (applyMatch(r, L, M)) n++; }); if (n) { saveInvs(L); L.forEach(function (v) { if (!v.stk && !v.void && status(v) === 'Paid' && v.items.some(function (it) { return it.pid; })) stockOut(v.id); }); } return n; }
     K.HK.rcpt.push(function (r) {
       var fresh = Date.now() - (r.ts || 0) < 180e3;
-      if (fresh && r.kind !== 'supporter') { fx(r.dir === 'in' ? 'in' : 'out'); if (r.kind !== 'refund') try { doneFx(r); } catch (e) {} }
+      var spoken = fresh && r.dir === 'in' && r.kind !== 'refund' && get('voice', true) && /^[a-f0-9]{64}$/i.test(String(r.txid || ''));
+      if (fresh && r.kind !== 'supporter') { if (!spoken) fx(r.dir === 'in' ? 'in' : 'out'); if (r.kind !== 'refund') try { doneFx(r); } catch (e) {} }
+      if (spoken) vAnnounce(r);
       matchRcpt(r, !fresh);
     });
     function invFor(r) { var k = rkey(r); return invs().filter(function (v) { return (v.pays || []).indexOf(k) >= 0; })[0]; }
@@ -1295,9 +1352,9 @@
         row('inv', 'Invoices', open ? open + ' open' : 'Create and track invoices', 'invs') + row('users', 'Customers', custs().length ? custs().length + ' saved' : 'People and businesses who pay you', 'cust') +
         row('exp', 'Expenses', 'What the business spends, and its profit', 'expenses') + row('sun', 'Day summary', 'Today’s sales, expenses and profit', 'daysum') + row('user', 'Staff mode', get('staffC', {}).code ? 'Active · ' + (get('staffC', {}).staff || 'Staff') : 'Let staff take sales on their phone', 'staff') + row('repeat', 'Recurring requests', recs().length ? recs().length + ' active' : 'Weekly or monthly invoices', 'recur') + row('qr', 'My Pi QR', 'Poster to print or share', 'myqr') + '</div>';
     };
-    K.HK.html.settings = function () { return row('store', 'Business profile', biz().name ? K.NTYPE[K.nType() === 'name' ? 'business' : K.nType()].l + ' · ' + biz().name : 'Name, logo, address, tax ID', 'bizprof') + row('sound', 'Payment sounds', get('sound', true) ? 'On · sound and vibration' : 'Off', 'sound') + row(get('hide', false) ? 'eyeoff' : 'eye', 'Hide amounts', get('hide', false) ? 'On' : 'Off', 'hide'); };
+    K.HK.html.settings = function () { return row('sound', 'Voice announcements', get('voice', true) ? 'On · “FinPi! You have received … Pi.”' : 'Off', 'voice') + row('store', 'Business profile', biz().name ? K.NTYPE[K.nType() === 'name' ? 'business' : K.nType()].l + ' · ' + biz().name : 'Name, logo, address, tax ID', 'bizprof') + row('sound', 'Payment sounds', get('sound', true) ? 'On · sound and vibration' : 'Off', 'sound') + row(get('hide', false) ? 'eyeoff' : 'eye', 'Hide amounts', get('hide', false) ? 'On' : 'Off', 'hide'); };
     Object.assign(K.A, {
-      biz: function () { bizSheet(); }, bizreport: function () { reportSheet(); }, expenses: function () { expSheet(); }, daysum: function () { daySheet(); }, staff: function () { staffSheet(); }, taxsum: function () { taxSheet(); }, goals: function () { goalSheet(); }, collect: function () { colSheet(); }, sale: function () { saleSheet(); }, prods: function () { prodSheet(); }, 'inv-new': function () { invEdit(''); }, invs: function () { invList(); }, cust: function () { custSheet(); }, recur: recSheet, myqr: qrSheet, bizprof: profSheet, reports: repSheet,
+      biz: function () { bizSheet(); }, bizreport: function () { reportSheet(); }, expenses: function () { expSheet(); }, daysum: function () { daySheet(); }, staff: function () { staffSheet(); }, voice: function () { voiceSheet(); }, taxsum: function () { taxSheet(); }, goals: function () { goalSheet(); }, collect: function () { colSheet(); }, sale: function () { saleSheet(); }, prods: function () { prodSheet(); }, 'inv-new': function () { invEdit(''); }, invs: function () { invList(); }, cust: function () { custSheet(); }, recur: recSheet, myqr: qrSheet, bizprof: profSheet, reports: repSheet,
       hide: toggleHide,
       sound: function () { put('sound', !get('sound', true)); if (get('sound', true)) { ac(); fx('in'); } toast(get('sound', true) ? 'Payment sounds on' : 'Payment sounds off'); K.rerender(); }
     });
