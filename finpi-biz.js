@@ -348,7 +348,7 @@
       var logo = b.logo || '';
       $('#bp-f', w).onchange = function () {
         var f = this.files && this.files[0]; if (!f) return; var rd = new FileReader();
-        rd.onload = function () { loadImg(rd.result).then(function (im) { if (!im) return toast('This image cannot be used'); var c = document.createElement('canvas'), s = Math.min(im.width, im.height); c.width = c.height = 256; var x = c.getContext('2d'); x.fillStyle = '#fff'; x.fillRect(0, 0, 256, 256); x.drawImage(im, (im.width - s) / 2, (im.height - s) / 2, s, s, 0, 0, 256, 256); logo = c.toDataURL('image/jpeg', 0.86); $('#bp-lg', w).innerHTML = '<img alt="" src="' + logo + '">'; }); };
+        rd.onload = function () { loadImg(rd.result).then(function (im) { if (!im) return toast('This image format is not supported'); var c = document.createElement('canvas'), s = Math.min(im.width, im.height); c.width = c.height = 256; var x = c.getContext('2d'); x.fillStyle = '#fff'; x.fillRect(0, 0, 256, 256); x.drawImage(im, (im.width - s) / 2, (im.height - s) / 2, s, s, 0, 0, 256, 256); logo = c.toDataURL('image/jpeg', 0.86); $('#bp-lg', w).innerHTML = '<img alt="" src="' + logo + '">'; }); };
         rd.readAsDataURL(f);
       };
       $$('[data-bt]', w).forEach(function (q) { q.onclick = function () { bt = q.dataset.bt; $$('[data-bt]', w).forEach(function (x) { x.classList.toggle('on', x === q); }); $('#bp-nl', w).textContent = K.NTYPE[bt].l; $('#bp-n', w).placeholder = K.NTYPE[bt].p; }; });
@@ -374,7 +374,7 @@
         $('#cu-l', w).innerHTML = L.length ? L.map(function (c) {
           var got = sum(S.filter(function (r) { return c.to && payer(r).toLowerCase() === c.to.toLowerCase(); })), due = r7(invs().filter(function (v) { return v.cid === c.id || (c.to && v.cto && v.cto.toLowerCase() === c.to.toLowerCase()); }).reduce(function (a, v) { return a + balance(v); }, 0));
           return '<button type="button" class="li" data-cu="' + c.id + '"><span class="ico bz-av">' + esc(c.name.charAt(0).toUpperCase()) + '</span><span class="grow"><b>' + esc(c.name) + '</b><small>' + esc(c.to ? (K.isG(c.to) ? K.short(c.to) : '@' + c.to) : (c.phone || 'No Pi account added')) + '</small></span><span class="amt-r"><b class="num bz-amt">' + fpi(got) + ' π</b>' + (due ? '<small class="bz-due">' + fpi(due) + ' π due</small>' : '') + '</span></button>';
-        }).join('') : '<div class="empty">' + ic('users') + '<div>' + (C.length ? 'No match.' : 'No customers yet. Add the people and businesses who pay you.') + '</div></div>';
+        }).join('') : '<div class="empty">' + ic('users') + '<div>' + (C.length ? 'No match.' : 'No customers yet.') + '</div></div>';
         $$('[data-cu]', w).forEach(function (b) { b.onclick = function () { custView(b.dataset.cu); }; });
       }
       $('#cu-q', w).oninput = draw; draw();
@@ -423,7 +423,7 @@
       f = f || 'all'; var L = invs();
       var cnt = function (k) { return L.filter(function (v) { return k === 'all' || (k === 'open' ? /Unpaid|Part paid|Overdue/.test(status(v)) : status(v) === k); }).length; };
       var w = sheet('Invoices', '<div class="chips">' + [['all', 'All'], ['open', 'Open'], ['Overdue', 'Overdue'], ['Paid', 'Paid']].map(function (x) { return '<button type="button" class="chip' + (f === x[0] ? ' on' : '') + '" data-if="' + x[0] + '">' + x[1] + ' · ' + cnt(x[0]) + '</button>'; }).join('') + '</div>' +
-        '<div class="list" style="margin-top:12px">' + (function () { var F2 = L.filter(function (v) { return f === 'all' || (f === 'open' ? /Unpaid|Part paid|Overdue/.test(status(v)) : status(v) === f); }); return F2.length ? F2.map(invRow).join('') : '<div class="empty">' + ic('inv') + '<div>' + (L.length ? 'Nothing here.' : 'No invoices yet. Create one and share it. FinPi marks it paid when the payment arrives.') + '</div></div>'; })() + '</div>' +
+        '<div class="list" style="margin-top:12px">' + (function () { var F2 = L.filter(function (v) { return f === 'all' || (f === 'open' ? /Unpaid|Part paid|Overdue/.test(status(v)) : status(v) === f); }); return F2.length ? F2.map(invRow).join('') : '<div class="empty">' + ic('inv') + '<div>' + (L.length ? 'Nothing here.' : 'No invoices yet.') + '</div></div>'; })() + '</div>' +
         '<button type="button" class="btn" data-x="new">' + ic('plus') + 'New invoice</button>');
       $$('[data-if]', w).forEach(function (b) { b.onclick = function () { invList(b.dataset.if); }; });
       $('[data-x="new"]', w).onclick = function () { invEdit(''); };
@@ -700,7 +700,7 @@
           if (!rows.length) { T(x, empty, cx + 16, y + 110, '500 18px ' + FONT, '#94A3B8'); return; }
           rows.forEach(function (rw, i) { var yy = y + 108 + i * 52; x.font = '600 19px ' + FONT; T(x, fit(x, rw[0], colW - 230), cx + 16, yy, '600 19px ' + FONT, '#0B1B33'); T(x, fpi(rw[2]), cx + colW - 150, yy, '500 18px ' + MONO, '#334155', 'right'); T(x, fpi(rw[1]) + ' π', cx + colW - 16, yy, '700 18px ' + MONO, '#0B2A6F', 'right'); x.fillStyle = '#EEF2F7'; x.fillRect(cx, yy + 18, colW, 1.5); });
         }
-        table(X, 'TOP PRODUCTS AND SERVICES', ['Item', 'Qty', 'Amount'], D.TI, 'Items appear when invoices and sales are paid');
+        table(X, 'TOP PRODUCTS AND SERVICES', ['Item', 'Qty', 'Amount'], D.TI, 'No paid items in this period');
         table(X + colW + 40, 'TOP CUSTOMERS', ['Customer', 'Payments', 'Amount'], D.TC, 'No payments received in this period');
         // invoices summary
         y = 1270; T(x, 'INVOICES AND SALES', X, y, '700 19px ' + FONT, '#64748B');

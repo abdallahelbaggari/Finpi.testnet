@@ -686,3 +686,13 @@ body{background:#EAF1FF!important}
 .ico.tx,.ico.nt{filter:saturate(1.2) brightness(1.05)}
 #onb{background:radial-gradient(90% 55% at 100% 0%,rgba(0,214,201,.45),transparent 60%),radial-gradient(70% 45% at 0% 35%,rgba(91,140,255,.55),transparent 70%),linear-gradient(180deg,#1446E0 0%,#0A2A8C 62%)!important}
 .onb-dots i.on{background:linear-gradient(90deg,#1D5BFF,#00B3A4)!important}
+
+/* live Pi rate on the first welcome screen */
+.onb-fr{position:relative;width:100%;max-width:460px;max-height:100%;display:flex}
+.onb-fr img{max-width:none}
+.onb-rate{position:absolute;left:14px;right:14px;bottom:14px;padding:12px 14px;border-radius:18px;color:#fff;background:linear-gradient(135deg,rgba(10,42,140,.88),rgba(29,91,255,.82));border:1px solid rgba(255,255,255,.35);box-shadow:0 16px 30px -14px rgba(0,0,0,.6);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);animation:pop .5s cubic-bezier(.2,1.3,.4,1) .2s both}
+.onb-rk{display:flex;align-items:center;gap:7px;font-size:12.5px;font-weight:700;color:rgba(255,255,255,.85)}
+.onb-rk em{margin-left:auto;font-style:normal;padding:2px 8px;border-radius:999px;font-size:12px}.onb-rk em.up{background:rgba(52,211,153,.25);color:#A7F3D0}.onb-rk em.dn{background:rgba(248,113,113,.25);color:#FECACA}
+.onb-rate b{display:block;font-size:26px;font-weight:800;margin-top:2px;letter-spacing:-.01em}
+.onb-rate small{display:block;font-size:13px;color:rgba(255,255,255,.8)}
+.onb-rate.wait b{height:30px}

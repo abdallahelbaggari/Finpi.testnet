@@ -175,7 +175,7 @@
       var img = /^image\//.test(type), w = sheet('Saved to your phone',
         '<p class="sh-sub">' + (img ? 'Your ' + esc(what) + ' image is in your phone’s <b>Downloads</b> and <b>Gallery</b>.' : 'Your ' + esc(what) + ' is in your phone’s <b>Downloads</b> folder.') + '</p>' +
         '<button type="button" class="btn" data-x="open">' + ic(img ? 'rcpt' : 'down') + (img ? 'Open the image' : 'Download again') + '</button>' +
-        '<p class="small muted" style="text-align:center;margin-top:10px">Not there? ' + (img ? 'Open the image, then press and hold it to save.' : 'Tap Download again.') + '</p>');
+        '<p class="small muted" style="text-align:center;margin-top:10px">Not there? ' + (img ? 'Open the image, then press and hold to save.' : 'Tap Download again.') + '</p>');
       $('[data-x="open"]', w).onclick = function () { if (img) location.href = d.page; else { var b = document.createElement('a'); b.href = url; b.download = d.name || name; document.body.appendChild(b); b.click(); b.remove(); } };
     }, function () { blobSave(blob, name); toast(what.charAt(0).toUpperCase() + what.slice(1) + ' saved to Downloads'); });
   }
@@ -292,19 +292,19 @@
     var sub = r.usd ? '≈ ' + money(r.amount * r.usd, 'USD') + (r.lr && r.lc && r.lc !== 'USD' ? ' · ' + money(r.amount * r.lr, r.lc) : '') + ' at payment time' : '';
     var mine = (get('name', '') || '@' + (r.me || me())) + (get('name', '') && (r.me || me()) ? ' (@' + (r.me || me()) + ')' : '');
     var base = { amount: fpi(r.amount), sub: sub, verify: verifyUrl(r), status: { text: '✓  Verified on the Pi blockchain', ok: true } };
-    if (r.kind === 'refund') return Object.assign(base, { title: 'Automatic refund', rows: [['From', 'FinPi app wallet (automatic)'], ['To', mine], ['Reason', 'Your transfer to ' + r.other + ' could not be delivered'], ['Narration', r.narr || '—'], ['Pi rate', rateTxt(r)], ['Reference', r.pid]].concat(when, [['Network', r.net], ['Your address', r.addr, 1], ['Transaction ID', r.txid, 1]]), thanks: 'Refunded by FinPi', note: 'Refunded automatically under FinPi’s published rules, with no manual decision.' });
+    if (r.kind === 'refund') return Object.assign(base, { title: 'Automatic refund', rows: [['From', 'FinPi app wallet (automatic)'], ['To', mine], ['Reason', 'Your transfer to ' + r.other + ' could not be delivered'], ['Narration', r.narr || '—'], ['Pi rate', rateTxt(r)], ['Reference', r.pid]].concat(when, [['Network', r.net], ['Your address', r.addr, 1], ['Transaction ID', r.txid, 1]]), thanks: 'Refunded by FinPi', note: 'Refunded automatically.' });
     if (r.kind === 'supporter') return Object.assign(base, { title: 'Payment receipt', status: { text: '✓  Completed', ok: true }, rows: [['Paid by', mine], ['For', 'FinPi Supporter badge'], ['Pi rate', rateTxt(r)], ['Payment ID', r.pid, 1]].concat(when, [['Network', r.net], ['Transaction ID', r.txid, 1]]), thanks: 'Thank you for supporting FinPi', note: 'The badge supports the app. It gives no reward or financial return.' });
     var rate = rateTxt(r);
     if (r.kind === 'wallet') {
       var wi = r.dir === 'in';
       return Object.assign(base, { title: wi ? 'Payment received' : 'Payment receipt',
         rows: [['From', wi ? short(r.from || r.addr) : mine], ['To', wi ? mine : short(r.addr)], ['Narration', r.narr || '—'], ['Category', wi ? '' : r.cat], ['Value', valTxt(r)], ['Pi rate', rate], ['Paid with', 'Pi Wallet'], ['Reference', r.pid]].concat(when, [['Network', r.net], ['Sender address', r.from, 1], ['Recipient address', wi ? r.to : r.addr, 1], ['Transaction ID', r.txid, 1]]),
-        thanks: wi ? 'Received · verified by FinPi' : 'Paid · verified by FinPi', note: 'Paid from Pi Wallet and verified by FinPi on the public Pi blockchain. Scan the code to check it.' });
+        thanks: wi ? 'Received · verified by FinPi' : 'Paid · verified by FinPi', note: 'Paid from Pi Wallet · verified on the Pi blockchain.' });
     }
     var inn = r.dir === 'in', fee = inn ? 0 : (r.fee || 0.01), A = r.tk === 'address';
     return Object.assign(base, { title: inn ? 'Transfer received' : 'Transfer receipt',
       rows: [['From', inn ? r.other : mine], ['To', inn ? mine : (A ? 'Pi wallet address' : r.other)], ['Narration', r.narr || '—'], ['Category', inn ? '' : r.cat], ['Value', valTxt(r)], ['Pi rate', rate]].concat(fee ? [['Blockchain fee', fpi(fee) + ' π'], ['Total paid', fpi(r7(Number(r.amount) + fee)) + ' π']] : [], [['Reference', r.pid]], when, [['Network', r.net], [inn ? 'Your address' : 'Recipient address', r.addr, 1], ['Transaction ID', r.txid, 1]]),
-      thanks: inn ? 'Received with FinPi' : 'Sent with FinPi', note: (A ? 'Paid in FinPi and delivered automatically to the wallet address on the Pi blockchain.' : 'Paid in FinPi and delivered automatically through Pi Network’s official payments.') + ' Scan the code to check it on the Pi blockchain.' });
+      thanks: inn ? 'Received with FinPi' : 'Sent with FinPi', note: (A ? 'Paid in FinPi · delivered to the wallet address on the Pi blockchain.' : 'Paid in FinPi · delivered through Pi Network payments.') + ' Scan the code to check it on the Pi blockchain.' });
   }
   function fontsReady() { try { return document.fonts && document.fonts.ready ? Promise.race([document.fonts.ready, new Promise(function (r) { setTimeout(r, 1500); })]) : Promise.resolve(); } catch (e) { return Promise.resolve(); } }
   function rcName(r) { var d = new Date(r.ts); return 'FinPi-receipt-' + d.getFullYear() + String(d.getMonth() + 1).padStart(2, '0') + String(d.getDate()).padStart(2, '0') + '-' + String(r.txid || r.pid || Date.now()).slice(0, 8) + '.jpg'; }
@@ -416,7 +416,7 @@
     }
     var p = authP;
     return new Promise(function (ok) {
-      var slow = setTimeout(function () { if (!silent) msg.textContent = 'Still connecting to Pi… you will be signed in as soon as Pi answers. If nothing happens, tap Sign in again.'; reset(); }, 15000);
+      var slow = setTimeout(function () { if (!silent) msg.textContent = 'Connecting to Pi… If nothing happens, tap Sign in again.'; reset(); }, 15000);
       p.then(function (res) {
         clearTimeout(slow);
         if (res) msg.textContent = ''; else if (!silent) msg.textContent = 'Sign-in was cancelled or failed. Please try again.';
@@ -549,7 +549,7 @@
           if (!d.ok) { h.innerHTML = '<span class="bad">' + esc(d.error || 'Could not check right now.') + '</span>'; return; }
           if (d.exists && d.username.toLowerCase() === me().toLowerCase()) { h.innerHTML = '<span class="bad">That is you.</span>'; return; }
           if (d.exists) { ok = d.username; h.innerHTML = '<span class="ok">✓ @' + esc(d.username) + ' is on FinPi</span>'; }
-          else h.innerHTML = '<span class="bad">@' + esc(name) + ' has not used FinPi yet.' + (addrOn ? ' You can send to their wallet address instead.' : ' Ask them to open FinPi and sign in with Pi once.') + '</span>';
+          else h.innerHTML = '<span class="bad">@' + esc(name) + ' has not used FinPi yet.' + (addrOn ? ' You can send to their wallet address instead.' : ' They need to sign in to FinPi once to receive by @username.') + '</span>';
         }).catch(function () { h.textContent = 'No connection. Try again.'; });
       }, 400);
     };
@@ -580,11 +580,11 @@
       var v = r7(a.value), x = $('#s-x', w).value.trim(), btn = this, to = ok;
       if (!to) return toast(kind === 'addr' ? 'Enter a valid Pi wallet address' : 'Enter the Pioneer’s @username');
       if (!(v >= 0.01)) return toast('The smallest payment is 0.01 π');
-      if (!x) return toast('Add a narration: what is this payment for?');
+      if (!x) return toast('What is this payment for?');
       if (isG(to) && !S.cfg.enabled) return review(to, v, x, cat, { wallet: true, first: get('payees', []).indexOf(to) < 0 });
       if (!signedIn()) { needSignIn('Sign in with Pi to send inside FinPi.'); return; }
       if (S.cfg.max && v > S.cfg.max) return toast('The most you can send at once is ' + S.cfg.max + ' π');
-      if (!x) return toast('Add a narration: what is this payment for?');
+      if (!x) return toast('What is this payment for?');
       btn.disabled = true; btn.textContent = 'Checking…';
       api('/transfer', isG(to) ? { a: 'check', accessToken: S.token, addr: to, amt: v } : { a: 'check', accessToken: S.token, to: to, amt: v }).then(function (d) {
         btn.disabled = false; btn.textContent = 'Continue';
@@ -655,8 +655,8 @@
               api('/transfer', { a: 'payout', paymentId: pid }).then(function (x) {
                 if (x && x.ok && x.row && x.row.txid) return finish(x.row);
                 if (x && x.refunded && x.row) return refunded(x.row);
-                if (++tries < 40) { step(3, 'Delivering to ' + esc(lab) + '… You can close this screen: your receipt will appear in Activity.'); setTimeout(retry, 8000); }
-                else step(3, 'Your payment is processing. Your receipt will appear in Activity as soon as it is delivered.');
+                if (++tries < 40) { step(3, 'Delivering to ' + esc(lab) + '… The receipt will appear in Activity.'); setTimeout(retry, 8000); }
+                else step(3, 'Payment processing. The receipt will appear in Activity once delivered.');
               }).catch(function () { if (++tries < 40) setTimeout(retry, 8000); });
             })();
           }).catch(function () { step(2, 'Connection problem. Your payment is recorded; FinPi finishes it automatically when you reopen the app.', 'err'); });
@@ -752,7 +752,7 @@
   }
   /* add a receipt from a transaction ID (a payment made in Pi Wallet) */
   function addTxSheet(p) {
-    var w = sheet(p ? 'Add the transaction ID' : 'Get a receipt', '<p class="sh-sub">' + (p ? 'In Pi Wallet, open the payment and copy its transaction ID (64 letters and numbers).' : 'Paste the transaction ID of any Pi payment you sent or received.') + '</p>' +
+    var w = sheet(p ? 'Add the transaction ID' : 'Get a receipt', '<p class="sh-sub">' + (p ? 'Found in Pi Wallet under the payment · 64 characters.' : 'Transaction ID of any Pi payment you sent or received.') + '</p>' +
       '<label class="l" for="tx-i">Transaction ID</label><textarea class="in num" id="tx-i" rows="2" maxlength="80" spellcheck="false" style="font-size:14px;resize:none" placeholder="64 letters and numbers"></textarea><div class="hint" id="tx-h"></div>' +
       '<button type="button" class="btn" id="tx-go">' + ic('search') + 'Find payment</button><div id="tx-r"></div>', { stack: true });
     $('#tx-go', w).onclick = function () {
@@ -804,7 +804,7 @@
   function requestSheet(isLink) {
     if (needTarget(isLink ? 'Payment links' : 'Request Pi')) return;
     var to = myTarget();
-    var w = sheet(isLink ? 'Create payment link' : 'Request Pi', '<p class="sh-sub">' + (isLink ? 'Leave the amount empty to let the payer choose.' : 'A payment code with the amount, ready to scan.') + '</p>' +
+    var w = sheet(isLink ? 'Create payment link' : 'Request Pi', '<p class="sh-sub">' + (isLink ? 'Leave empty for any amount.' : 'A payment code with the amount, ready to scan.') + '</p>' +
       '<label class="l" for="q-a">Amount' + (isLink ? ' (optional)' : '') + '</label><div class="amt"><input id="q-a" type="number" inputmode="decimal" placeholder="0.00"><span>π</span></div><div class="hint num" id="q-c"></div>' +
       '<label class="l" for="q-x">What is it for?</label><input class="in" id="q-x" maxlength="80" placeholder="e.g. Rent, groceries, shop payment">' +
       '<button type="button" class="btn" id="q-go">' + ic(isLink ? 'link' : 'qr') + (isLink ? 'Create link' : 'Create payment code') + '</button>', { stack: !!isLink });
@@ -903,7 +903,7 @@
     }).join('') + '</div>';
   }
   function addrSheet(save) {
-    var w = sheet(save ? 'Your Pi wallet address' : 'Check a Pi address', '<p class="sh-sub">' + (save ? 'Copy it from Pi Wallet (it starts with G). It is public and safe to share. FinPi only reads it.' : 'See the balance and recent payments of any Pi address on the public blockchain.') + '</p>' +
+    var w = sheet(save ? 'Your Pi wallet address' : 'Check a Pi address', '<p class="sh-sub">' + (save ? 'Starts with G · 56 characters · found in Pi Wallet' : 'Balance and recent payments of any Pi address.') + '</p>' +
       '<label class="l" for="ad-i">Wallet address</label><textarea class="in num" id="ad-i" rows="2" maxlength="56" autocapitalize="characters" spellcheck="false" placeholder="G…" style="font-size:14px;resize:none">' + esc(save ? get('addr', '') : '') + '</textarea><div class="hint" id="ad-h"></div>' +
       '<div class="note warn" style="margin-top:8px">' + ic('lock') + '<span>Never paste your passphrase or secret key anywhere. An address starts with G; a secret key starts with S.</span></div>' +
       '<button type="button" class="btn" id="ad-go">' + (save ? 'Save address' : ic('search') + 'Check address') + '</button>' + (save && get('addr', '') ? '<button type="button" class="btn danger" id="ad-rm">Remove address</button>' : '') + '<div id="ad-r" style="margin-top:12px"></div>');
@@ -1061,7 +1061,7 @@
     if (codes.indexOf('USD') < 0) codes.push('USD');
     var list = codes.map(function (c) { return { c: c, n: cname(c) }; }).sort(function (a, b) { return a.n.localeCompare(b.n); });
     var cur = travel ? get('cur2', '') : curr();
-    var w = sheet(travel ? 'Travel currency' : 'Your currency', '<p class="sh-sub">' + (travel ? 'Show Pi values in the currency of the country you are visiting, next to your own.' : 'Pi values are shown in this currency. Payments are always in Pi.') + '</p>' + (travel && cur ? '<button type="button" class="btn ghost" id="cu-off">' + ic('x') + 'Turn off travel currency</button>' : '') + '<div class="to" style="margin-top:6px">' + ic('search', 'color:var(--mute)') + '<input id="cu-q" placeholder="Search currency" autocomplete="off"></div><div class="list cur-list" id="cu-l"></div>');
+    var w = sheet(travel ? 'Travel currency' : 'Your currency', '<p class="sh-sub">' + (travel ? 'Pi values in the currency of the country you visit.' : 'Payments are always in Pi.') + '</p>' + (travel && cur ? '<button type="button" class="btn ghost" id="cu-off">' + ic('x') + 'Turn off travel currency</button>' : '') + '<div class="to" style="margin-top:6px">' + ic('search', 'color:var(--mute)') + '<input id="cu-q" placeholder="Search currency" autocomplete="off"></div><div class="list cur-list" id="cu-l"></div>');
     function draw() {
       var q = $('#cu-q', w).value.trim().toLowerCase();
       $('#cu-l', w).innerHTML = list.filter(function (x) { return !q || x.c.toLowerCase().indexOf(q) >= 0 || x.n.toLowerCase().indexOf(q) >= 0; }).slice(0, 80).map(function (x) {
@@ -1122,11 +1122,11 @@
       '<button type="button" class="btn" data-x="chk">' + ic('refresh') + 'Check now</button>');
     $('[data-x="chk"]', w).onclick = function () { closeSheets(); toast('Checking…'); checkPendingInApp(); };
   }
-  var TIPS = ['FinPi staff will never ask you to send Pi or share your passphrase.', 'Check the @username and amount before you confirm.', 'A receipt is genuine only if its QR code checks out on the Pi blockchain.', 'Your passphrase and secret key (starting with S) are for you alone. Never type them into any app.'];
+  var TIPS = ['FinPi staff will never ask you to send Pi or share your passphrase.', 'Check the @username and amount before you confirm.', 'A receipt is genuine only when its QR code is verified on the Pi blockchain.', 'Never share your passphrase or secret key.'];
   var T = {
     home: function () {
       var R = rcpts();
-      return '<div class="band"><div class="hello"><h1>' + hour() + (signedIn() ? ', @' + esc(me()) : '') + '</h1><p>' + (signedIn() ? 'Here is your Pi today.' : 'You are exploring. Sign in to send and receive Pi.') + '</p></div>' +
+      return '<div class="band"><div class="hello"><h1>' + hour() + (signedIn() ? ', @' + esc(me()) : '') + '</h1><p>' + (signedIn() ? 'Your Pi at a glance.' : 'Sign in with Pi to send and receive.') + '</p></div>' +
         '<div class="hero" data-act="price" data-p="hero" role="button" tabindex="0" aria-label="Pi price details">' + heroHTML() + '</div></div>' +
         '<div class="qa"><button type="button" data-act="send"><i>' + ic('send') + '</i>Send</button><button type="button" data-act="request"><i class="t">' + ic('req') + '</i>Request</button><button type="button" data-act="scan"><i class="n">' + ic('qr') + '</i>Scan</button><button type="button" data-act="receive"><i class="a">' + ic('card') + '</i>Receive</button></div>' +
         dueHTML() + '<div class="sec"><h2>Services</h2><button type="button" data-tab="pay">All services</button></div>' + svcGrid(HOME_SVC.map(svcById), 'home') + hook('home') + '<div class="sec"><h2>Overview</h2></div><div class="card" data-p="month">' + monthHTML() + '</div>' +
@@ -1169,7 +1169,7 @@
         row('edit', 'Name on receipts', get('name', '') ? NTYPE[nType()].l + ' · ' + get('name', '') : 'Your name, business, store or shop', 'name') + row('globe', 'Currency', cname(curr()) + ' (' + curr() + ')', 'currency') +
         row('bell', 'Notifications', !('Notification' in window) ? 'In-app alerts on' : get('push', false) ? 'Phone and in-app alerts' : 'In-app alerts on', 'push') + row('pie', 'Monthly budget', get('budget', 0) ? fpi(get('budget', 0)) + ' π' : 'Not set', 'budget') + row('card', 'Wallet address', get('addr', '') ? short(get('addr', '')) : 'Not added', 'addr-set') + hook('settings') + '</div>' +
         '<div class="sec"><h2>Support</h2></div><div class="list">' + row('info', 'Welcome tour', 'A quick look at FinPi', 'tour') +
-        row('shield', 'Trust center', 'Payments, limits and records', 'security') + row('refresh', 'Repair app', 'Refresh FinPi and restore your data', 'repair') + row('act', 'Resolve a pending payment', 'Finishes or clears an unfinished payment', 'resolvepend') + row('heart', sup ? 'You are a Supporter' : 'Become a Supporter', sup ? 'Thank you!' : '1 π · badge only, no reward', 'supporter') +
+        row('shield', 'Trust center', 'Payments, limits and records', 'security') + row('refresh', 'Repair app', 'Refresh FinPi and restore your data', 'repair') + row('act', 'Resolve a pending payment', 'Finishes or clears an unfinished payment', 'resolvepend') + row('heart', sup ? 'You are a Supporter' : 'Become a Supporter', sup ? 'Thank you!' : '1 π · Supporter badge', 'supporter') +
         row('mail', 'Help & contact', 'Contact the FinPi team', 'help') + '</div>' +
         '<div class="sec"><h2>Legal</h2></div><div class="list">' + lrow('Terms of Service', 'terms-of-service.html') + lrow('Privacy Policy', 'privacy-policy.html') + lrow('Risk Disclosure', 'risk-disclosure.html') + '</div>' +
         (signedIn() ? '<button type="button" class="btn danger" data-act="signout" style="margin-top:18px">' + ic('out') + 'Sign out</button>' : '') +
@@ -1275,7 +1275,7 @@
     { id: 'trust', n: 'Trust center', s: 'Payments, limits, records', i: 'shield', c: 'b', g: 'help', a: 'security' },
     { id: 'repair', n: 'Repair app', s: 'Refresh and restore data', i: 'refresh', c: 't', g: 'help', a: 'repair' },
     { id: 'pending', n: 'Pending payment', s: 'Finish or clear it', i: 'undo', c: 'a', g: 'help', a: 'resolvepend' },
-    { id: 'help', n: 'Help & contact', s: 'We reply quickly', i: 'mail', c: 'n', g: 'help', a: 'help' }
+    { id: 'help', n: 'Help & contact', s: 'Contact FinPi support', i: 'mail', c: 'n', g: 'help', a: 'help' }
   ];
   var HOME_SVC = ['sale', 'verify', 'invoice', 'myqr', 'links', 'split', 'biz', 'more'];
   function svcById(id) { return id === 'more' ? { id: 'more', n: 'All services', i: 'grid', c: 'k', tab: 'pay' } : SVC.filter(function (x) { return x.id === id; })[0]; }
@@ -1734,18 +1734,28 @@
     { t: 'Verify any receipt', p: 'Check any receipt against the Pi blockchain in seconds', img: 'icons/onb-5.webp' }
   ];
   ONB.forEach(function (s0) { var im = new Image(); im.src = s0.img; });
+  function onbRate() {
+    var p = S.p; if (!p || !p.usd) return '<div class="onb-rate wait"><span class="live off"></span><span>Pi price</span><b><span class="skel"></span></b></div>';
+    var c = curr(), r = rateIn(c), ch = typeof p.change24h === 'number' ? p.change24h : null;
+    return '<div class="onb-rate"><div class="onb-rk"><span class="live"></span>Pi price · live' + (ch !== null ? '<em class="' + (ch >= 0 ? 'up' : 'dn') + '">' + (ch >= 0 ? '▲ ' : '▼ ') + Math.abs(ch).toFixed(2) + '%</em>' : '') + '</div>' +
+      '<b class="num">1 π = ' + money(p.usd, 'USD', p.usd < 1 ? 4 : 2) + '</b>' + (c !== 'USD' && r ? '<small class="num">≈ ' + money(r, c, r < 1 ? 4 : 2) + '</small>' : '') + '</div>';
+  }
   function onboarding(force) {
-    if (!force && get('onb', false)) return;
+    // shown every time FinPi is opened (once per visit); Skip closes it
+    var seen = false; try { seen = sessionStorage.getItem('fp_onb_s') === '1'; sessionStorage.setItem('fp_onb_s', '1'); } catch (e) {}
+    if (!force && seen) return;
+    var rt = null;
     var i = 0, o = document.createElement('div'); o.id = 'onb'; o.setAttribute('role', 'dialog'); o.setAttribute('aria-modal', 'true'); o.setAttribute('aria-label', 'Welcome to FinPi');
     function draw(dir) {
       var s0 = ONB[i], last = i === ONB.length - 1;
       o.innerHTML = '<div class="onb-top"><div class="brand"><img src="icons/logo-256.png" alt="">FinPi</div>' + (last ? '' : '<button type="button" class="onb-skip" data-o="skip">Skip</button>') + '</div>' +
-        '<div class="onb-art ' + (dir || '') + '"><img src="' + s0.img + '" alt=""></div>' +
+        '<div class="onb-art ' + (dir || '') + '"><div class="onb-fr"><img src="' + s0.img + '" alt="">' + (i === 0 ? '<div id="onb-rt">' + onbRate() + '</div>' : '') + '</div></div>' +
         '<div class="onb-panel"><div class="onb-txt ' + (dir || '') + '"><h2>' + esc(s0.t) + '</h2><p>' + esc(s0.p) + '</p></div>' +
         '<div class="onb-dots">' + ONB.map(function (x, k) { return '<i class="' + (k === i ? 'on' : '') + '"></i>'; }).join('') + '</div>' +
-        '<div class="onb-b">' + (last ? '<button type="button" class="btn" data-o="signin"><span class="pi-dot">π</span>Sign in with Pi</button><button type="button" class="onb-ex" data-o="explore">Explore without signing in</button>' : '<button type="button" class="btn" data-o="next">Continue</button>') + '</div></div>';
+        '<div class="onb-b">' + (last ? (signedIn() ? '<button type="button" class="btn" data-o="skip">Continue to FinPi</button>' : '<button type="button" class="btn" data-o="signin"><span class="pi-dot">π</span>Sign in with Pi</button><button type="button" class="onb-ex" data-o="explore">Explore without signing in</button>') : '<button type="button" class="btn" data-o="next">Continue</button>') + '</div></div>';
     }
-    function end() { put('onb', true); o.classList.add('out'); setTimeout(function () { o.remove(); }, 260); }
+    function end() { put('onb', true); clearInterval(rt); o.classList.add('out'); setTimeout(function () { o.remove(); }, 260); }
+    rt = setInterval(function () { var e = $('#onb-rt', o); if (e) e.innerHTML = onbRate(); if (!document.body.contains(o)) clearInterval(rt); }, 1500);
     o.addEventListener('click', function (e) {
       var b = e.target.closest('[data-o]'); if (!b) return; var k = b.dataset.o;
       if (k === 'skip') return end();
@@ -1793,13 +1803,13 @@
     push: function () {
       var sup = 'Notification' in window, perm = sup ? Notification.permission : 'unsupported', on = get('push', false);
       var w = sheet('Notifications', '<p class="sh-sub">Alerts for payments, invoices, refunds and reminders.</p>' +
-        '<div class="note ' + (perm === 'granted' ? 'ok' : perm === 'denied' || perm === 'unsupported' ? 'warn' : '') + '">' + ic('bell') + '<span>' + (perm === 'granted' ? 'Allowed on this phone.' : perm === 'denied' ? 'Blocked for FinPi. Allow notifications in your browser settings to turn them on.' : perm === 'unsupported' ? 'This browser does not support phone notifications. You will still see alerts in FinPi.' : 'Not allowed yet.') + '</span></div>' +
+        '<div class="note ' + (perm === 'granted' ? 'ok' : perm === 'denied' || perm === 'unsupported' ? 'warn' : '') + '">' + ic('bell') + '<span>' + (perm === 'granted' ? 'Allowed on this phone.' : perm === 'denied' ? 'Blocked for FinPi. Allow notifications in your browser settings to turn them on.' : perm === 'unsupported' ? 'Alerts appear inside FinPi.' : 'Not allowed yet.') + '</span></div>' +
         (sup && perm !== 'denied' ? '<button type="button" class="btn" id="ps-on">' + (on && perm === 'granted' ? 'Turn off' : 'Turn on') + '</button>' : '') + (on && perm === 'granted' ? '<button type="button" class="btn ghost" id="ps-t">Send a test</button>' : ''));
       var b = $('#ps-on', w); if (b) b.onclick = function () {
         if (on && perm === 'granted') { put('push', false); closeSheets(); render(S.tab); return; }
         Notification.requestPermission().then(function (p) { if (p === 'granted') { put('push', true); toast('Phone notifications on'); } else toast('Notifications were not allowed'); closeSheets(); render(S.tab); });
       };
-      var t = $('#ps-t', w); if (t) t.onclick = function () { addNote('bell', 'FinPi test', 'Notifications are working.', 'test-' + Date.now()); toast('Test sent'); };
+      var t = $('#ps-t', w); if (t) t.onclick = function () { addNote('bell', 'FinPi notifications', 'Alerts are working.', 'test-' + Date.now()); toast('Test sent'); };
     },
     resolvepend: function () { window.fpResolvePending(); }, backup: function () { backupSheet(); }, travel: function () { curSheet(true); }, insights: function () { S.seg = 'ins'; go('activity'); }, repair: function () { repairSheet(); },
     security: function () {
@@ -1817,7 +1827,7 @@
       $('#sp-go', w).onclick = supporterPay;
     },
     status: function () { location.href = 'setup.html'; },
-    help: function () { sheet('Help & contact', '<p class="sh-sub">We reply within 30 days, usually much sooner.</p><a class="btn" href="mailto:' + SUPPORT + '?subject=FinPi%20help">' + ic('mail') + 'Email FinPi support</a><div class="card" style="margin-top:14px"><h3>Common questions</h3><p><b>Where is my Pi?</b> In your own Pi Wallet. FinPi never holds balances.<br><br><b>A transfer did not arrive.</b> FinPi keeps delivering automatically, or refunds you. You will be notified either way.<br><br><b>Can a transfer be reversed?</b> No. Delivered blockchain payments are final.</p></div>'); },
+    help: function () { sheet('Help & contact', '<p class="sh-sub">FinPi support will reply as soon as possible.</p><a class="btn" href="mailto:' + SUPPORT + '?subject=FinPi%20help">' + ic('mail') + 'Email FinPi support</a><div class="card" style="margin-top:14px"><h3>Common questions</h3><p><b>Where is my Pi?</b> In your own Pi Wallet. FinPi never holds balances.<br><br><b>A transfer did not arrive.</b> FinPi keeps delivering automatically, or refunds you. You will be notified either way.<br><br><b>Can a transfer be reversed?</b> No. Delivered blockchain payments are final.</p></div>'); },
     signout: function () { S.user = null; S.token = null; registered = false; put('user', null); closeSheets(); $('#app').hidden = true; $('#landing').hidden = false; toast('Signed out'); }
   };
   function supporterPay() {
@@ -1867,7 +1877,7 @@
     if (TEST) { $('#ld-net').textContent = 'Pi Testnet'; }
     $('#signin').onclick = function () { signIn(); };
     $('#explore').onclick = function () { S.guest = true; showApp(); if (pendingCode) { var c = pendingCode; pendingCode = null; openCode(c); } };
-    onboarding(); loadPrice(true); paintPrice(); initPi(); loadCfg(); checkRems();
+    loadPrice(true); onboarding(); paintPrice(); initPi(); loadCfg(); checkRems();
     var u = get('user', null);
     if (u && u.username && window.Pi) { $('#signin-t').textContent = 'Signing in as @' + u.username + '…'; signIn(true).then(function (ok) { if (!ok) $('#signin-t').textContent = 'Sign in with Pi'; }); }
     checkPendingWallet(); checkPendingInApp();
