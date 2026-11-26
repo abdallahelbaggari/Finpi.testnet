@@ -193,7 +193,7 @@
   function shareImage(blob, name, title, text, short) {
     var f = null; try { f = new File([blob], name, { type: 'image/jpeg' }); } catch (e) {}
     var fallback = function () {
-      var wh = String(title || 'FinPi receipt').replace(/^FinPi /, '').toLowerCase();
+      var wh = String(title || 'FinPi receipt').replace(/^FinPi /, ''); wh = wh.charAt(0).toLowerCase() + wh.slice(1);
       saveFile(blob, name, 'image/jpeg', wh, true);
       var w = sheet('Share the ' + wh + ' image', '<p class="sh-sub">The ' + esc(wh) + ' image is saved to your phone’s <b>Gallery</b>. Open WhatsApp (or any app), tap attach, choose <b>Gallery</b> and pick the FinPi ' + esc(wh) + '.</p>' +
         '<button type="button" class="btn" data-x="lk">' + ic('link') + 'Share as a link instead</button>');

@@ -1,6 +1,7 @@
 // /verify — checks a Pi payment on the Pi blockchain (Pi Horizon). Read-only: it never moves Pi.
 //   ?tx=<64-hex hash>&net=main|test                         → that transaction and its payments
 //   ?to=<G… address>&ref=HM-XXXXXX&amt=<π>&net=main|test    → finds a payment to that address with that memo
+import { rateOk } from './_lib/transfers.js';
 const H = { 'Access-Control-Allow-Origin': '*', 'Content-Type': 'application/json' };
 const out = (o, age) => new Response(JSON.stringify(o), { status: 200, headers: { ...H, 'Cache-Control': 'public, max-age=' + (age || 0) } });
 const HORIZON = { main: 'https://api.mainnet.minepi.com', test: 'https://api.testnet.minepi.com' };
@@ -30,6 +31,7 @@ async function seal(env, net, hash, total, from, to) {
   return 'FP-' + c.slice(0, 5) + '-' + c.slice(5);
 }
 export async function onRequestGet({ request, env }) {
+  if (!(await rateOk(env, request, 'verify', 900))) return out({ ok: false, error: 'Too many checks. Try again in a few minutes.' });
   const u = new URL(request.url), net = u.searchParams.get('net') === 'test' ? 'test' : 'main', base = HORIZON[net];
   try {
     const tx = u.searchParams.get('tx');
