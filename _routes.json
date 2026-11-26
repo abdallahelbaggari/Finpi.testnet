@@ -1,1 +1,1 @@
-{"version": 1, "include": ["/approve", "/complete", "/recover", "/transfer", "/users", "/pi-price", "/fx", "/verify", "/file", "/f/*", "/r/*", "/history"], "exclude": []}
+{"version": 1, "include": ["/approve", "/complete", "/recover", "/transfer", "/users", "/pi-price", "/fx", "/verify", "/file", "/f/*", "/r/*", "/history", "/staff", "/report", "/directory"], "exclude": []}
