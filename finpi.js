@@ -677,13 +677,14 @@
     paint([1, 'Checking scam reports…']);
     api('/report?k=' + encodeURIComponent(to)).then(function (d) {
       if (!d || !d.ok) return paint([1, 'Scam reports could not be checked']);
-      paint(d.flagged ? [2, 'Reported as a scam by ' + d.n + ' Pioneers'] : d.n ? [1, 'Reported by ' + d.n + ' Pioneer' + (d.n === 1 ? '' : 's')] : [0, 'No scam reports']);
+      // a warning appears only once 50 different Pioneers have reported it
+      paint(d.flagged ? [2, 'Reported as a scam by ' + d.n + ' Pioneers'] : [0, 'No scam warnings']);
     }).catch(function () { paint([1, 'Scam reports could not be checked']); });
   }
   var RREASON = [['scam', 'Scam or fraud'], ['nodelivery', 'Paid, nothing delivered'], ['impersonation', 'Pretends to be someone else'], ['fake', 'Fake receipt or payment'], ['other', 'Other']];
   function reportSheet(pre) {
     var why = 'scam';
-    var w = sheet('Report a scam', '<p class="sh-sub">Reports help protect every Pioneer. An address or username is flagged when several Pioneers report it.</p>' +
+    var w = sheet('Report a scam', '<p class="sh-sub">Reports help protect every Pioneer. A warning is shown once 50 different Pioneers report the same address or username.</p>' +
       '<label class="l" for="rp-k">@username or Pi wallet address</label><textarea class="in num" id="rp-k" rows="2" maxlength="60" autocapitalize="none" spellcheck="false" style="font-size:14px;resize:none" placeholder="@username or G…">' + esc(pre ? (isG(pre) ? pre : '@' + pre) : '') + '</textarea>' +
       '<label class="l">What happened?</label><div class="chips" id="rp-r">' + RREASON.map(function (x) { return '<button type="button" class="chip' + (x[0] === why ? ' on' : '') + '" data-rw="' + x[0] + '">' + x[1] + '</button>'; }).join('') + '</div>' +
       '<div class="hint" id="rp-h"></div><button type="button" class="btn danger" id="rp-go">' + ic('warn') + 'Send report</button>', { stack: true });
@@ -942,7 +943,7 @@
   function scanSheet() {
     var stop = null;
     var w = sheet('Scan QR code', '<p class="sh-sub">Payment code, Pi wallet address or FinPi receipt.</p>' + scanBox('sc-b') +
-      '<label class="btn ghost" style="cursor:pointer">' + ic('down') + 'Scan a photo from the gallery<input type="file" id="sc-f" accept="image/*" hidden></label>' + ('NDEFReader' in window ? '<button type="button" class="btn soft" data-act="nfc">' + ic('zap') + 'Tap an NFC tag instead</button>' : ''), { onClose: function () { if (stop) stop(); } });
+      '<label class="btn ghost" style="cursor:pointer">' + ic('down') + 'Scan a photo from the gallery<input type="file" id="sc-f" accept="image/*" hidden></label>', { onClose: function () { if (stop) stop(); } });
     var box = $('#sc-b', w), msg = $('.scan-m', box);
     function finish(fn) { if (stop) stop(); scanOk(); setTimeout(function () { w.remove(); fn(); }, 220); }
     function found(t) {
@@ -1401,7 +1402,6 @@
     { id: 'scan', n: 'Scan to pay', s: 'Payment code or wallet QR', i: 'qr', c: 'n', g: 'pay', a: 'scan' },
     { id: 'receive', n: 'Receive Pi', s: 'Your @username and address', i: 'card', c: 'a', g: 'pay', a: 'receive' },
     { id: 'contacts', n: 'Contacts', s: 'People you pay often', i: 'user', c: 'b', g: 'pay', a: 'contacts' },
-    { id: 'nfc', n: 'Tap to Pay', s: 'NFC payment tags', i: 'zap', c: 'a', g: 'pay', a: 'nfc' },
     { id: 'directory', n: 'Merchant directory', s: 'Businesses that accept Pi', i: 'store', c: 'g', g: 'pay', a: 'directory' },
     { id: 'pidomain', n: 'Pay a .pi name', s: 'Coming soon', i: 'globe', c: 'n', g: 'pay', a: 'pi-domain', soon: 1 },
     { id: 'links', n: 'Payment links', s: 'Share a link to get paid', i: 'link', c: 'b', g: 'get', a: 'links' },

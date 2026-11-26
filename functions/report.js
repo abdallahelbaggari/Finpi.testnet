@@ -1,10 +1,10 @@
 // /report — community scam reports for Pi addresses and @usernames.
 //   GET  ?k=<G… address or username>               → how many different Pioneers reported it, and whether it is flagged
 //   POST {a:'report', accessToken, k, reason}       → one report per Pioneer per address (signed in with Pi)
-// A target is flagged once 3 different Pioneers report it. Reports are counted, never shown with names.
+// A target is flagged once 50 different Pioneers report it. Reports are counted, never shown with names.
 import { json, H, me, DBB, rateOk } from './_lib/transfers.js';
 
-const REASONS = ['scam', 'fake', 'nodelivery', 'impersonation', 'other'], FLAG = 3;
+const REASONS = ['scam', 'fake', 'nodelivery', 'impersonation', 'other'], FLAG = 50;
 let ready = false;
 async function rdb(env) {
   const d = DBB(env); if (!d) return null;

@@ -1318,38 +1318,6 @@
       $('[data-x="code"]', w).onclick = function () { K.copy(btn); };
     }
 
-    /* ── Tap to Pay (NFC): where the phone and browser allow it, alongside QR ── */
-    function nfcOK() { return 'NDEFReader' in window; }
-    function nfcSheet() {
-      if (!nfcOK()) {
-        var w0 = sheet('Tap to Pay', '<div class="pd-hero">' + ic('zap') + '<b>Tap to Pay with NFC</b><span>This browser does not support NFC. Scan to pay works everywhere.</span></div>' +
-          '<div class="list" style="margin-top:12px"><div class="li"><span class="ico">' + ic('info') + '</span><span class="grow"><b>Where it works</b><small>Chrome on Android phones with NFC turned on</small></span></div></div>' +
-          '<button type="button" class="btn" data-x="qr">' + ic('qr') + 'Scan to pay</button>');
-        $('[data-x="qr"]', w0).onclick = function () { K.A.scan(); }; return;
-      }
-      var w = sheet('Tap to Pay', '<div class="pd-hero">' + ic('zap') + '<b>Tap to Pay with NFC</b><span>Tap a FinPi payment tag to pay, or write your own tag for customers to tap.</span></div>' +
-        '<div class="nfc-st" id="nf-st"></div>' +
-        '<button type="button" class="btn" data-x="read">' + ic('zap') + 'Tap a tag to pay</button>' +
-        (K.myTarget() ? '<button type="button" class="btn ghost" data-x="write">' + ic('edit') + 'Write my payment tag</button>' : ''));
-      var st = $('#nf-st', w), ctl = null;
-      function msg(t, cls) { st.className = 'nfc-st ' + (cls || ''); st.textContent = t; }
-      $('[data-x="read"]', w).onclick = function () {
-        try {
-          var r = new NDEFReader(); ctl = window.AbortController ? new AbortController() : null;
-          r.scan(ctl ? { signal: ctl.signal } : undefined).then(function () { msg('Hold the top of your phone on the tag…', 'on'); }).catch(function (e) { msg(e && e.name === 'NotAllowedError' ? 'Allow NFC for FinPi to tap to pay.' : 'NFC is off. Turn on NFC in your phone settings.', 'bad'); });
-          r.onreading = function (ev) {
-            var url = ''; (ev.message.records || []).forEach(function (rec) { try { if (rec.recordType === 'url' || rec.recordType === 'text') url = url || new TextDecoder(rec.encoding || 'utf-8').decode(rec.data); } catch (e) {} });
-            if (!/#pay=/.test(url)) { msg('This tag is not a FinPi payment tag.', 'bad'); return; }
-            if (ctl) ctl.abort(); K.scanOk(); w.remove(); K.openLink(url);
-          };
-        } catch (e) { msg('NFC could not start on this phone.', 'bad'); }
-      };
-      var wb = $('[data-x="write"]', w); if (wb) wb.onclick = function () {
-        var q = get('qrO', { a: 0, x: '' }), link = K.payLink({ u: K.myTarget(), a: q.a || 0, x: q.x || '' });
-        try { msg('Hold a blank NFC tag on the back of your phone…', 'on'); new NDEFReader().write({ records: [{ recordType: 'url', data: link }] }).then(function () { K.scanOk(); msg('Payment tag ready. Customers tap it to pay you.', 'ok'); }).catch(function () { msg('Could not write the tag. Try again with a writable NFC tag.', 'bad'); }); } catch (e) { msg('NFC could not start on this phone.', 'bad'); }
-      };
-    }
-
     /* ── recurring requests ── */
     function recSheet() {
       var R = recs();
@@ -1542,7 +1510,7 @@
     };
     K.HK.html.settings = function () { return row('sound', 'Voice announcements', get('voice', true) ? 'On · “FinPi! You have received … Pi.”' : 'Off', 'voice') + row('store', 'Business profile', biz().name ? K.NTYPE[K.nType() === 'name' ? 'business' : K.nType()].l + ' · ' + biz().name : 'Name, logo, address, tax ID', 'bizprof') + row('sound', 'Payment sounds', get('sound', true) ? 'On · sound and vibration' : 'Off', 'sound') + row(get('hide', false) ? 'eyeoff' : 'eye', 'Hide amounts', get('hide', false) ? 'On' : 'Off', 'hide'); };
     Object.assign(K.A, {
-      biz: function () { bizSheet(); }, bizreport: function () { reportSheet(); }, expenses: function () { expSheet(); }, daysum: function () { daySheet(); }, staff: function () { staffSheet(); }, voice: function () { voiceSheet(); }, taxsum: function () { taxSheet(); }, goals: function () { goalSheet(); }, collect: function () { colSheet(); }, networth: function () { nwSheet(); }, directory: function () { dirSheet(); }, checkout: function () { checkoutSheet(); }, nfc: function () { nfcSheet(); }, sale: function () { saleSheet(); }, prods: function () { prodSheet(); }, 'inv-new': function () { invEdit(''); }, invs: function () { invList(); }, cust: function () { custSheet(); }, recur: recSheet, myqr: qrSheet, bizprof: profSheet, reports: repSheet,
+      biz: function () { bizSheet(); }, bizreport: function () { reportSheet(); }, expenses: function () { expSheet(); }, daysum: function () { daySheet(); }, staff: function () { staffSheet(); }, voice: function () { voiceSheet(); }, taxsum: function () { taxSheet(); }, goals: function () { goalSheet(); }, collect: function () { colSheet(); }, networth: function () { nwSheet(); }, directory: function () { dirSheet(); }, checkout: function () { checkoutSheet(); }, sale: function () { saleSheet(); }, prods: function () { prodSheet(); }, 'inv-new': function () { invEdit(''); }, invs: function () { invList(); }, cust: function () { custSheet(); }, recur: recSheet, myqr: qrSheet, bizprof: profSheet, reports: repSheet,
       hide: toggleHide,
       sound: function () { put('sound', !get('sound', true)); if (get('sound', true)) { ac(); fx('in'); } toast(get('sound', true) ? 'Payment sounds on' : 'Payment sounds off'); K.rerender(); }
     });

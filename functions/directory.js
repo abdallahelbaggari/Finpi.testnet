@@ -3,7 +3,7 @@
 //   POST {a:'mine', accessToken}                    → the signed-in owner's listing
 //   POST {a:'set', accessToken, listing}            → creates or updates the owner's listing (one per Pi account)
 //   POST {a:'off', accessToken}                     → removes it
-//   POST {a:'report', accessToken, id}              → reports a listing; hidden after 3 different Pioneers report it
+//   POST {a:'report', accessToken, id}              → reports a listing; hidden after 50 different Pioneers report it
 import { json, H, me, DBB, rateOk } from './_lib/transfers.js';
 
 export const CATS = ['food', 'grocery', 'fashion', 'electronics', 'services', 'transport', 'beauty', 'education', 'travel', 'online', 'other'];
@@ -49,7 +49,7 @@ export async function onRequestPost({ request, env }) {
       if (r.uid === u.uid) return json({ ok: false, error: 'You cannot report your own listing' });
       await d.prepare('INSERT OR IGNORE INTO dir_reports (id, uid, ts) VALUES (?, ?, ?)').bind(id, u.uid, Date.now()).run();
       const c = await d.prepare('SELECT COUNT(*) AS n FROM dir_reports WHERE id = ?').bind(id).first();
-      if (c && c.n >= 3) await d.prepare('UPDATE dir SET hidden = 1 WHERE id = ?').bind(id).run();
+      if (c && c.n >= 50) await d.prepare('UPDATE dir SET hidden = 1 WHERE id = ?').bind(id).run();
       return json({ ok: true });
     }
     if (b.a === 'set') {
