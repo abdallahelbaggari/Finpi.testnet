@@ -642,25 +642,97 @@
     };
     if (!pre.u) setTimeout(function () { (kind === 'addr' ? g : u).focus(); }, 120);
   }
+  /* ── protection: trusted recipients, community scam reports and a risk check before every payment ── */
+  function contactOf(to) { var l = String(to || '').replace(/^@/, '').toLowerCase(); return contacts().filter(function (x) { return x.to.replace(/^@/, '').toLowerCase() === l; })[0] || null; }
+  function isTrusted(to) { var c = contactOf(to); return !!(c && c.trusted); }
+  function lev(a, b) { if (Math.abs(a.length - b.length) > 1) return 9; var d = []; for (var i = 0; i <= a.length; i++) { d[i] = [i]; } for (var j = 0; j <= b.length; j++) d[0][j] = j; for (i = 1; i <= a.length; i++) for (j = 1; j <= b.length; j++) d[i][j] = Math.min(d[i - 1][j] + 1, d[i][j - 1] + 1, d[i - 1][j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1)); return d[a.length][b.length]; }
+  // an address or username that looks like one you know but is not the same: a common trick
+  function lookAlike(to) {
+    var A = isG(to), known = contacts().map(function (c) { return { n: c.name, to: c.to }; }).concat(get('payees', []).map(function (p) { return { n: toLabel(p), to: p }; }));
+    for (var i = 0; i < known.length; i++) {
+      var k = known[i].to; if (!k || k.toLowerCase() === String(to).toLowerCase()) continue;
+      if (A && isG(k) && k.slice(0, 4) === to.slice(0, 4) && k.slice(-4) === to.slice(-4)) return known[i];
+      if (!A && !isG(k) && to.length > 3 && lev(k.replace(/^@/, '').toLowerCase(), String(to).toLowerCase()) === 1) return known[i];
+    }
+    return null;
+  }
+  function riskCheck(to, amt, o, box, done) {
+    var R = [], A = isG(to), tr = isTrusted(to);
+    function add(lv, t) { R.push([lv, t]); }
+    if (tr) add(0, 'Trusted recipient'); else if (!o.first) add(0, 'You have paid ' + (A ? 'this address' : '@' + to) + ' before'); else add(1, 'First payment to ' + (A ? 'this address' : '@' + to));
+    var la = lookAlike(to); if (la) add(2, 'Looks like ' + la.n + ' but it is a different ' + (A ? 'address' : 'username'));
+    var out = rcpts().filter(function (r) { return r.dir === 'out' && r.kind !== 'refund' && Date.now() - r.ts < 90 * 864e5; }), mx = Math.max.apply(null, out.map(function (r) { return Number(r.amount); }).concat([0]));
+    if (out.length >= 3 && amt > Math.max(10, mx * 3)) add(1, 'Much larger than your usual payments');
+    var b = get('budget', 0); if (b > 0) { var sp = monthStats(0).out; if (sp + amt > b) add(1, 'This goes over your monthly budget'); }
+    function paint(rep) {
+      var L = R.slice(); if (rep) L.splice(1, 0, rep);
+      var hi = L.some(function (x) { return x[0] === 2; }), mid = L.some(function (x) { return x[0] === 1; }), lvl = hi ? 'high' : mid ? 'mid' : 'low';
+      box.className = 'risk ' + lvl;
+      box.innerHTML = '<div class="risk-h"><b>Payment risk check</b><span class="risk-l">' + (hi ? 'High risk' : mid ? 'Check carefully' : 'Low risk') + '</span></div>' +
+        L.map(function (x) { return '<div class="risk-r r' + x[0] + '">' + ic(x[0] === 0 ? 'check' : 'warn') + '<span>' + esc(x[1]) + '</span></div>'; }).join('') +
+        '<button type="button" class="lnk risk-rep" data-rr>Report this ' + (A ? 'address' : 'username') + '</button>';
+      $('[data-rr]', box).onclick = function () { reportSheet(to); };
+      done(lvl);
+    }
+    paint([1, 'Checking scam reports…']);
+    api('/report?k=' + encodeURIComponent(to)).then(function (d) {
+      if (!d || !d.ok) return paint([1, 'Scam reports could not be checked']);
+      paint(d.flagged ? [2, 'Reported as a scam by ' + d.n + ' Pioneers'] : d.n ? [1, 'Reported by ' + d.n + ' Pioneer' + (d.n === 1 ? '' : 's')] : [0, 'No scam reports']);
+    }).catch(function () { paint([1, 'Scam reports could not be checked']); });
+  }
+  var RREASON = [['scam', 'Scam or fraud'], ['nodelivery', 'Paid, nothing delivered'], ['impersonation', 'Pretends to be someone else'], ['fake', 'Fake receipt or payment'], ['other', 'Other']];
+  function reportSheet(pre) {
+    var why = 'scam';
+    var w = sheet('Report a scam', '<p class="sh-sub">Reports help protect every Pioneer. An address or username is flagged when several Pioneers report it.</p>' +
+      '<label class="l" for="rp-k">@username or Pi wallet address</label><textarea class="in num" id="rp-k" rows="2" maxlength="60" autocapitalize="none" spellcheck="false" style="font-size:14px;resize:none" placeholder="@username or G…">' + esc(pre ? (isG(pre) ? pre : '@' + pre) : '') + '</textarea>' +
+      '<label class="l">What happened?</label><div class="chips" id="rp-r">' + RREASON.map(function (x) { return '<button type="button" class="chip' + (x[0] === why ? ' on' : '') + '" data-rw="' + x[0] + '">' + x[1] + '</button>'; }).join('') + '</div>' +
+      '<div class="hint" id="rp-h"></div><button type="button" class="btn danger" id="rp-go">' + ic('warn') + 'Send report</button>', { stack: true });
+    $$('[data-rw]', w).forEach(function (b) { b.onclick = function () { why = b.dataset.rw; $$('[data-rw]', w).forEach(function (x) { x.classList.toggle('on', x === b); }); }; });
+    $('#rp-go', w).onclick = function () {
+      var k = $('#rp-k', w).value.replace(/\s/g, ''), bt = this;
+      if (!(isG(k.toUpperCase()) && validG(k.toUpperCase())) && !USER_RE.test(k.replace(/^@/, ''))) return toast('Enter a valid @username or Pi wallet address');
+      if (!signedIn()) return needSignIn('Sign in with Pi to send a report.');
+      bt.disabled = true;
+      api('/report', { a: 'report', accessToken: S.token, k: isG(k.toUpperCase()) ? k.toUpperCase() : k, reason: why }).then(function (d) {
+        bt.disabled = false; if (!d || !d.ok) return toast((d && d.error) || 'Could not send the report. Try again.');
+        var c = contactOf(k); if (c && c.trusted) put('contacts', contacts().map(function (x) { if (x === c || x.to === c.to) x.trusted = false; return x; }));
+        w.remove(); toast('Report sent. Thank you for protecting the community.');
+      }).catch(function () { bt.disabled = false; toast('No connection. Try again.'); });
+    };
+  }
+  function trustedSheet() {
+    var L = contacts().filter(function (c) { return c.trusted; });
+    var w = sheet('Trusted recipients', '<p class="sh-sub">Payments to trusted recipients are marked safe in the risk check. Add only people and businesses you know.</p>' +
+      '<div class="list">' + (L.length ? L.map(function (c) { return '<button type="button" class="li" data-tp="' + esc(c.to) + '"><span class="ico in">' + ic('shield') + '</span><span class="grow"><b>' + esc(c.name) + '</b><small class="num">' + esc(toLabel(c.to)) + '</small></span><span class="go">' + ic('chev') + '</span></button>'; }).join('') : '<div class="empty">' + ic('shield') + '<div>No trusted recipients yet.</div></div>') + '</div>' +
+      '<button type="button" class="btn" data-x="add">' + ic('plus') + 'Add trusted recipient</button>');
+    $$('[data-tp]', w).forEach(function (b) { b.onclick = function () { var all = contacts(), i = -1; all.forEach(function (c, k) { if (c.to === b.dataset.tp) i = k; }); contactEdit(i); }; });
+    $('[data-x="add"]', w).onclick = function () { contactEdit(-1); setTimeout(function () { var t = $('#ct-tr'); if (t) t.checked = true; }, 50); };
+  }
   function review(to, amt, narr, cat, o) {
     var A = isG(to), warn = [], lc = String(to).toLowerCase();
     var dup = rcpts().filter(function (r) { return r.dir === 'out' && r.kind !== 'refund' && Date.now() - (r.ts || 0) < 30 * 60e3 && Math.abs(Number(r.amount) - amt) < 1e-7 && (A ? r.addr === to : String(r.other || '').toLowerCase() === '@' + lc); })[0]
       || pendingList().filter(function (q) { return String(q.to).toLowerCase() === lc && Math.abs(Number(q.amt) - amt) < 1e-7; })[0];
     if (dup) warn.push('<div class="note warn">' + ic('warn') + '<span>You already sent <b>' + fpi(amt) + ' π</b> to ' + esc(toLabel(to)) + ' at ' + new Date(dup.ts).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) + '. Check this is not a repeat payment.</span></div>');
     if (A) warn.push('<div class="note warn">' + ic('warn') + '<span>You are sending to a <b>wallet address</b>. Check every character with the person. Pi sent to a wrong address cannot be recovered.</span></div>');
-    if (o.first) warn.push('<div class="note warn">' + ic('warn') + '<span>First time paying ' + (A ? 'this address' : '<b>@' + esc(to) + '</b>') + '. Only send to people and businesses you know and trust. FinPi staff will never ask you to send Pi.</span></div>');
+    if (o.first) warn.push('<div class="note gray">' + ic('shield') + '<span>FinPi staff will never ask you to send Pi.</span></div>');
     warn.push('<div class="note gray">' + ic('info') + '<span>Blockchain payments cannot be reversed.</span></div>');
     var w = sheet('Check before you send',
       '<div class="big"><div class="v">' + fpi(amt) + ' π</div><div class="c">' + esc(conv(amt)) + '</div><div class="w">To ' + esc(toLabel(to)) + '</div></div>' +
       '<div class="sum">' + (A ? '<div style="display:block"><span>To wallet address</span><b class="num" style="display:block;text-align:left;margin-top:4px;font-size:13px;overflow-wrap:anywhere">' + esc(to) + '</b></div>' : '<div><span>To</span><b class="t">@' + esc(to) + '</b></div>') +
       '<div><span>For</span><b class="t">' + esc(narr) + '</b></div>' + (cat ? '<div><span>Category</span><b class="t">' + esc(cat) + '</b></div>' : '') +
       '<div><span>They receive</span><b>' + fpi(amt) + ' π</b></div><div><span>' + (o.wallet ? 'Network fee (Pi Wallet)' : 'Blockchain fee') + '</span><b>' + S.cfg.fee + ' π</b></div><div class="tot"><span>You pay</span><b>' + fpi(r7(amt + S.cfg.fee)) + ' π</b></div></div>' +
+      '<div class="risk" id="rv-risk"></div>' +
+      (!isTrusted(to) ? '<label class="tg rt-tg"><input type="checkbox" id="rv-tr"><span>Save to trusted recipients</span></label>' : '') +
+      '<label class="tg rt-tg" id="rv-ackw" hidden><input type="checkbox" id="rv-ack"><span>I understand the risk and still want to pay</span></label>' +
       '<div style="margin-top:12px">' + warn.join('') + '</div>' +
       (A && (o.wallet || !S.cfg.enabled) ? '<button type="button" class="btn" id="rv-w">' + ic('card') + 'Continue in Pi Wallet</button>'
         : '<button type="button" class="btn" id="rv-ok">' + ic('lock') + 'Confirm and pay</button>') +
       '<button type="button" class="btn ghost" id="rv-ed">Edit</button>');
-    var ok1 = $('#rv-ok', w); if (ok1) ok1.onclick = function () { if (!window.Pi || !initPi()) return toast('Open FinPi in the Pi Browser to pay inside FinPi'); pay(to, amt, narr, cat); };
-    var ok2 = $('#rv-w', w); if (ok2) ok2.onclick = function () { walletPay(to, amt, narr, cat); };
+    var risk = 'low';
+    riskCheck(to, amt, o, $('#rv-risk', w), function (l) { risk = l; var ak = $('#rv-ackw', w); if (ak) ak.hidden = l !== 'high'; var tt = $('#rv-tr', w); if (tt && l === 'high') { tt.checked = false; tt.closest('label').hidden = true; } });
+    function gate() { if (risk === 'high' && !$('#rv-ack', w).checked) { toast('Tick the box to confirm you understand the risk'); return false; } var tt = $('#rv-tr', w); if (tt && tt.checked) { var L2 = contacts().filter(function (x) { return x.to.toLowerCase() !== String(to).toLowerCase(); }); L2.push({ name: toLabel(to), to: to, trusted: true }); L2.sort(function (a, b) { return a.name.localeCompare(b.name); }); put('contacts', L2.slice(0, 200)); } return true; }
+    var ok1 = $('#rv-ok', w); if (ok1) ok1.onclick = function () { if (!gate()) return; if (!window.Pi || !initPi()) return toast('Open FinPi in the Pi Browser to pay inside FinPi'); pay(to, amt, narr, cat); };
+    var ok2 = $('#rv-w', w); if (ok2) ok2.onclick = function () { if (!gate()) return; walletPay(to, amt, narr, cat); };
     $('#rv-ed', w).onclick = function () { sendSheet({ u: to, a: amt, x: narr, cat: cat }); };
   }
   function pay(to, amt, narr, cat) {
@@ -1309,7 +1381,7 @@
   }
   function actPaint() { var l = $('#act-l'); if (l) l.innerHTML = actList(); else render('activity'); }
   /* ── services: one list, used by Home, the Services tab and search ── */
-  var SVC_G = [['pay', 'Payments'], ['get', 'Get paid'], ['biz', 'Business'], ['rec', 'Receipts & records'], ['plan', 'Planning'], ['wal', 'Wallet tools'], ['help', 'Help']];
+  var SVC_G = [['pay', 'Payments'], ['get', 'Get paid'], ['biz', 'Business'], ['rec', 'Receipts & records'], ['plan', 'Planning'], ['wal', 'Wallet tools'], ['sec', 'Security'], ['help', 'Help']];
   var SVC = [
     { id: 'send', n: 'Send Pi', s: 'To a @username or wallet address', i: 'send', c: 'b', g: 'pay', a: 'send' },
     { id: 'request', n: 'Request Pi', s: 'Payment code with the amount', i: 'req', c: 't', g: 'pay', a: 'request' },
@@ -1351,6 +1423,8 @@
     { id: 'addr', n: 'My address', s: 'Your Pi wallet address', i: 'card', c: 'n', g: 'wal', a: 'addr-set' },
     { id: 'currency', n: 'Currency', s: 'Show values in your currency', i: 'globe', c: 'a', g: 'wal', a: 'currency' },
     { id: 'travel', n: 'Travel currency', s: 'Values in the country you visit', i: 'globe', c: 't', g: 'wal', a: 'travel' },
+    { id: 'trusted', n: 'Trusted recipients', s: 'Addresses and usernames you trust', i: 'shield', c: 'g', g: 'sec', a: 'trusted' },
+    { id: 'report', n: 'Report a scam', s: 'Warn other Pioneers', i: 'warn', c: 'a', g: 'sec', a: 'report' },
     { id: 'trust', n: 'Trust center', s: 'Payments, limits, records', i: 'shield', c: 'b', g: 'help', a: 'security' },
     { id: 'repair', n: 'Repair app', s: 'Refresh and restore data', i: 'refresh', c: 't', g: 'help', a: 'repair' },
     { id: 'pending', n: 'Pending payment', s: 'Finish or clear it', i: 'undo', c: 'a', g: 'help', a: 'resolvepend' },
@@ -1482,7 +1556,7 @@
   function contactsSheet() {
     var L = contacts();
     var w = sheet('Contacts', '<p class="sh-sub">People and businesses you pay often. Saved on this phone only.</p>' +
-      (L.length ? '<div class="list">' + L.map(function (c, i) { return '<div class="li"><span class="ico">' + ic(isG(c.to) ? 'card' : 'user') + '</span><button type="button" class="grow lb" data-cs="' + i + '"><b>' + esc(c.name) + '</b><small class="num">' + esc(toLabel(c.to)) + '</small></button><button type="button" class="tbtn" data-ce="' + i + '" aria-label="Edit ' + esc(c.name) + '">' + ic('edit') + '</button></div>'; }).join('') + '</div>'
+      (L.length ? '<div class="list">' + L.map(function (c, i) { return '<div class="li"><span class="ico">' + ic(isG(c.to) ? 'card' : 'user') + '</span><button type="button" class="grow lb" data-cs="' + i + '"><b>' + esc(c.name) + (c.trusted ? ' <span class="tr-b">' + ic('shield') + 'Trusted</span>' : '') + '</b><small class="num">' + esc(toLabel(c.to)) + '</small></button><button type="button" class="tbtn" data-ce="' + i + '" aria-label="Edit ' + esc(c.name) + '">' + ic('edit') + '</button></div>'; }).join('') + '</div>'
         : '<div class="list"><div class="empty">' + ic('users') + '<div>No contacts yet. Add the people you pay often.</div></div></div>') +
       '<button type="button" class="btn" data-x="add">' + ic('users') + 'Add contact</button>');
     $$('[data-cs]', w).forEach(function (b) { b.onclick = function () { payTo(L[+b.dataset.cs].to); }; });
@@ -1495,6 +1569,7 @@
       '<label class="l" for="ct-n">Name</label><input class="in" id="ct-n" maxlength="40" placeholder="e.g. Alex, Landlord, Shop" value="' + esc(c.name) + '">' +
       '<label class="l" for="ct-t">' + (userSends() ? '@username or wallet address' : 'Pi wallet address') + '</label><textarea class="in num" id="ct-t" rows="2" maxlength="60" autocapitalize="none" spellcheck="false" style="font-size:14px;resize:none" placeholder="' + (userSends() ? '@username or G…' : 'G…') + '">' + esc(c.to ? (isG(c.to) ? c.to : '@' + c.to) : '') + '</textarea><div class="hint" id="ct-h"></div>' +
       (i < 0 && rec.length ? '<label class="l">From your recent payments</label><div class="chips">' + rec.map(function (p) { return '<button type="button" class="chip" data-rp="' + esc(p) + '">' + esc(toLabel(p)) + '</button>'; }).join('') + '</div>' : '') +
+      '<label class="tg rt-tg"><input type="checkbox" id="ct-tr"' + (c.trusted ? ' checked' : '') + '><span>Trusted recipient</span></label>' +
       '<button type="button" class="btn" id="ct-go">Save contact</button>' + (i >= 0 ? '<button type="button" class="btn ghost" id="ct-pay">' + ic('send') + 'Send Pi</button><button type="button" class="btn danger" id="ct-rm">' + ic('trash') + 'Delete contact</button>' : ''), { stack: true });
     var t = $('#ct-t', w), h = $('#ct-h', w);
     function val() {
@@ -1509,7 +1584,7 @@
       var n = $('#ct-n', w).value.trim(), v = val();
       if (!n) return toast('Enter a name'); if (!v) return toast(userSends() ? 'Enter a valid @username or wallet address' : 'Enter a valid wallet address');
       var L2 = contacts().filter(function (x, k) { return k !== i && x.to.toLowerCase() !== v.toLowerCase(); });
-      L2.push({ name: n, to: v }); L2.sort(function (a, b) { return a.name.localeCompare(b.name); }); put('contacts', L2.slice(0, 200));
+      L2.push({ name: n, to: v, trusted: $('#ct-tr', w).checked }); L2.sort(function (a, b) { return a.name.localeCompare(b.name); }); put('contacts', L2.slice(0, 200));
       toast('Contact saved'); contactsSheet(); rerenderUnder();
     };
     var pb = $('#ct-pay', w); if (pb) pb.onclick = function () { payTo(c.to); };
@@ -1877,7 +1952,7 @@
     signin: function () { signIn(); },
     price: function () { go('wallet'); }, 'price-retry': function (el, e) { e.stopPropagation(); loadPrice(true); paintPrice(); },
     currency: function (el, e) { e && e.stopPropagation(); curSheet(); },
-    lang: function () { if (window.FPL) FPL.sheet(); }, install: installApp, 'pi-domain': piDomainSheet, 'check-addr': function () { addrSheet(false); }, verify: function () { verifySheet(); },
+    lang: function () { if (window.FPL) FPL.sheet(); }, install: installApp, trusted: trustedSheet, report: function () { reportSheet(''); }, 'pi-domain': piDomainSheet, 'check-addr': function () { addrSheet(false); }, verify: function () { verifySheet(); },
     'addr-set': function () { addrSheet(true); }, 'addr-use': function () { var s = get('addrSug', ''); if (validG(s)) { put('addr', s); put('addrSug', ''); render(S.tab); loadWal(); toast('Address saved'); } },
     'wal-load': function () { S.wal = null; loadWal(); },
     notifs: function () {
