@@ -1727,40 +1727,42 @@
 
   /* ── welcome screens (first open) ── */
   var ONB = [
-    { t: 'Welcome to FinPi', p: 'Live Pi rate in your currency and a verified receipt for every payment', img: 'icons/onb-1.webp' },
-    { t: 'Send and receive Pi', p: 'Pay any Pioneer by @username or Pi wallet address', img: 'icons/onb-2.webp' },
-    { t: 'Scan to pay', p: 'Scan a FinPi QR code to pay a merchant or a friend', img: 'icons/onb-3.webp' },
-    { t: 'Run your business', p: 'Quick sale, invoices, products and business reports', img: 'icons/onb-4.webp' },
-    { t: 'Verify any receipt', p: 'Check any receipt against the Pi blockchain in seconds', img: 'icons/onb-5.webp' }
+    { t: 'Welcome to FinPi', p: 'Live Pi rate in your currency and a verified receipt for every payment', img: 'icons/onb-v3-1.webp' },
+    { t: 'Send and receive Pi', p: 'Pay any Pioneer by @username or Pi wallet address', img: 'icons/onb-v3-2.webp' },
+    { t: 'Scan to pay', p: 'Scan a FinPi QR code to pay a merchant or a friend', img: 'icons/onb-v3-3.webp' },
+    { t: 'Run your business', p: 'Quick sale, invoices, products and business reports', img: 'icons/onb-v3-4.webp' },
+    { t: 'Verify any receipt', p: 'Check any receipt against the Pi blockchain in seconds', img: 'icons/onb-v3-5.webp' }
   ];
   ONB.forEach(function (s0) { var im = new Image(); im.src = s0.img; });
   function onbRate() {
-    var p = S.p; if (!p || !p.usd) return '<div class="onb-rate wait"><span class="live off"></span><span>Pi price</span><b><span class="skel"></span></b></div>';
+    var p = S.p; if (!p || !p.usd) return '<div class="onb-rate wait"><span class="live off"></span><span>Pi price</span><span class="skel"></span></div>';
     var c = curr(), r = rateIn(c), ch = typeof p.change24h === 'number' ? p.change24h : null;
-    return '<div class="onb-rate"><div class="onb-rk"><span class="live"></span>Pi price · live' + (ch !== null ? '<em class="' + (ch >= 0 ? 'up' : 'dn') + '">' + (ch >= 0 ? '▲ ' : '▼ ') + Math.abs(ch).toFixed(2) + '%</em>' : '') + '</div>' +
-      '<b class="num">1 π = ' + money(p.usd, 'USD', p.usd < 1 ? 4 : 2) + '</b>' + (c !== 'USD' && r ? '<small class="num">≈ ' + money(r, c, r < 1 ? 4 : 2) + '</small>' : '') + '</div>';
+    return '<div class="onb-rate"><span class="live"></span><span class="onb-rl">Pi price</span><b class="num">1 π = ' + money(p.usd, 'USD', p.usd < 1 ? 4 : 2) + '</b>' + (c !== 'USD' && r ? '<small class="num">≈ ' + money(r, c, r < 1 ? 4 : 2) + '</small>' : '') + (ch !== null ? '<em class="' + (ch >= 0 ? 'up' : 'dn') + '">' + (ch >= 0 ? '▲ ' : '▼ ') + Math.abs(ch).toFixed(2) + '%</em>' : '') + '</div>';
   }
   function onboarding(force) {
     // shown every time FinPi is opened (once per visit); Skip closes it
     var seen = false; try { seen = sessionStorage.getItem('fp_onb_s') === '1'; sessionStorage.setItem('fp_onb_s', '1'); } catch (e) {}
     if (!force && seen) return;
-    var rt = null;
+    var rt = null, at = null;
     var i = 0, o = document.createElement('div'); o.id = 'onb'; o.setAttribute('role', 'dialog'); o.setAttribute('aria-modal', 'true'); o.setAttribute('aria-label', 'Welcome to FinPi');
     function draw(dir) {
       var s0 = ONB[i], last = i === ONB.length - 1;
-      o.innerHTML = '<div class="onb-top"><div class="brand"><img src="icons/logo-256.png" alt="">FinPi</div>' + (last ? '' : '<button type="button" class="onb-skip" data-o="skip">Skip</button>') + '</div>' +
-        '<div class="onb-art ' + (dir || '') + '"><div class="onb-fr"><img src="' + s0.img + '" alt="">' + (i === 0 ? '<div id="onb-rt">' + onbRate() + '</div>' : '') + '</div></div>' +
-        '<div class="onb-panel"><div class="onb-txt ' + (dir || '') + '"><h2>' + esc(s0.t) + '</h2><p>' + esc(s0.p) + '</p></div>' +
-        '<div class="onb-dots">' + ONB.map(function (x, k) { return '<i class="' + (k === i ? 'on' : '') + '"></i>'; }).join('') + '</div>' +
-        '<div class="onb-b">' + (last ? (signedIn() ? '<button type="button" class="btn" data-o="skip">Continue to FinPi</button>' : '<button type="button" class="btn" data-o="signin"><span class="pi-dot">π</span>Sign in with Pi</button><button type="button" class="onb-ex" data-o="explore">Explore without signing in</button>') : '<button type="button" class="btn" data-o="next">Continue</button>') + '</div></div>';
+      o.innerHTML = '<div class="onb-art ' + (dir || '') + '"><img src="' + s0.img + '" alt=""><button type="button" class="onb-tap l" data-o="prev" aria-label="Previous"></button><button type="button" class="onb-tap r" data-o="next" aria-label="Next"></button>' +
+        '<div class="onb-top"><div class="brand"><img src="icons/logo-256.png" alt="">FinPi</div>' + (last ? '' : '<button type="button" class="onb-skip" data-o="skip">Skip</button>') + '</div>' +
+        (i === 0 ? '<div id="onb-rt">' + onbRate() + '</div>' : '') + '</div>' +
+        '<div class="onb-panel"><div class="onb-dots">' + ONB.map(function (x, k) { return '<i class="' + (k === i ? 'on' : k < i ? 'done' : '') + '"></i>'; }).join('') + '</div>' +
+        '<div class="onb-txt ' + (dir || '') + '"><h2>' + esc(s0.t) + '</h2><p>' + esc(s0.p) + '</p></div>' +
+        (last ? '<div class="onb-b">' + (signedIn() ? '<button type="button" class="btn" data-o="skip">Continue to FinPi</button>' : '<button type="button" class="btn" data-o="signin"><span class="pi-dot">π</span>Sign in with Pi</button><button type="button" class="onb-ex" data-o="explore">Explore without signing in</button>') + '</div>' : '<div class="onb-sw">Swipe to continue</div>') + '</div>';
+      clearTimeout(at); if (!last) at = setTimeout(function () { if (document.body.contains(o) && i < ONB.length - 1) { i++; draw('fwd'); } }, 4500);
     }
-    function end() { put('onb', true); clearInterval(rt); o.classList.add('out'); setTimeout(function () { o.remove(); }, 260); }
-    rt = setInterval(function () { var e = $('#onb-rt', o); if (e) e.innerHTML = onbRate(); if (!document.body.contains(o)) clearInterval(rt); }, 1500);
+    function end() { put('onb', true); clearInterval(rt); clearTimeout(at); o.classList.add('out'); setTimeout(function () { o.remove(); }, 260); }
+    rt = setInterval(function () { var e = $('#onb-rt', o), h = onbRate(); if (e && e.getAttribute('data-h') !== h) { e.setAttribute('data-h', h); e.innerHTML = h; } if (!document.body.contains(o)) clearInterval(rt); }, 1500);
     o.addEventListener('click', function (e) {
       var b = e.target.closest('[data-o]'); if (!b) return; var k = b.dataset.o;
       if (k === 'skip') return end();
       if (k === 'signin') { end(); if (!$('#app').hidden) return; var si = $('#signin'); if (si) si.click(); return; }
       if (k === 'explore') { end(); if (!$('#app').hidden) return; var ex = $('#explore'); if (ex) ex.click(); return; }
+      if (k === 'prev') { if (i > 0) { i--; draw('back'); } return; }
       if (i < ONB.length - 1) { i++; draw('fwd'); }
     });
     var sx = null; o.addEventListener('touchstart', function (e) { sx = e.touches[0].clientX; }, { passive: true });
