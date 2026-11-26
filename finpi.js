@@ -1232,7 +1232,7 @@
       return '<div class="pcard"><div class="avatar">' + esc(signedIn() ? me().charAt(0) : 'G') + '</div><div class="grow"><b>' + (signedIn() ? '@' + esc(me()) : 'Guest') + '</b><small>' + (get('name', '') ? esc(get('name', '')) + ' · ' : '') + NETN + '</small>' + (sup ? '<div class="badge">' + ic('star') + 'FinPi Supporter</div>' : '') + '</div></div>' +
         (!signedIn() ? '<button type="button" class="btn" data-act="signin" style="margin-top:14px"><span class="pi-dot">π</span>Sign in with Pi</button>' : '') +
         '<div class="sec"><h2>Settings</h2></div><div class="list">' +
-        row('edit', 'Name on receipts', get('name', '') ? NTYPE[nType()].l + ' · ' + get('name', '') : 'Your name, business, store or shop', 'name') + row('globe', 'Currency', cname(curr()) + ' (' + curr() + ')', 'currency') +
+        row('edit', 'Name on receipts', get('name', '') ? NTYPE[nType()].l + ' · ' + get('name', '') : 'Your name, business, store or shop', 'name') + row('globe', 'Currency', cname(curr()) + ' (' + curr() + ')', 'currency') + (window.FPL ? row('globe', 'Language', FPL.LANGS[FPL.lang()], 'lang') : '') + (canInstall() ? row('down', 'Install FinPi', 'Add to home screen', 'install') : '') +
         row('bell', 'Notifications', !('Notification' in window) ? 'In-app alerts on' : get('push', false) ? 'Phone and in-app alerts' : 'In-app alerts on', 'push') + row('pie', 'Monthly budget', get('budget', 0) ? fpi(get('budget', 0)) + ' π' : 'Not set', 'budget') + row('card', 'Wallet address', get('addr', '') ? short(get('addr', '')) : 'Not added', 'addr-set') + hook('settings') + '</div>' +
         '<div class="sec"><h2>Support</h2></div><div class="list">' + row('info', 'Welcome tour', 'A quick look at FinPi', 'tour') +
         row('shield', 'Trust center', 'Payments, limits and records', 'security') + row('refresh', 'Repair app', 'Refresh FinPi and restore your data', 'repair') + row('act', 'Resolve a pending payment', 'Finishes or clears an unfinished payment', 'resolvepend') + row('heart', sup ? 'You are a Supporter' : 'Become a Supporter', sup ? 'Thank you!' : '1 π · Supporter badge', 'supporter') +
@@ -1356,6 +1356,18 @@
     return '<div class="sv-grid' + (kind ? ' ' + kind : '') + '">' + L.filter(Boolean).map(function (x) {
       return '<button type="button" class="sv c-' + x.c + '" ' + (x.tab ? 'data-tab="' + x.tab + '"' : 'data-act="' + x.a + '"') + ' data-k="' + esc((x.n + ' ' + (x.s || '') + ' ' + x.g).toLowerCase()) + '"><i>' + ic(x.i) + '</i><b>' + esc(x.n) + '</b>' + (x.soon ? '<em class="sv-soon">Soon</em>' : '') + '</button>';
     }).join('') + '</div>';
+  }
+  /* ── install to the home screen (browsers that support it; the Pi Browser opens FinPi from its own menu) ── */
+  var instEv = null;
+  addEventListener('beforeinstallprompt', function (e) { e.preventDefault(); instEv = e; });
+  addEventListener('appinstalled', function () { instEv = null; toast('FinPi is on your home screen'); });
+  function standalone() { try { return matchMedia('(display-mode: standalone)').matches || navigator.standalone === true; } catch (e) { return false; } }
+  function isIOS() { return /iPhone|iPad|iPod/i.test(navigator.userAgent); }
+  function canInstall() { return !standalone() && !/PiBrowser/i.test(navigator.userAgent) && (!!instEv || isIOS()); }
+  function installApp() {
+    if (instEv) { var e = instEv; instEv = null; e.prompt(); (e.userChoice || Promise.resolve()).then(function (c) { if (c && c.outcome === 'accepted') toast('FinPi is on your home screen'); render(S.tab); }).catch(function () {}); return; }
+    sheet('Install FinPi', '<div class="pd-hero">' + ic('down') + '<b>Add FinPi to your home screen</b><span>Open it like an app, in one tap.</span></div><div class="list" style="margin-top:12px">' +
+      '<div class="li"><span class="ico">1</span><span class="grow"><b>Tap the Share button</b><small>At the bottom of Safari</small></span></div><div class="li"><span class="ico">2</span><span class="grow"><b>Choose Add to Home Screen</b><small>Then tap Add</small></span></div></div>');
   }
   function piDomainSheet() {
     var w = sheet('Pay a .pi name', '<div class="pd-hero">' + ic('globe') + '<b>Pay anyone by their .pi name</b><span>Send Pi to names such as shop.pi, with the same verified receipt.</span><em class="sv-soon">Coming soon</em></div>' +
@@ -1859,7 +1871,7 @@
     signin: function () { signIn(); },
     price: function () { go('wallet'); }, 'price-retry': function (el, e) { e.stopPropagation(); loadPrice(true); paintPrice(); },
     currency: function (el, e) { e && e.stopPropagation(); curSheet(); },
-    'pi-domain': piDomainSheet, 'check-addr': function () { addrSheet(false); }, verify: function () { verifySheet(); },
+    lang: function () { if (window.FPL) FPL.sheet(); }, install: installApp, 'pi-domain': piDomainSheet, 'check-addr': function () { addrSheet(false); }, verify: function () { verifySheet(); },
     'addr-set': function () { addrSheet(true); }, 'addr-use': function () { var s = get('addrSug', ''); if (validG(s)) { put('addr', s); put('addrSug', ''); render(S.tab); loadWal(); toast('Address saved'); } },
     'wal-load': function () { S.wal = null; loadWal(); },
     notifs: function () {
@@ -1955,6 +1967,7 @@
   });
 
   /* ── start ── */
+  (function () { var b = document.getElementById('ld-lang'); if (b && window.FPL) { var t = document.getElementById('ld-lang-t'); if (t) { t.textContent = FPL.lang().toUpperCase(); t.setAttribute('data-noi18n', ''); } b.onclick = function () { FPL.sheet(); }; } else if (b) b.hidden = true; })();
   function start() {
     if (TEST) { $('#ld-net').textContent = 'Pi Testnet'; }
     $('#signin').onclick = function () { signIn(); };

@@ -774,3 +774,15 @@ html.fp-staff body>:not(#staffv):not(#toast):not(.sh-wrap):not(script):not(#netb
 .cat.ns .bar i{background:linear-gradient(90deg,#F59E0B,#FBBF24)}
 .cs-li{flex-wrap:wrap;transition:opacity .25s,transform .25s}.cs-li.done{opacity:0;transform:translateX(30px)}
 .cs-ch{flex-basis:100%;margin-top:8px;flex-wrap:nowrap;overflow-x:auto}.cs-ch .chip{flex:none;padding:6px 11px;font-size:12.5px}
+
+/* languages and install */
+.ld-r{display:flex;align-items:center;gap:8px}
+.ld-lang{display:flex;align-items:center;gap:5px;padding:6px 10px;border-radius:999px;border:1px solid rgba(255,255,255,.3);background:rgba(255,255,255,.12);color:#fff;font-size:12px;font-weight:700}
+.lg-li.on{border-color:#1543E0;background:#EEF3FF}.lg-ok{font-weight:800;color:#1543E0;font-size:18px}
+[dir=rtl] .go svg,[dir=rtl] [data-mon="1"] svg,[dir=rtl] .bz-dnav [data-dn="1"] svg{transform:scaleX(-1)}
+[dir=rtl] .bz-dnav [data-dn="-1"] svg,[dir=rtl] [data-mon="-1"] svg{transform:none}
+[dir=rtl] .amt input,[dir=rtl] .num,[dir=rtl] input[type=number],[dir=rtl] .mono{direction:ltr;unicode-bidi:isolate}
+[dir=rtl] .amt-r{text-align:left}
+[dir=rtl] body{font-family:'Segoe UI',Tahoma,'Noto Sans Arabic',Poppins,sans-serif}
+[dir=rtl] .hero-v,[dir=rtl] .ld-rate,[dir=rtl] .onb-rate b,[dir=rtl] .bz-amt,[dir=rtl] .qs-amt,[dir=rtl] .tot b,[dir=rtl] .big .v{direction:ltr;unicode-bidi:isolate}
+
