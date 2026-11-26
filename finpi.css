@@ -797,3 +797,12 @@ html.fp-staff body>:not(#staffv):not(#toast):not(.sh-wrap):not(script):not(#netb
 .risk-rep{margin-top:6px;font-size:12.5px;color:#B42318}
 .tr-b{display:inline-flex;align-items:center;gap:3px;font-size:10.5px;font-weight:800;color:#047857;background:#D1FAE5;border-radius:999px;padding:2px 7px;vertical-align:2px}.tr-b svg{width:11px;height:11px}
 .fc-card{margin-top:12px}
+
+/* directory, checkout, NFC */
+.dr-cat{flex-wrap:nowrap;overflow-x:auto;margin-top:10px}.dr-cat .chip{flex:none}
+.dr-lg{width:44px;height:44px;border-radius:14px;flex:none;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:18px;color:#fff;background:linear-gradient(135deg,#1543E0,#14C2AE);overflow:hidden}.dr-lg img{width:100%;height:100%;object-fit:cover}
+.dr-lg.big{width:76px;height:76px;border-radius:22px;font-size:30px}
+.dr-hero{display:flex;flex-direction:column;align-items:center;text-align:center;gap:6px;margin:4px 0 12px}.dr-hero b{font-size:19px;color:var(--ink)}.dr-hero small{color:var(--mute);font-weight:600}
+.dr-about{font-size:14px;line-height:1.5;color:var(--ink);background:#F7F9FD;border-radius:14px;padding:12px 14px;margin:0 0 12px}
+.oc-prev{padding:18px;border:1px dashed var(--line);border-radius:14px;text-align:center;background:#fff;margin-bottom:8px}
+.nfc-st{min-height:20px;margin:12px 2px;font-weight:700;font-size:14px;text-align:center;color:var(--mute)}.nfc-st.on{color:#1543E0}.nfc-st.ok{color:#047857}.nfc-st.bad{color:var(--bad)}

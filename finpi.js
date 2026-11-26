@@ -942,7 +942,7 @@
   function scanSheet() {
     var stop = null;
     var w = sheet('Scan QR code', '<p class="sh-sub">Payment code, Pi wallet address or FinPi receipt.</p>' + scanBox('sc-b') +
-      '<label class="btn ghost" style="cursor:pointer">' + ic('down') + 'Scan a photo from the gallery<input type="file" id="sc-f" accept="image/*" hidden></label>', { onClose: function () { if (stop) stop(); } });
+      '<label class="btn ghost" style="cursor:pointer">' + ic('down') + 'Scan a photo from the gallery<input type="file" id="sc-f" accept="image/*" hidden></label>' + ('NDEFReader' in window ? '<button type="button" class="btn soft" data-act="nfc">' + ic('zap') + 'Tap an NFC tag instead</button>' : ''), { onClose: function () { if (stop) stop(); } });
     var box = $('#sc-b', w), msg = $('.scan-m', box);
     function finish(fn) { if (stop) stop(); scanOk(); setTimeout(function () { w.remove(); fn(); }, 220); }
     function found(t) {
@@ -1401,6 +1401,8 @@
     { id: 'scan', n: 'Scan to pay', s: 'Payment code or wallet QR', i: 'qr', c: 'n', g: 'pay', a: 'scan' },
     { id: 'receive', n: 'Receive Pi', s: 'Your @username and address', i: 'card', c: 'a', g: 'pay', a: 'receive' },
     { id: 'contacts', n: 'Contacts', s: 'People you pay often', i: 'user', c: 'b', g: 'pay', a: 'contacts' },
+    { id: 'nfc', n: 'Tap to Pay', s: 'NFC payment tags', i: 'zap', c: 'a', g: 'pay', a: 'nfc' },
+    { id: 'directory', n: 'Merchant directory', s: 'Businesses that accept Pi', i: 'store', c: 'g', g: 'pay', a: 'directory' },
     { id: 'pidomain', n: 'Pay a .pi name', s: 'Coming soon', i: 'globe', c: 'n', g: 'pay', a: 'pi-domain', soon: 1 },
     { id: 'links', n: 'Payment links', s: 'Share a link to get paid', i: 'link', c: 'b', g: 'get', a: 'links' },
     { id: 'myqr', n: 'My Pi QR', s: 'Poster to print or share', i: 'qr', c: 't', g: 'get', a: 'myqr' },
@@ -1415,6 +1417,7 @@
     { id: 'recur', n: 'Recurring', s: 'Weekly or monthly invoices', i: 'repeat', c: 'a', g: 'biz', a: 'recur' },
     { id: 'expenses', n: 'Expenses', s: 'Spending and profit', i: 'exp', c: 'a', g: 'biz', a: 'expenses' },
     { id: 'daysum', n: 'Day summary', s: 'Sales, expenses and profit', i: 'sun', c: 'g', g: 'biz', a: 'daysum' },
+    { id: 'checkout', n: 'Online checkout', s: 'Pay with Pi button for websites', i: 'link', c: 'b', g: 'biz', a: 'checkout' },
     { id: 'staff', n: 'Staff mode', s: 'Staff take sales on their phone', i: 'user', c: 'n', g: 'biz', a: 'staff' },
     { id: 'taxsum', n: 'Tax summary', s: 'Tax collected, by rate', i: 'pct', c: 'b', g: 'biz', a: 'taxsum' },
     { id: 'bizreport', n: 'Business report', s: 'One-page PDF for any period', i: 'bars', c: 'n', g: 'biz', a: 'bizreport' },
@@ -2083,7 +2086,7 @@
     kit: { HK: HK, P: P, A: A, T: T, get: get, put: put, esc: esc, ic: ic, toast: toast, sheet: sheet, closeSheets: closeSheets, copy: copy, fpi: fpi, conv: conv, money: money, rateIn: rateIn, curr: curr, short: short, r7: r7,
       rcpts: rcpts, me: me, signedIn: signedIn, myTarget: myTarget, needTarget: needTarget, payLink: payLink, isG: isG, validG: validG, cName: cName, contacts: contacts, toLabel: toLabel,
       shareText: shareText, shareImage: shareImage, shareLink: shareLink, shareFile: shareFile, saveFile: saveFile, canShareFile: canShareFile, makePdf: makePdf, fontsReady: fontsReady, addNote: addNote,
-      go: go, rerender: rerender, wal: function () { return S.wal; }, loadWal: function () { var a = get('addr', ''); if (!a) return Promise.resolve(); return lookAddr(a).then(function (W) { S.wal = W; }).catch(function () {}); }, scanBox: scanBox, scanOk: scanOk, budgetCheck: budgetCheck, nType: nType, NTYPE: NTYPE, setName: setName, curSheet: curSheet, api: api, token: function () { return S.token; }, NETN: NETN, TEST: TEST, USER_RE: USER_RE, rcptTitle: rcptTitle } };
+      go: go, rerender: rerender, openLink: function (u) { var c = parseCode(u); if (c) openCode(c); }, wal: function () { return S.wal; }, loadWal: function () { var a = get('addr', ''); if (!a) return Promise.resolve(); return lookAddr(a).then(function (W) { S.wal = W; }).catch(function () {}); }, scanBox: scanBox, scanOk: scanOk, budgetCheck: budgetCheck, nType: nType, NTYPE: NTYPE, setName: setName, curSheet: curSheet, api: api, token: function () { return S.token; }, NETN: NETN, TEST: TEST, USER_RE: USER_RE, rcptTitle: rcptTitle } };
   try { document.dispatchEvent(new Event('finpi:ready')); } catch (e) {}
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', start); else start();
 })();
