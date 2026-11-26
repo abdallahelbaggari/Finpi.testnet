@@ -52,7 +52,8 @@
     function balance(v) { return status(v) === 'Paid' || v.void ? 0 : r7(Math.max(0, v.total - (v.paid || 0))); }
     function sales() { return K.rcpts().filter(function (r) { return r.dir === 'in' && r.kind !== 'refund'; }); }
     function payer(r) { return r.kind === 'wallet' ? (r.from || r.addr || '') : String(r.other || '').replace(/^@/, ''); }
-    function custFor(to) { to = String(to || '').toLowerCase(); if (!to) return null; return custs().filter(function (c) { return String(c.to || '').toLowerCase() === to; })[0] || null; }
+    var CI = { raw: null, map: {} };
+    function custFor(to) { to = String(to || '').toLowerCase(); if (!to) return null; var raw = localStorage.getItem('fp_v1_cust') || ''; if (CI.raw !== raw) { var m = {}; custs().forEach(function (c) { if (c.to) m[String(c.to).toLowerCase()] = c; }); CI = { raw: raw, map: m }; } return CI.map[to] || null; }
     function who(to) { var c = custFor(to); return c ? c.name : K.isG(to) ? K.short(to) : to ? '@' + to : '—'; }
     function invLink(v) { return K.payLink({ u: v.to, a: balance(v) || v.total, x: (v.no + ' · ' + (v.title || (v.items[0] && v.items[0].d) || 'Invoice')).slice(0, 80) }); }
 
@@ -130,17 +131,23 @@
 
     /* ── invoice payments: matched automatically by invoice number in the narration ── */
     function rkey(r) { return String(r.txid || r.pid || r.ts); }
-    function matchRcpt(r, quiet) {
-      if (!r || r.dir !== 'in' || r.kind === 'refund') return false;
-      var t = String(r.narr || ''); if (!/INV-\d{4,}/i.test(t)) return false;
-      var L = invs(), hit = null;
-      L.forEach(function (v) {
-        if (hit || v.void || (v.pays || []).indexOf(rkey(r)) >= 0) return;
-        if (!new RegExp('\\b' + v.no + '\\b', 'i').test(t)) return;
-        v.pays = (v.pays || []).concat(rkey(r)); v.paid = r7((v.paid || 0) + Number(r.amount || 0));
+    function invIndex(L) { var m = {}; L.forEach(function (v, i) { if (v && v.no) m[String(v.no).toUpperCase()] = i; }); return m; }
+    function applyMatch(r, L, M) {
+      if (!r || r.dir !== 'in' || r.kind === 'refund') return null;
+      var nos = String(r.narr || '').toUpperCase().match(/INV-\d{4,}/g); if (!nos) return null;
+      var k = rkey(r);
+      for (var j = 0; j < nos.length; j++) {
+        var i = M[nos[j]]; if (i == null) continue; var v = L[i];
+        if (v.void || (v.pays || []).indexOf(k) >= 0) continue;
+        v.pays = (v.pays || []).concat(k); v.paid = r7((v.paid || 0) + Number(r.amount || 0));
         if (v.paid >= v.total - 1e-7 && !v.pts) v.pts = r.ts || Date.now();
-        hit = v;
-      });
+        return v;
+      }
+      return null;
+    }
+    function matchRcpt(r, quiet) {
+      if (!r || r.dir !== 'in' || r.kind === 'refund' || !/INV-\d{4,}/i.test(String(r.narr || ''))) return false;
+      var L = invs(), hit = applyMatch(r, L, invIndex(L));
       if (!hit) return false;
       saveInvs(L);
       if (!quiet) {
@@ -152,7 +159,7 @@
       }
       return true;
     }
-    function matchAll() { var n = 0; sales().forEach(function (r) { if (matchRcpt(r, true)) n++; }); return n; }
+    function matchAll() { var L = invs(), M = invIndex(L), n = 0; if (!L.length) return 0; sales().forEach(function (r) { if (applyMatch(r, L, M)) n++; }); if (n) saveInvs(L); return n; }
     K.HK.rcpt.push(function (r) {
       var fresh = Date.now() - (r.ts || 0) < 180e3;
       if (fresh && r.kind !== 'supporter') { fx(r.dir === 'in' ? 'in' : 'out'); if (r.kind !== 'refund') try { doneFx(r); } catch (e) {} }
@@ -369,10 +376,12 @@
         '<div class="list" id="cu-l" style="margin-top:12px"></div>' +
         (sug.length ? '<div class="day">Recent payers</div><div class="chips">' + sug.map(function (p) { return '<button type="button" class="chip" data-sg="' + esc(p) + '">' + ic('plus', 'width:14px;height:14px;vertical-align:-2px') + ' @' + esc(p) + '</button>'; }).join('') + '</div>' : '') +
         '<button type="button" class="btn" data-x="add">' + ic('plus') + 'Add customer</button>');
+      var PAY = {}; S.forEach(function (r) { var k = String(payer(r)).toLowerCase(); PAY[k] = r7((PAY[k] || 0) + Number(r.amount || 0)); });
+      var DUE = {}; invs().forEach(function (v) { var b = balance(v); if (!b) return; if (v.cid) DUE['id:' + v.cid] = r7((DUE['id:' + v.cid] || 0) + b); else if (v.cto) DUE['to:' + v.cto.toLowerCase()] = r7((DUE['to:' + v.cto.toLowerCase()] || 0) + b); });
       function draw() {
         var t = $('#cu-q', w).value.trim().toLowerCase(), L = C.filter(function (c) { return !t || (c.name + ' ' + (c.to || '') + ' ' + (c.phone || '')).toLowerCase().indexOf(t) >= 0; });
         $('#cu-l', w).innerHTML = L.length ? L.map(function (c) {
-          var got = sum(S.filter(function (r) { return c.to && payer(r).toLowerCase() === c.to.toLowerCase(); })), due = r7(invs().filter(function (v) { return v.cid === c.id || (c.to && v.cto && v.cto.toLowerCase() === c.to.toLowerCase()); }).reduce(function (a, v) { return a + balance(v); }, 0));
+          var got = c.to ? (PAY[c.to.toLowerCase()] || 0) : 0, due = r7((DUE['id:' + c.id] || 0) + (c.to ? (DUE['to:' + c.to.toLowerCase()] || 0) : 0));
           return '<button type="button" class="li" data-cu="' + c.id + '"><span class="ico bz-av">' + esc(c.name.charAt(0).toUpperCase()) + '</span><span class="grow"><b>' + esc(c.name) + '</b><small>' + esc(c.to ? (K.isG(c.to) ? K.short(c.to) : '@' + c.to) : (c.phone || 'No Pi account added')) + '</small></span><span class="amt-r"><b class="num bz-amt">' + fpi(got) + ' π</b>' + (due ? '<small class="bz-due">' + fpi(due) + ' π due</small>' : '') + '</span></button>';
         }).join('') : '<div class="empty">' + ic('users') + '<div>' + (C.length ? 'No match.' : 'No customers yet.') + '</div></div>';
         $$('[data-cu]', w).forEach(function (b) { b.onclick = function () { custView(b.dataset.cu); }; });

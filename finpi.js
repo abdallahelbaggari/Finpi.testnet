@@ -6,11 +6,36 @@
   var $ = function (s, r) { return (r || document).querySelector(s); };
   var $$ = function (s, r) { return [].slice.call((r || document).querySelectorAll(s)); };
   var K = 'fp_v1_';
-  function get(k, d) { try { var v = localStorage.getItem(K + k); return v === null ? d : JSON.parse(v); } catch (e) { return d; } }
+  /* reads: large lists are parsed once and reused until they change, so screens open instantly */
+  var MEMO = {}, BIG = { rcpts: 1, inv: 1, cust: 1, prod: 1, notes: 1, recur: 1, contacts: 1, links: 1 };
+  function mirrorSoon() { try { if (typeof IDB === 'object' && IDB) { clearTimeout(IDB.t); IDB.t = setTimeout(mirror, 1500); } } catch (e) {} }
+  function get(k, d) {
+    try {
+      var v = localStorage.getItem(K + k); if (v === null) return d;
+      if (!BIG[k]) return JSON.parse(v);
+      var m = MEMO[k]; if (m && m.raw === v) return m.val.map(function (x) { return x && typeof x === 'object' ? Object.assign({}, x) : x; });
+      var val = JSON.parse(v); if (!Array.isArray(val)) return val;
+      MEMO[k] = { raw: v, val: val }; return val.map(function (x) { return x && typeof x === 'object' ? Object.assign({}, x) : x; });
+    } catch (e) { return d; }
+  }
+  addEventListener('storage', function () { MEMO = {}; });
+  /* second copy of your records in the phone's database, restored automatically if browser storage is cleared */
+  var IDB = { db: null, t: null };
+  function idb() { return new Promise(function (ok) { if (IDB.db) return ok(IDB.db); try { var q = indexedDB.open('finpi', 1); q.onupgradeneeded = function () { q.result.createObjectStore('kv'); }; q.onsuccess = function () { IDB.db = q.result; ok(IDB.db); }; q.onerror = function () { ok(null); }; } catch (e) { ok(null); } }); }
+  function mirror() {
+    idb().then(function (db) { if (!db) return; var snap = {}; for (var i = 0; i < localStorage.length; i++) { var k = localStorage.key(i); if (k && k.indexOf(K) === 0 && !/price|fx|errlog/.test(k)) snap[k] = localStorage.getItem(k); }
+      try { db.transaction('kv', 'readwrite').objectStore('kv').put({ ts: Date.now(), d: snap }, 'snap'); } catch (e) {} });
+  }
+  function restoreLocal() {
+    return idb().then(function (db) {
+      if (!db) return 0; return new Promise(function (ok) { try { var q = db.transaction('kv').objectStore('kv').get('snap'); q.onsuccess = function () { var v = q.result, n = 0; if (v && v.d) { Object.keys(v.d).forEach(function (k) { if (localStorage.getItem(k) === null) { try { localStorage.setItem(k, v.d[k]); n++; } catch (e) {} } }); } ok(n); }; q.onerror = function () { ok(0); }; } catch (e) { ok(0); } });
+    });
+  }
+  try { if (navigator.storage && navigator.storage.persist) navigator.storage.persisted().then(function (p) { if (!p) navigator.storage.persist(); }).catch(function () {}); } catch (e) {}
   /* storage: if the phone's browser storage is full, the oldest receipts that are already backed up are trimmed
      (they stay in the server history) and the save is retried, so nothing new is ever lost */
   function put(k, v) {
-    try { localStorage.setItem(K + k, JSON.stringify(v)); if (k === 'name' || k === 'nameType') setTimeout(function () { try { HK.dirty.forEach(function (f) { f(); }); } catch (e) {} }, 0); return true; } catch (e) {}
+    try { localStorage.setItem(K + k, JSON.stringify(v)); mirrorSoon(); if (k === 'name' || k === 'nameType') setTimeout(function () { try { HK.dirty.forEach(function (f) { f(); }); } catch (e) {} }, 0); return true; } catch (e) {}
     try {
       ['errlog', 'price', 'fx', 'payers'].forEach(function (x) { if (x !== k) localStorage.removeItem(K + x); });
       var N = JSON.parse(localStorage.getItem(K + 'notes') || '[]'); if (k !== 'notes' && N.length > 15) localStorage.setItem(K + 'notes', JSON.stringify(N.slice(0, 15)));
@@ -20,7 +45,7 @@
       try {
         var R = k === 'rcpts' ? v : JSON.parse(localStorage.getItem(K + 'rcpts') || '[]');
         if (Array.isArray(R) && R.length > 20) { var cut = Math.max(20, Math.floor(R.length * keepF[i])), keep = R.slice(0, cut).concat(R.slice(cut).filter(function (r) { return !r.hs; })); if (k === 'rcpts') v = keep; else localStorage.setItem(K + 'rcpts', JSON.stringify(keep)); }
-        localStorage.setItem(K + k, JSON.stringify(v)); return true;
+        localStorage.setItem(K + k, JSON.stringify(v)); mirrorSoon(); return true;
       } catch (e2) {}
     }
     return false;
@@ -151,7 +176,16 @@
   addEventListener('resize', vv); vv();
   document.addEventListener('focusin', function (e) { var t = e.target; if (t && /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName) && t.closest('.sh')) setTimeout(function () { try { t.scrollIntoView({ block: 'center', behavior: 'smooth' }); } catch (x) {} }, 300); });
   document.addEventListener('keydown', function (e) { if (e.key === 'Escape') closeSheets(); });
-  function api(path, body) { return fetch(path, body ? { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) } : { cache: 'no-store' }).then(function (r) { return r.json(); }); }
+  /* network: every request has a time limit; read-only requests are retried once; a server error page never breaks the screen */
+  var SAFE = { list: 1, pull: 1, bget: 1, count: 1, check: 1, status: 1 };
+  function api1(path, body) {
+    var ctl = window.AbortController ? new AbortController() : null, tm = ctl ? setTimeout(function () { ctl.abort(); }, 20000) : null;
+    var o = body ? { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) } : { cache: 'no-store' }; if (ctl) o.signal = ctl.signal;
+    return fetch(path, o).then(function (r) { clearTimeout(tm); return r.text().then(function (t) { try { return JSON.parse(t); } catch (e) { return { ok: false, error: r.status >= 500 ? 'FinPi is busy right now. Try again in a moment.' : 'Unexpected reply. Try again.' }; } }); }, function (e) { clearTimeout(tm); throw e; });
+  }
+  function api(path, body) {
+    var retry = !body || SAFE[body.a];
+    return api1(path, body).catch(function (e) { if (!retry || !navigator.onLine) throw e; return new Promise(function (ok) { setTimeout(ok, 1200); }).then(function () { return api1(path, body); }); }); }
   function copy(t) { try { navigator.clipboard.writeText(t).then(function () { toast('Copied'); }, function () { toast('Press and hold to copy'); }); } catch (e) { toast('Press and hold to copy'); } }
   function shareText(title, text) { if (navigator.share) navigator.share({ title: title, text: text }).catch(function () {}); else if (window.Pi && Pi.openShareDialog) { try { Pi.openShareDialog(title, text); } catch (e) { copy(text); } } else copy(text); }
   /* Saving and sharing files. Inside the Pi Browser a page cannot save files it made itself or share them as files,
@@ -235,6 +269,11 @@
     h.innerHTML = '<span class="ico nt ' + ntCls(icn) + '">' + ic(icn || 'bell') + '</span><span class="grow"><b>' + esc(t) + '</b><small>' + esc(b) + '</small></span>';
     h.classList.remove('on'); void h.offsetWidth; h.classList.add('on'); clearTimeout(huT); huT = setTimeout(function () { h.classList.remove('on'); }, 4200);
   }
+  function netBar() {
+    var b = $('#netbar'); if (navigator.onLine) { if (b) b.remove(); return; }
+    if (!b) { b = document.createElement('div'); b.id = 'netbar'; b.setAttribute('role', 'status'); b.textContent = 'Offline · FinPi updates when you reconnect'; document.body.insertBefore(b, document.body.firstChild); }
+  }
+  addEventListener('offline', netBar); addEventListener('online', function () { netBar(); try { loadPrice(true); sync(); } catch (e) {} });
   function bellDot() { var d = $('#bell-dot'); if (d) d.hidden = !notes().some(function (x) { return !x.read; }); }
 
   /* ── receipts ── */
@@ -1741,8 +1780,7 @@
   }
   function onboarding(force) {
     // shown every time FinPi is opened (once per visit); Skip closes it
-    var seen = false; try { seen = sessionStorage.getItem('fp_onb_s') === '1'; sessionStorage.setItem('fp_onb_s', '1'); } catch (e) {}
-    if (!force && seen) return;
+    if (!force && window.__fpOnbShown) return; window.__fpOnbShown = true;
     var rt = null, at = null;
     var i = 0, o = document.createElement('div'); o.id = 'onb'; o.setAttribute('role', 'dialog'); o.setAttribute('aria-modal', 'true'); o.setAttribute('aria-label', 'Welcome to FinPi');
     function draw(dir) {
@@ -1879,7 +1917,8 @@
     if (TEST) { $('#ld-net').textContent = 'Pi Testnet'; }
     $('#signin').onclick = function () { signIn(); };
     $('#explore').onclick = function () { S.guest = true; showApp(); if (pendingCode) { var c = pendingCode; pendingCode = null; openCode(c); } };
-    loadPrice(true); onboarding(); paintPrice(); initPi(); loadCfg(); checkRems();
+    loadPrice(true); onboarding(); paintPrice(); initPi(); loadCfg(); checkRems(); netBar();
+    restoreLocal().then(function (n) { if (n) { MEMO = {}; try { render(S.tab); } catch (e) {} toast('Your records were restored on this phone'); } else mirrorSoon(); });
     var u = get('user', null);
     if (u && u.username && window.Pi) { $('#signin-t').textContent = 'Signing in as @' + u.username + '…'; signIn(true).then(function (ok) { if (!ok) $('#signin-t').textContent = 'Sign in with Pi'; }); }
     checkPendingWallet(); checkPendingInApp();
