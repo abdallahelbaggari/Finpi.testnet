@@ -667,3 +667,22 @@ body{background:#EAF0FA}
 /* small phones */
 @media (max-width:350px){#top{padding:8px 10px}#top .brand{font-size:17px;gap:7px}#top .brand img{width:28px;height:28px}.top-r{gap:5px}#top .tbtn{width:36px;height:36px}#top .avatar{width:36px;height:36px;font-size:14px}#top .netb{font-size:10.5px;padding:3px 7px}.qa i{width:46px;height:46px}.sv i{width:42px;height:42px}.sv b{font-size:11px}}
 .li .grow{min-width:0}.li .grow b{overflow-wrap:anywhere}
+
+/* ══ brighter navy ══ */
+:root{--blue:#1D5BFF;--navy:#0A2A8C;--bg:#EAF1FF}
+body{background:#EAF1FF!important}
+#top{background:linear-gradient(90deg,#0B33B8,#1446E0)!important}#top .dot{border-color:#0B33B8}
+#top .netb{background:#FFD166!important;color:#3A2A00!important;border-color:transparent!important}
+.band,#view>.ph{background:radial-gradient(85% 85% at 100% 0%,rgba(0,214,201,.45),transparent 60%),radial-gradient(70% 70% at 0% 100%,rgba(91,140,255,.55),transparent 70%),linear-gradient(180deg,#1446E0 0%,#0A2A8C 100%)!important}
+.band .hero{background:linear-gradient(135deg,rgba(255,255,255,.22),rgba(255,255,255,.06)),radial-gradient(80% 120% at 100% 0%,rgba(0,214,201,.4),transparent 60%)!important;border-color:rgba(255,255,255,.3)!important}
+.act-card,.bz-kpi .bz-k1,.bz-strip,.pcard{background:radial-gradient(90% 120% at 100% 0%,rgba(0,214,201,.45),transparent 60%),linear-gradient(135deg,#0A2A8C,#1D5BFF)!important}
+.btn:not(.ghost):not(.soft):not(.danger),.onb-b .btn{background:linear-gradient(90deg,#1D5BFF,#00B3A4)!important;box-shadow:0 14px 28px -14px rgba(29,91,255,.9)!important}
+#tabs button:nth-child(3) span.b{background:linear-gradient(135deg,#1D5BFF,#00C2B2)!important}
+#tabs button.on span.b{background:#1D5BFF!important}#tabs button.on{color:#1D5BFF!important}
+.chip.on,.seg button.on,.act-seg button.on{background:#1446E0!important;color:#fff!important}
+.sec h2{color:#0A2A8C}.sec h2:before{background:linear-gradient(180deg,#1D5BFF,#00C2B2)!important}
+.sec button,.lnk,.act-pill .ic{color:#1D5BFF!important}
+.qa i,.sv i{filter:saturate(1.25) brightness(1.05)}
+.ico.tx,.ico.nt{filter:saturate(1.2) brightness(1.05)}
+#onb{background:radial-gradient(90% 55% at 100% 0%,rgba(0,214,201,.45),transparent 60%),radial-gradient(70% 45% at 0% 35%,rgba(91,140,255,.55),transparent 70%),linear-gradient(180deg,#1446E0 0%,#0A2A8C 62%)!important}
+.onb-dots i.on{background:linear-gradient(90deg,#1D5BFF,#00B3A4)!important}
