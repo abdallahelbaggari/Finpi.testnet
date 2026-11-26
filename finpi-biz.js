@@ -63,7 +63,7 @@
 
     /* ── backup of business records to the Pi account (restored on any phone after sign-in) ── */
     var BK = ['biz', 'inv', 'invSeq', 'cust', 'recur', 'qrO', 'prod', 'name', 'nameType', 'exp'], bT = null, put0 = K.put;
-    put = function (k, v) { var r = put0(k, v); if (BK.indexOf(k) >= 0) bDirty(); return r; };
+    put = function (k, v) { var r = put0(k, v); if (BK.indexOf(k) >= 0) bDirty(); if (k === 'prod' || k === 'biz' || k === 'name') { try { staffPushSoon(); } catch (e) {} } return r; };
     function bSnap() { var d = {}; BK.forEach(function (k) { var v = get(k, null); if (v !== null) d[k] = v; }); return d; }
     function bHas(d) { return !!(d && ((d.inv || []).length || (d.cust || []).length || (d.recur || []).length || (d.prod || []).length || (d.exp || []).length || (d.biz && d.biz.name))); }
     function bDirty() { put0('bizTs', Date.now()); clearTimeout(bT); bT = setTimeout(bPush, 2500); }
@@ -138,7 +138,7 @@
     function invIndex(L) { var m = {}; L.forEach(function (v, i) { if (v && v.no) m[String(v.no).toUpperCase()] = i; }); return m; }
     function applyMatch(r, L, M) {
       if (!r || r.dir !== 'in' || r.kind === 'refund') return null;
-      var nos = String(r.narr || '').toUpperCase().match(/INV-\d{4,}/g); if (!nos) return null;
+      var nos = String(r.narr || '').toUpperCase().match(/INV-(?:S\d{1,3}-)?\d{4,}/g); if (!nos) return null;
       var k = rkey(r);
       for (var j = 0; j < nos.length; j++) {
         var i = M[nos[j]]; if (i == null) continue; var v = L[i];
@@ -150,7 +150,7 @@
       return null;
     }
     function matchRcpt(r, quiet) {
-      if (!r || r.dir !== 'in' || r.kind === 'refund' || !/INV-\d{4,}/i.test(String(r.narr || ''))) return false;
+      if (!r || r.dir !== 'in' || r.kind === 'refund' || !/INV-(?:S\d{1,3}-)?\d{4,}/i.test(String(r.narr || ''))) return false;
       var L = invs(), hit = applyMatch(r, L, invIndex(L));
       if (!hit) return false;
       saveInvs(L);
@@ -159,11 +159,12 @@
         K.addNote('check', done ? 'Invoice paid' : 'Invoice part paid', hit.no + ' · ' + fpi(r.amount) + ' π from ' + who(payer(r)) + (done ? '' : ' · ' + fpi(balance(hit)) + ' π left'), 'invp-' + rkey(r));
         toast(done ? hit.no + ' paid' : hit.no + ' part paid');
         if (done && Date.now() - (r.ts || 0) < 180e3) setTimeout(function () { fx('paid'); }, 700);
-        if (done) stockOut(hit.id);
       }
+      if (status(hit) === 'Paid') stockOut(hit.id);
       return true;
     }
-    function matchAll() { var L = invs(), M = invIndex(L), n = 0; if (!L.length) return 0; sales().forEach(function (r) { if (applyMatch(r, L, M)) n++; }); if (n) saveInvs(L); return n; }
+    // stock goes down once for every paid invoice, however the payment was matched
+    function matchAll() { var L = invs(), M = invIndex(L), n = 0; if (!L.length) return 0; sales().forEach(function (r) { if (applyMatch(r, L, M)) n++; }); if (n) { saveInvs(L); L.forEach(function (v) { if (!v.stk && !v.void && status(v) === 'Paid' && v.items.some(function (it) { return it.pid; })) stockOut(v.id); }); } return n; }
     K.HK.rcpt.push(function (r) {
       var fresh = Date.now() - (r.ts || 0) < 180e3;
       if (fresh && r.kind !== 'supporter') { fx(r.dir === 'in' ? 'in' : 'out'); if (r.kind !== 'refund') try { doneFx(r); } catch (e) {} }
@@ -191,6 +192,7 @@
     }
     function checkRec() {
       try { eodCheck(); } catch (e) {}
+      try { if (get('staffC', {}).code) staffPull(); } catch (e) {}
       var R = recs(), ch = false, now = Date.now();
       R.forEach(function (x) {
         if (x.off) return; var guard = 0;
@@ -502,12 +504,13 @@
       var v = invs().filter(function (x) { return x.id === id; })[0]; if (!v) return;
       var st = status(v), open = /Unpaid|Part paid|Overdue/.test(st);
       var link = invLink(v), txt = function () { return bizName() + ' sent you invoice ' + v.no + ' for ' + fpi(balance(v) || v.total) + ' π' + (conv(balance(v) || v.total) ? ' (' + conv(balance(v) || v.total).replace('≈ ', '≈') + ')' : '') + (v.due ? ', due ' + dstr(v.due) : '') + '. Pay with FinPi:\n' + link; };
-      var w = sheet('Invoice ' + v.no, '<div class="big bz-big"><div class="bz-row">' + badge(v) + '<span class="small">' + esc(v.no) + '</span></div><div class="v bz-amt">' + fpi(open ? balance(v) : v.total) + ' π</div><div class="c">' + esc(open ? 'Amount due' + (conv(balance(v)) ? ' · ' + conv(balance(v)) : '') : st === 'Paid' ? 'Paid' + (v.pts ? ' on ' + dstr(v.pts) : '') : 'Cancelled') + '</div><div class="w">' + esc(v.cname || who(v.cto)) + (v.due ? ' · due ' + dstr(v.due) : '') + '</div></div>' +
+      var w = sheet('Invoice ' + v.no, '<div class="big bz-big"><div class="bz-row">' + badge(v) + '<span class="small">' + esc(v.no) + '</span></div><div class="v bz-amt">' + fpi(open ? balance(v) : v.total) + ' π</div><div class="c">' + esc(open ? 'Amount due' + (conv(balance(v)) ? ' · ' + conv(balance(v)) : '') : st === 'Paid' ? 'Paid' + (v.pts ? ' on ' + dstr(v.pts) : '') + (retAmt(v) ? ' · returned ' + fpi(retAmt(v)) + ' π' : '') : 'Cancelled') + '</div><div class="w">' + esc(v.cname || who(v.cto)) + (v.due ? ' · due ' + dstr(v.due) : '') + '</div></div>' +
         '<div class="bz-prev">Preparing invoice…</div>' +
         fileBtns(open ? '<div class="two"><button type="button" class="btn ghost" data-x="lk">' + ic('link') + 'Share pay link</button><button type="button" class="btn ghost" data-x="cp">' + ic('copy') + 'Copy link</button></div>' : '') +
         '<div class="day">Manage</div><div class="list">' +
         (open ? row('check', 'Mark as paid', 'For a payment made another way', 'x-paid') : st === 'Paid' && v.mpaid ? row('undo', 'Mark as unpaid', 'Undo the manual mark', 'x-unpaid') : '') +
         (open && !(v.paid > 0) ? row('edit', 'Edit invoice', 'Items, customer, due date', 'x-edit') : '') +
+        (st === 'Paid' && !v.void && v.items.some(function (it) { return !it.tip; }) ? row('undo', 'Return items', retAmt(v) ? 'Returned so far ' + fpi(retAmt(v)) + ' π' : 'Restock and refund the customer', 'x-ret') : '') +
         row('copy', 'Duplicate', 'Create a new invoice from this one', 'x-dup') +
         (v.void ? row('trash', 'Delete invoice', 'Remove it from this phone', 'x-del') : open ? row('x', 'Cancel invoice', 'Keeps it in your records as cancelled', 'x-void') : '') + '</div>');
       fileActions(w, function () { return invCanvas(v); }, 'FinPi-' + v.no, 'invoice', 'FinPi invoice ' + v.no, txt);
@@ -559,10 +562,10 @@
     }
 
     /* ── quick sale: build the sale, show one QR, and it turns Paid by itself when the payment arrives ── */
-    function saleSheet(c0) {
-      if (K.needTarget('Quick sale')) return;
-      var cart = c0 || {}, P = prods().slice().sort(function (a, b) { return a.n.localeCompare(b.n); }), dm = 'pi', tp = 0;
-      var w = sheet('Quick sale', (P.length ? '<div class="qs-top"><div class="bz-search">' + ic('search') + '<input class="in" id="qs-q" placeholder="Search products"></div><button type="button" class="qs-scan" data-x="scan" aria-label="Scan a barcode">' + ic('bar') + '<span>Scan</span></button></div><div class="qs-grid" id="qs-g"></div>' : '<button type="button" class="btn soft" data-x="pa">' + ic('plus') + 'Add products</button>') +
+    function saleSheet(c0, SX) {
+      if (!SX && K.needTarget('Quick sale')) return;
+      var cart = c0 || {}, P = (SX ? SX.prods : prods()).slice().sort(function (a, b) { return a.n.localeCompare(b.n); }), dm = 'pi', tp = 0;
+      var w = sheet('Quick sale', (P.length ? '<div class="qs-top"><div class="bz-search">' + ic('search') + '<input class="in" id="qs-q" placeholder="Search products"></div><button type="button" class="qs-scan" data-x="scan" aria-label="Scan a barcode">' + ic('bar') + '<span>Scan</span></button></div><div class="qs-grid" id="qs-g"></div>' : SX ? '' : '<button type="button" class="btn soft" data-x="pa">' + ic('plus') + 'Add products</button>') +
         '<label class="l" for="qs-a">' + (P.length ? 'Other amount' : 'Amount') + '</label><div class="amt sm"><input id="qs-a" type="number" inputmode="decimal" placeholder="0.00"><span>π</span></div>' +
         '<label class="l" for="qs-x">Note (optional)</label><input class="in" id="qs-x" maxlength="40" placeholder="e.g. Table 4, delivery">' +
         '<div class="qs-adj"><div><label class="l" for="qs-d">Discount</label><div class="qs-dw"><input class="in num" id="qs-d" type="number" inputmode="decimal" min="0" placeholder="0"><div class="seg qs-du" role="tablist"><button type="button" data-du="pi" class="on">π</button><button type="button" data-du="pc">%</button></div></div></div>' +
@@ -594,6 +597,7 @@
       var sc = $('[data-x="scan"]', w); if (sc) sc.onclick = function () {
         barScan('Scan products', function (code) {
           var q = P.filter(function (x) { return x.sku && window.FPBar && FPBar.same(x.sku, code); })[0];
+          if (!q && SX) { toast('This code is not in the product list'); return { msg: 'Not in the product list · ' + code }; }
           if (!q) return { stop: true, then: function () { unknownCode(code, function () { saleSheet(cart); }); } };
           var n = r7((cart[q.id] || 0) + 1); if (typeof q.stock === 'number' && n > q.stock) { toast('Only ' + fpi(q.stock) + ' ' + q.n + ' in stock'); return { msg: 'Out of stock · ' + q.n }; }
           cart[q.id] = n; draw(); tot(); return { msg: q.n + ' · ' + fpi(n) + ' in this sale' };
@@ -604,6 +608,7 @@
         if (Number($('#qs-d', w).value) < 0) return toast('Discount cannot be negative');
         if (L.length > 12) return toast('Up to 12 different items per sale');
         var note = $('#qs-x', w).value.trim();
+        if (SX) return SX.charge(A, note);
         var v = issue({ to: K.myTarget(), cname: note ? 'Sale · ' + note : 'Walk-in customer', cto: '', items: L, disc: A.disc, term: 0, title: A.G.length === 1 ? A.G[0].d : 'Sale' }, '');
         var all = invs(); all.forEach(function (x) { if (x.id === v.id) x.sale = true; }); saveInvs(all); K.rerender(); saleView(v.id);
       };
@@ -696,7 +701,7 @@
     function salesIn(a, b) { return sales().filter(function (r) { return r.ts >= a && r.ts < b; }); }
     function expSheet(p) {
       p = p || get('exP', 'month'); put('exP', p);
-      var rg = range(p), L = expIn(rg[0], rg[1]).sort(function (a, b) { return b.ts - a.ts; }), et = esum(L), st = sum(salesIn(rg[0], rg[1])), pr = r7(st - et);
+      var rg = range(p), L = expIn(rg[0], rg[1]).sort(function (a, b) { return b.ts - a.ts; }), et = esum(L), st = sum(salesIn(rg[0], rg[1])), pr = r7(st - retIn(rg[0], rg[1]) - et);
       var bc = {}; L.forEach(function (e) { bc[e.cat] = r7((bc[e.cat] || 0) + Number(e.a)); });
       var C = Object.keys(bc).map(function (k) { return [k, bc[k]]; }).sort(function (a, b) { return b[1] - a[1]; }), top = C.length ? C[0][1] : 0;
       var w = sheet('Expenses', '<div class="seg bz-seg" role="tablist">' + [['today', 'Today'], ['7d', '7 days'], ['30d', '30 days'], ['month', 'Month']].map(function (x) { return '<button type="button" data-ep="' + x[0] + '" class="' + (p === x[0] ? 'on' : '') + '">' + x[1] + '</button>'; }).join('') + '</div>' +
@@ -744,7 +749,8 @@
       var items = {}; paid.forEach(function (v) { v.items.forEach(function (it) { if (it.tip) return; var k = it.d.trim(); items[k] = items[k] || [0, 0]; items[k][0] += r7(it.q * it.p); items[k][1] += Number(it.q); }); });
       var TI = Object.keys(items).map(function (k) { return [k, r7(items[k][0]), items[k][1]]; }).sort(function (x, y) { return y[1] - x[1]; }).slice(0, 5);
       var n = TI.reduce(function (s0, x) { return s0 + x[2]; }, 0), tips = r7(paid.reduce(function (s0, v) { return s0 + v.items.filter(function (it) { return it.tip; }).reduce(function (q, it) { return q + it.p; }, 0); }, 0));
-      return { a: a, S: S, E: E, st: st, et: et, pr: r7(st - et), paid: paid, issued: issued, TI: TI, n: n, tips: tips, avg: S.length ? Math.round(st / S.length * 100) / 100 : 0 };
+      var rt = retIn(a, b);
+      return { a: a, S: S, E: E, st: st, et: et, rt: rt, pr: r7(st - rt - et), paid: paid, issued: issued, TI: TI, n: n, tips: tips, avg: S.length ? Math.round(st / S.length * 100) / 100 : 0 };
     }
     function dayName(t) { return new Date(t).toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }); }
     function dayCanvas(t) {
@@ -759,7 +765,7 @@
         T(x, 'END-OF-DAY SUMMARY', X + 122, 142, '700 20px ' + FONT, '#99F6E4');
         T(x, dayName(D.a), X, 228, '700 30px ' + FONT, '#fff');
         var y = 320, cw = (W - 2 * X - 20) / 2;
-        [['SALES', fpi(D.st) + ' π', D.S.length + ' payment' + (D.S.length === 1 ? '' : 's')], ['EXPENSES', fpi(D.et) + ' π', D.E.length + ' entr' + (D.E.length === 1 ? 'y' : 'ies')], ['PROFIT', (D.pr < 0 ? '−' : '') + fpi(Math.abs(D.pr)) + ' π', conv(Math.abs(D.pr))], ['AVERAGE SALE', fpi(D.avg) + ' π', D.tips ? 'Tips ' + fpi(D.tips) + ' π' : '']].forEach(function (k, i) {
+        [['SALES', fpi(D.st) + ' π', D.S.length + ' payment' + (D.S.length === 1 ? '' : 's')], ['EXPENSES', fpi(D.et) + ' π', D.E.length + ' entr' + (D.E.length === 1 ? 'y' : 'ies') + (D.rt ? ' · returns ' + fpi(D.rt) + ' π' : '')], ['PROFIT', (D.pr < 0 ? '−' : '') + fpi(Math.abs(D.pr)) + ' π', conv(Math.abs(D.pr))], ['AVERAGE SALE', fpi(D.avg) + ' π', D.tips ? 'Tips ' + fpi(D.tips) + ' π' : '']].forEach(function (k, i) {
           var cx = X + (i % 2) * (cw + 20), cy = y + Math.floor(i / 2) * 170; x.fillStyle = i === 2 ? (D.pr < 0 ? '#FDECEC' : '#EAFBF6') : '#F5F7FB'; rr(x, cx, cy, cw, 150, 20); x.fill();
           T(x, k[0], cx + 24, cy + 42, '700 18px ' + FONT, '#64748B'); x.font = '800 40px ' + MONO; T(x, fit(x, k[1], cw - 48), cx + 24, cy + 94, '800 40px ' + MONO, i === 2 ? (D.pr < 0 ? '#B42318' : '#047857') : '#0B1B33');
           if (k[2]) { x.font = '500 18px ' + FONT; T(x, fit(x, k[2], cw - 48), cx + 24, cy + 128, '500 18px ' + FONT, '#64748B'); }
@@ -780,7 +786,7 @@
       t = day0(t || Date.now()); var D = dayData(t), today = t === day0();
       var w = sheet('Day summary', '<div class="bz-dnav"><button type="button" class="tbtn" data-dn="-1" aria-label="Previous day">' + ic('chev') + '</button><b>' + esc(today ? 'Today · ' + dstr(t) : dayName(t)) + '</b><button type="button" class="tbtn" data-dn="1" aria-label="Next day"' + (today ? ' disabled' : '') + '>' + ic('chev') + '</button></div>' +
         '<div class="bz-kpi"><div class="bz-k1"><small>Sales</small><b class="num bz-amt">' + fpi(D.st) + ' π</b><span class="bz-amt">' + D.S.length + ' payment' + (D.S.length === 1 ? '' : 's') + (conv(D.st) ? ' · ' + esc(conv(D.st)) : '') + '</span></div>' +
-        '<div><small>Expenses</small><b class="num bz-amt">' + fpi(D.et) + ' π</b></div><div class="' + (D.pr < 0 ? 'bad' : '') + '"><small>Profit</small><b class="num bz-amt">' + (D.pr < 0 ? '−' : '') + fpi(Math.abs(D.pr)) + ' π</b></div><div><small>Invoices paid</small><b class="num">' + D.paid.length + '</b></div></div>' +
+        '<div><small>Expenses' + (D.rt ? ' · returns' : '') + '</small><b class="num bz-amt">' + fpi(r7(D.et + D.rt)) + ' π</b></div><div class="' + (D.pr < 0 ? 'bad' : '') + '"><small>Profit</small><b class="num bz-amt">' + (D.pr < 0 ? '−' : '') + fpi(Math.abs(D.pr)) + ' π</b></div><div><small>Invoices paid</small><b class="num">' + D.paid.length + '</b></div></div>' +
         '<div class="day">Top items</div>' + (D.TI.length ? '<div class="card bz-card">' + D.TI.map(function (x) { return '<div class="cat"><div class="row"><span>' + esc(x[0]) + ' <small class="muted">× ' + fpi(x[2]) + '</small></span><b class="num bz-amt">' + fpi(x[1]) + ' π</b></div></div>'; }).join('') + '</div>' : '<div class="list"><div class="empty">No paid items on this day.</div></div>') +
         '<div class="bz-prev">Preparing summary…</div>' + fileBtns(''));
       $$('[data-dn]', w).forEach(function (b) { b.onclick = function () { var n = t + Number(b.dataset.dn) * 864e5 + 3600e3; if (day0(n) <= day0()) daySheet(n); }; });
@@ -791,6 +797,184 @@
       var now = new Date(); if (now.getHours() < 20) return; var key = iso(now); if (get('eodN', '') === key) return;
       var D = dayData(Date.now()); if (!D.S.length && !D.E.length) return;
       put('eodN', key); K.addNote('bars', 'Today’s summary', 'Sales ' + fpi(D.st) + ' π · Expenses ' + fpi(D.et) + ' π · Profit ' + (D.pr < 0 ? '−' : '') + fpi(Math.abs(D.pr)) + ' π', 'eod-' + key);
+    }
+
+    /* ── returns: items given back after payment; stock goes back and the refund can be sent in one tap ── */
+    function retAmt(v) { return r7((v.rets || []).reduce(function (s0, x) { return s0 + Number(x.a || 0); }, 0)); }
+    function retIn(a, b) { var t = 0; invs().forEach(function (v) { (v.rets || []).forEach(function (x) { if (x.ts >= a && x.ts < b) t += Number(x.a || 0); }); }); return r7(t); }
+    function retQ(v, i) { return (v.rets || []).reduce(function (s0, x) { return s0 + (x.items || []).filter(function (it) { return it.i === i; }).reduce(function (q, it) { return q + Number(it.q); }, 0); }, 0); }
+    function payerOf(v) { var keys = v.pays || []; var r = K.rcpts().filter(function (x) { return keys.indexOf(rkey(x)) >= 0; })[0]; return r ? payer(r) : (v.cto || ''); }
+    function retSheet(id) {
+      var v = invs().filter(function (x) { return x.id === id; })[0]; if (!v) return;
+      var c = calc(v), share = c.sub > 0 ? (c.sub - c.disc) / c.sub * (1 + (Number(v.tax) || 0) / 100) : 1, sel = {};
+      var L = v.items.map(function (it, i) { return { i: i, it: it, max: r7(Number(it.q) - retQ(v, i)) }; }).filter(function (x) { return !x.it.tip && x.max > 0; });
+      if (!L.length) return toast('All items on ' + v.no + ' were already returned');
+      var w = sheet('Return items · ' + v.no, '<div class="list" id="rt-l">' + L.map(function (x) { return '<div class="li"><span class="grow"><b>' + esc(x.it.d) + '</b><small>' + fpi(x.it.p) + ' π each · up to ' + fpi(x.max) + '</small></span><div class="qs-n rt-n"><button type="button" data-rm="' + x.i + '" aria-label="One less">' + ic('minus') + '</button><b class="num" id="rt-q' + x.i + '">0</b><button type="button" data-ra="' + x.i + '" aria-label="One more">' + ic('plus') + '</button></div></div>'; }).join('') + '</div>' +
+        '<label class="tg rt-tg"><input type="checkbox" id="rt-s" checked><span>Put returned items back in stock</span></label>' +
+        '<div class="sum" id="rt-sum"></div><button type="button" class="btn" id="rt-go">' + ic('undo') + 'Record return</button>', { stack: true });
+      function amt() { var t = 0; L.forEach(function (x) { t += (sel[x.i] || 0) * Number(x.it.p); }); return r7(Math.min(r7(t * share), r7(v.total - retAmt(v)))); }
+      function draw() { L.forEach(function (x) { $('#rt-q' + x.i, w).textContent = fpi(sel[x.i] || 0); }); var a = amt(); $('#rt-sum', w).innerHTML = '<div class="tot"><span>Refund</span><b>' + fpi(a) + ' π</b></div>' + (conv(a) ? '<div><span></span><b class="small muted">' + esc(conv(a)) + '</b></div>' : ''); }
+      $$('[data-ra]', w).forEach(function (b) { b.onclick = function () { var x = L.filter(function (y) { return y.i === Number(b.dataset.ra); })[0]; var n = r7((sel[x.i] || 0) + 1); if (n > x.max) return toast('Only ' + fpi(x.max) + ' can be returned'); sel[x.i] = n; draw(); }; });
+      $$('[data-rm]', w).forEach(function (b) { b.onclick = function () { var i = Number(b.dataset.rm); sel[i] = Math.max(0, r7((sel[i] || 0) - 1)); draw(); }; });
+      draw();
+      $('#rt-go', w).onclick = function () {
+        var a = amt(), items = Object.keys(sel).filter(function (k) { return sel[k] > 0; }).map(function (k) { return { i: Number(k), q: sel[k] }; });
+        if (!items.length) return toast('Choose the items being returned');
+        var restock = $('#rt-s', w).checked, P = prods(), ch = false;
+        saveInvs(invs().map(function (x) { if (x.id === id) { x.rets = (x.rets || []).concat([{ ts: Date.now(), items: items, a: a }]); } return x; }));
+        if (restock) items.forEach(function (it) { var pid = v.items[it.i].pid; P.forEach(function (q) { if (q.id === pid && typeof q.stock === 'number') { q.stock = r7(q.stock + it.q); ch = true; } }); });
+        if (ch) put('prod', P);
+        fx('in'); K.rerender(); w.remove(); invView(id);
+        var to = payerOf(v);
+        var w2 = sheet('Return recorded', '<div class="big bz-big"><div class="v bz-amt">' + fpi(a) + ' π</div><div class="c">Refund for ' + esc(v.no) + '</div>' + (to ? '<div class="w">' + esc(K.isG(to) ? K.short(to) : '@' + to) + '</div>' : '') + '</div>' +
+          (to && a >= 0.01 ? '<button type="button" class="btn" data-x="pay">' + ic('send') + 'Send refund now</button>' : '') + '<button type="button" class="btn ghost" data-x="ok">' + ic('check') + 'Done</button>', { stack: true });
+        var pb = $('[data-x="pay"]', w2); if (pb) pb.onclick = function () { w2.remove(); F.sendSheet({ u: to, a: a, x: ('Refund · ' + v.no).slice(0, 40) }); };
+        $('[data-x="ok"]', w2).onclick = function () { w2.remove(); };
+      };
+    }
+
+    /* ── tax summary: tax collected on paid invoices and sales, by rate ── */
+    function taxSheet(per) {
+      per = per || 'month'; var r = perRg(per), rows = {}, T = { base: 0, tax: 0, n: 0 };
+      invs().forEach(function (v) { var t = v.pts || v.ts; if (v.void || status(v) !== 'Paid' || t < r[0] || t >= r[1]) return; var c = calc(v), rate = Number(v.tax) || 0, k = String(rate); rows[k] = rows[k] || { rate: rate, base: 0, tax: 0, n: 0 }; rows[k].base = r7(rows[k].base + c.sub - c.disc); rows[k].tax = r7(rows[k].tax + c.tax); rows[k].n++; T.base = r7(T.base + c.sub - c.disc); T.tax = r7(T.tax + c.tax); T.n++; });
+      var R = Object.keys(rows).map(function (k) { return rows[k]; }).sort(function (a, b) { return b.rate - a.rate; });
+      var w = sheet('Tax summary', '<div class="chips">' + Object.keys(PLAB).map(function (k) { return '<button type="button" class="chip' + (k === per ? ' on' : '') + '" data-tx="' + k + '">' + PLAB[k] + '</button>'; }).join('') + '</div>' +
+        '<div class="bz-kpi" style="margin-top:12px"><div class="bz-k1"><small>Tax collected · ' + esc(perName(per)) + '</small><b class="num bz-amt">' + fpi(T.tax) + ' π</b><span class="bz-amt">' + esc(conv(T.tax) || ' ') + '</span></div>' +
+        '<div><small>Taxable sales</small><b class="num bz-amt">' + fpi(T.base) + ' π</b></div><div><small>Paid invoices</small><b class="num">' + T.n + '</b></div><div><small>Rates</small><b class="num">' + R.filter(function (x) { return x.rate > 0; }).length + '</b></div></div>' +
+        '<div class="day">By rate</div><div class="list">' + (R.length ? R.map(function (x) { return '<div class="li"><span class="ico">' + ic('pct') + '</span><span class="grow"><b>' + (x.rate ? fpi(x.rate) + '% tax' : 'No tax') + '</b><small>' + x.n + ' invoice' + (x.n === 1 ? '' : 's') + ' · taxable ' + fpi(x.base) + ' π</small></span><span class="amt-r"><b class="num bz-amt">' + fpi(x.tax) + ' π</b></span></div>'; }).join('') : '<div class="empty">' + ic('pct') + '<div>No paid invoices in this period.</div></div>') + '</div>' +
+        '<button type="button" class="btn" data-x="csv">' + ic('down') + 'Tax summary (CSV)</button>');
+      $$('[data-tx]', w).forEach(function (b) { b.onclick = function () { taxSheet(b.dataset.tx); }; });
+      $('[data-x="csv"]', w).onclick = function () {
+        var V = invs().filter(function (v) { var t = v.pts || v.ts; return !v.void && status(v) === 'Paid' && t >= r[0] && t < r[1]; }).sort(function (a, b) { return (a.pts || a.ts) - (b.pts || b.ts); });
+        if (!V.length) return toast('No paid invoices in this period');
+        csvOut([['invoice', 'paid_on', 'customer', 'taxable_pi', 'tax_percent', 'tax_pi', 'total_pi']].concat(V.map(function (v) { var c = calc(v); return [v.no, iso(v.pts || v.ts), v.cname || '', r7(c.sub - c.disc), v.tax || 0, c.tax, v.total]; })).concat([['TOTAL', '', '', T.base, '', T.tax, '']]), 'FinPi-tax-summary-' + perName(per).replace(/[^A-Za-z0-9]+/g, '-') + '.csv', 'FinPi tax summary');
+      };
+    }
+
+    /* ── staff mode (owner): a private link for a worker's phone; their sales arrive here automatically ── */
+    function staffCfg() { var b = biz(); return { name: bizName(), staff: get('staffC', {}).staff || 'Staff', target: K.myTarget(), prods: prods().map(function (q) { return { id: q.id, n: q.n, p: q.p, sku: q.sku || '', stock: typeof q.stock === 'number' ? q.stock : null }; }) }; }
+    function staffLink(code) { return location.origin + '/?staff=' + code; }
+    var stT = null;
+    function staffPushSoon() { if (!get('staffC', {}).code) return; clearTimeout(stT); stT = setTimeout(function () { if (K.signedIn() && K.token()) K.api('/staff', { a: 'set', accessToken: K.token(), cfg: staffCfg() }).catch(function () {}); }, 2500); }
+    function staffPull(quiet) {
+      var sc = get('staffC', {}); if (!sc.code || !K.signedIn() || !K.token()) return Promise.resolve(0);
+      var L = invs(), have = {}; L.forEach(function (v) { have[v.no] = v; });
+      var paid = L.filter(function (v) { return v.staff && status(v) === 'Paid'; }).map(function (v) { return v.no; }).slice(0, 200);
+      return K.api('/staff', { a: 'pull', accessToken: K.token(), paid: paid }).then(function (d) {
+        if (!d || !d.ok) return 0;
+        if (!d.code) { put('staffC', {}); return 0; }
+        var add = [], tgt = K.myTarget();
+        (d.items || []).forEach(function (x) { if (have[x.no]) return; var v = { id: uid(), no: x.no, to: tgt, cname: 'Sale · ' + (x.note || x.staff || 'Staff'), cto: '', items: x.items, disc: x.disc || 0, tax: 0, notes: '', ts: x.ts, due: day0(x.ts), paid: 0, pays: [], rec: '', sale: true, staff: x.staff || 'Staff' }; v.total = calc(v).total; add.push(v); });
+        if (!add.length) return 0;
+        saveInvs(add.concat(invs()).sort(function (a, b) { return b.ts - a.ts; })); matchAll(); K.rerender();
+        if (!quiet) K.addNote('users', add.length === 1 ? 'Staff sale recorded' : add.length + ' staff sales recorded', add.map(function (v) { return v.no + ' · ' + fpi(v.total) + ' π'; }).slice(0, 3).join(' · '), 'staff-' + add[0].no);
+        return add.length;
+      }).catch(function () { return 0; });
+    }
+    function staffSheet() {
+      if (!K.signedIn()) return toast('Sign in with Pi to use staff mode');
+      if (K.needTarget('Staff mode')) return;
+      var sc = get('staffC', {});
+      if (!sc.code) {
+        var w = sheet('Staff mode', '<div class="pd-hero">' + ic('users') + '<b>Let your staff take sales</b><span>Your worker records sales on their own phone. Payments go straight to you, and every sale appears in your FinPi. Staff never see your wallet.</span></div>' +
+          '<label class="l" for="st-n">Staff name</label><input class="in" id="st-n" maxlength="30" placeholder="e.g. Cashier 1">' +
+          '<button type="button" class="btn" id="st-go">' + ic('link') + 'Create staff link</button>');
+        $('#st-go', w).onclick = function () {
+          var n = $('#st-n', w).value.trim() || 'Staff', b = this; b.disabled = true;
+          put('staffC', { staff: n });
+          K.api('/staff', { a: 'set', accessToken: K.token(), cfg: staffCfg() }).then(function (d) { b.disabled = false; if (!d || !d.ok) return toast((d && d.error) || 'Could not create the link. Try again.'); put('staffC', { code: d.code, n: d.n, staff: n }); toast('Staff link ready'); staffSheet(); }).catch(function () { b.disabled = false; toast('No connection. Try again.'); });
+        };
+        return;
+      }
+      var link = staffLink(sc.code), S = invs().filter(function (v) { return v.staff; }).slice(0, 30), tod = S.filter(function (v) { return v.ts >= day0(); });
+      var w2 = sheet('Staff mode', '<div class="qs-pay"><div class="small muted">Open on your staff member’s phone</div><div class="qr qs-qr">' + (window.FPQR ? FPQR.svg(link, 220, '#061A4F') : '') + '</div><div class="qs-st ok">' + ic('check') + 'Active · ' + esc(sc.staff || 'Staff') + '</div></div>' +
+        '<div class="two"><button type="button" class="btn" data-x="sh">' + ic('share') + 'Share link</button><button type="button" class="btn ghost" data-x="cp">' + ic('copy') + 'Copy link</button></div>' +
+        '<div class="stats"><div><small>Today</small><b class="bz-amt">' + fpi(sum(tod.filter(function (v) { return status(v) === 'Paid'; }).map(function (v) { return { amount: v.total }; }))) + ' π</b></div><div><small>Sales today</small><b>' + tod.length + '</b></div><div><small>Waiting</small><b>' + S.filter(function (v) { return status(v) !== 'Paid' && !v.void; }).length + '</b></div></div>' +
+        '<div class="day">Staff sales</div><div class="list">' + (S.length ? S.map(invRow).join('') : '<div class="empty">' + ic('users') + '<div>Sales your staff take appear here.</div></div>') + '</div>' +
+        '<div class="day">Manage</div><div class="list">' + row('refresh', 'Check for new sales', 'Sales also arrive by themselves', 'x', ' data-sx="pull"') + row('link', 'New link', 'The current link stops working', 'x', ' data-sx="renew"') + row('x', 'Turn off staff mode', 'Staff can no longer record sales', 'x', ' data-sx="off"') + '</div>');
+      bindInvRows(w2);
+      $('[data-x="sh"]', w2).onclick = function () { K.shareText('FinPi staff link', bizName() + ' · staff link for ' + (sc.staff || 'Staff') + '\n' + link); };
+      $('[data-x="cp"]', w2).onclick = function () { K.copy(link); };
+      $$('[data-sx]', w2).forEach(function (b) {
+        b.removeAttribute('data-act');
+        b.onclick = function () {
+          var k = b.dataset.sx;
+          if (k === 'pull') return staffPull(true).then(function (n) { toast(n ? n + ' new sale' + (n === 1 ? '' : 's') : 'No new sales'); staffSheet(); });
+          K.api('/staff', k === 'off' ? { a: 'off', accessToken: K.token() } : { a: 'set', renew: true, accessToken: K.token(), cfg: staffCfg() }).then(function (d) {
+            if (!d || !d.ok) return toast((d && d.error) || 'Try again.');
+            if (k === 'off') { put('staffC', {}); toast('Staff mode turned off'); return w2.remove(); }
+            put('staffC', { code: d.code, n: d.n, staff: sc.staff }); toast('New staff link ready'); staffSheet();
+          }).catch(function () { toast('No connection. Try again.'); });
+        };
+      });
+    }
+
+    /* ── staff mode (worker's phone) ── */
+    function staffMode() {
+      var code = get('staffK', ''); if (!code) return false;
+      document.documentElement.classList.add('fp-staff');
+      var box = document.createElement('div'); box.id = 'staffv'; document.body.appendChild(box);
+      var cfg = get('staffCfg', null), n = get('staffN', 0);
+      function mine() { return get('staffS', []); }
+      function seq() { var s = Math.max(get('staffSeq', 0), get('staffCnt', 0)) + 1; put('staffSeq', s); return 'INV-S' + n + '-' + String(s).padStart(4, '0'); }
+      function paint(err) {
+        var S = mine(), tod = S.filter(function (x) { return x.ts >= day0(); }), pt = r7(tod.filter(function (x) { return x.paid; }).reduce(function (s0, x) { return s0 + x.total; }, 0));
+        box.innerHTML = '<div class="stf-h"><div class="stf-lg">' + ic('store') + '</div><div class="grow"><b>' + esc(cfg ? cfg.name : 'FinPi') + '</b><small>' + esc(cfg ? cfg.staff : '') + ' · Staff mode</small></div><span class="stf-b">' + esc(K.NETN.replace('Pi ', '')) + '</span></div>' +
+          (err ? '<div class="stf-err">' + ic('warn') + '<span>' + esc(err) + '</span></div>' : '') +
+          '<div class="bz-kpi"><div class="bz-k1"><small>Received today</small><b class="num bz-amt">' + fpi(pt) + ' π</b><span>' + tod.length + ' sale' + (tod.length === 1 ? '' : 's') + ' · ' + tod.filter(function (x) { return !x.paid; }).length + ' waiting</span></div></div>' +
+          '<button type="button" class="btn stf-go" data-s="sale"' + (cfg ? '' : ' disabled') + '>' + ic('card') + 'New sale</button>' +
+          '<div class="day">My sales</div><div class="list">' + (S.length ? S.slice(0, 40).map(function (x) { return '<button type="button" class="li" data-sv="' + esc(x.no) + '"><span class="ico ' + (x.paid ? 'in' : '') + '">' + ic(x.paid ? 'check' : 'qr') + '</span><span class="grow"><b>' + esc(x.no) + (x.note ? ' · ' + esc(x.note) : '') + '</b><small>' + new Date(x.ts).toLocaleString('en-GB', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }) + '</small></span><span class="amt-r"><b class="num bz-amt">' + fpi(x.total) + ' π</b><small class="' + (x.paid ? 'bz-ok' : 'bz-due') + '">' + (x.paid ? 'Paid' : 'Waiting') + '</small></span></button>'; }).join('') : '<div class="empty">' + ic('card') + '<div>Sales you take appear here.</div></div>') + '</div>' +
+          '<button type="button" class="btn ghost" data-s="leave">' + ic('out') + 'Leave staff mode</button>';
+        var sb = $('[data-s="sale"]', box); sb.onclick = function () { sale(); };
+        $('[data-s="leave"]', box).onclick = function () {
+          var w = sheet('Leave staff mode', '<p class="small muted">This phone will stop taking sales for ' + esc(cfg ? cfg.name : 'this business') + '. Sales already taken stay with the business.</p><button type="button" class="btn danger" data-x="y">' + ic('out') + 'Leave staff mode</button>');
+          $('[data-x="y"]', w).onclick = function () { ['staffK', 'staffCfg', 'staffN', 'staffS', 'staffSeq', 'staffCnt', 'staffQ'].forEach(function (k) { try { localStorage.removeItem('fp_v1_' + k); } catch (e) {} }); location.replace('/'); };
+        };
+        $$('[data-sv]', box).forEach(function (b) { b.onclick = function () { var x = mine().filter(function (y) { return y.no === b.dataset.sv; })[0]; if (x) pay(x); }; });
+      }
+      function load() {
+        return K.api('/staff', { a: 'cfg', code: code }).then(function (d) {
+          if (d && d.ok && d.cfg) { cfg = d.cfg; n = d.n; put('staffCfg', cfg); put('staffN', n); put('staffCnt', d.count || 0); paint(); return; }
+          if (d && d.off) { cfg = null; put('staffCfg', null); return paint(d.error); }
+          paint(cfg ? '' : 'Could not load the shop. Check the connection.');
+        }).catch(function () { paint(cfg ? '' : 'You are offline. Connect to load the shop.'); });
+      }
+      function flush() {
+        var Q = get('staffQ', []); if (!Q.length) return Promise.resolve();
+        return K.api('/staff', { a: 'sale', code: code, sale: Q[0] }).then(function (d) { if (d && (d.ok || !d.error || /not valid/.test(d.error))) { put('staffQ', get('staffQ', []).slice(1)); return flush(); } }).catch(function () {});
+      }
+      function status() {
+        var W = mine().filter(function (x) { return !x.paid && x.ts > Date.now() - 3 * 864e5; }).map(function (x) { return x.no; }).slice(0, 30); if (!W.length) return Promise.resolve([]);
+        return K.api('/staff', { a: 'status', code: code, nos: W }).then(function (d) {
+          var P = (d && d.paid) || []; if (!P.length) return P;
+          put('staffS', mine().map(function (x) { if (P.indexOf(x.no) >= 0 && !x.paid) { x.paid = Date.now(); } return x; })); paint(); return P;
+        }).catch(function () { return []; });
+      }
+      function sale() {
+        if (!cfg) return;
+        saleSheet({}, { prods: cfg.prods || [], charge: function (A, note) {
+          var x = { no: seq(), ts: Date.now(), items: A.L, disc: A.disc, total: A.total, note: note, staff: cfg.staff };
+          put('staffS', [x].concat(mine()).slice(0, 300)); put('staffQ', get('staffQ', []).concat([x]));
+          flush(); paint(); pay(x);
+        } });
+      }
+      function pay(x) {
+        var link = K.payLink({ u: cfg.target, a: x.total, x: (x.no + ' · ' + (x.items.length === 1 ? x.items[0].d : 'Sale')).slice(0, 80) }), tm = null;
+        var w = sheet('Charge ' + x.no, '<div class="qs-pay"><div class="qs-amt num bz-amt">' + fpi(x.total) + ' π</div><div class="small muted">' + esc(conv(x.total)) + '</div>' +
+          '<div class="qr qs-qr' + (x.paid ? ' paid' : '') + '">' + (window.FPQR ? FPQR.svg(link, 250, '#061A4F') : '') + '</div><div class="qs-st' + (x.paid ? ' ok' : '') + '" id="sp-st">' + (x.paid ? ic('check') + 'Paid · ' : '<span class="qs-dot"></span>Waiting for payment · ') + esc(x.no) + '</div>' +
+          '<p class="small muted" style="margin-top:6px">Scan with FinPi to pay ' + esc(cfg.name) + '</p></div>' +
+          '<button type="button" class="btn soft" data-x="new">' + ic('plus') + 'New sale</button>', { onClose: function () { clearInterval(tm); } });
+        $('[data-x="new"]', w).onclick = function () { clearInterval(tm); sale(); };
+        if (x.paid) return;
+        tm = setInterval(function () {
+          if (!document.body.contains(w)) return clearInterval(tm);
+          flush().then(status).then(function (P) { if (P.indexOf(x.no) < 0) return; clearInterval(tm); var st = $('#sp-st', w); if (st) { st.className = 'qs-st ok'; st.innerHTML = ic('check') + 'Paid · ' + esc(x.no); } var q = $('.qs-qr', w); if (q) q.classList.add('paid'); fx('paid'); });
+        }, 4000);
+      }
+      paint(); load().then(flush).then(status);
+      setInterval(function () { if (!document.hidden) flush().then(status); }, 15000);
+      addEventListener('online', function () { flush().then(status); });
+      return true;
     }
 
     /* ── recurring requests ── */
@@ -822,7 +1006,7 @@
     }
     function bizSheet(p) {
       p = p || get('bzP', '7d'); put('bzP', p);
-      var rg = range(p), S = sales().filter(function (r) { return r.ts >= rg[0] && r.ts < rg[1]; }), tot = sum(S), V = invs(), etot = esum(expIn(rg[0], rg[1])), prof = r7(tot - etot);
+      var rg = range(p), S = sales().filter(function (r) { return r.ts >= rg[0] && r.ts < rg[1]; }), tot = sum(S), V = invs(), etot = esum(expIn(rg[0], rg[1])), rtot = retIn(rg[0], rg[1]), prof = r7(tot - rtot - etot);
       var open = V.filter(function (v) { return /Unpaid|Part paid|Overdue/.test(status(v)); }), od = open.filter(function (v) { return status(v) === 'Overdue'; }), out = r7(open.reduce(function (a, v) { return a + balance(v); }, 0));
       var items = {}; V.forEach(function (v) { if (status(v) === 'Paid' && (v.pts || v.ts) >= rg[0] && (v.pts || v.ts) < rg[1]) v.items.forEach(function (it) { if (it.tip) return; var k = it.d.trim(); items[k] = items[k] || [0, 0]; items[k][0] += r7(it.q * it.p); items[k][1] += Number(it.q); }); });
       var TI = Object.keys(items).map(function (k) { return [k, r7(items[k][0]), items[k][1]]; }).sort(function (a, b) { return b[1] - a[1]; }).slice(0, 5);
@@ -834,13 +1018,13 @@
         '<div class="bz-kpi"><div class="bz-k1"><small>Sales · ' + esc(rg[2]) + '</small><b class="num bz-amt">' + fpi(tot) + ' π</b><span class="bz-amt">' + S.length + ' payment' + (S.length === 1 ? '' : 's') + (S.length ? ' · average ' + fpi(Math.round(tot / S.length * 100) / 100) + ' π' : '') + (conv(tot) ? ' · ' + esc(conv(tot)) : '') + '</span></div>' +
         '<button type="button" class="bz-kb" data-x="b-exp"><small>Expenses</small><b class="num bz-amt">' + fpi(etot) + ' π</b></button><button type="button" class="bz-kb' + (prof < 0 ? ' bad' : '') + '" data-x="b-pro"><small>Profit</small><b class="num bz-amt">' + (prof < 0 ? '−' : '') + fpi(Math.abs(prof)) + ' π</b></button><div class="' + (od.length ? 'bad' : '') + '"><small>Outstanding</small><b class="num bz-amt">' + fpi(out) + ' π</b><span>' + open.length + ' open' + (od.length ? ' · ' + od.length + ' overdue' : '') + '</span></div></div>' +
         '<div class="card bz-card">' + chart(p) + '</div>' +
-        '<div class="bz-grid">' + [['card', 'Quick sale', 'b-sale'], ['inv', 'New invoice', 'b-new'], ['rcpt', 'Invoices', 'b-inv'], ['tag', 'Products', 'b-prod'], ['users', 'Customers', 'b-cus'], ['exp', 'Expenses', 'b-exp'], ['sun', 'Day summary', 'b-day'], ['repeat', 'Recurring', 'b-rec'], ['store', 'My Pi QR', 'b-qr'], ['bars', 'Reports', 'b-rep']].map(function (x, i) { return '<button type="button" class="bz-a c' + i + '" data-x="' + x[2] + '"><i>' + ic(x[0]) + '</i><span>' + x[1] + '</span></button>'; }).join('') + '</div>' +
+        '<div class="bz-grid">' + [['card', 'Quick sale', 'b-sale'], ['inv', 'New invoice', 'b-new'], ['rcpt', 'Invoices', 'b-inv'], ['tag', 'Products', 'b-prod'], ['users', 'Customers', 'b-cus'], ['exp', 'Expenses', 'b-exp'], ['sun', 'Day summary', 'b-day'], ['user', 'Staff', 'b-staff'], ['pct', 'Tax summary', 'b-tax'], ['repeat', 'Recurring', 'b-rec'], ['store', 'My Pi QR', 'b-qr'], ['bars', 'Reports', 'b-rep']].map(function (x, i) { return '<button type="button" class="bz-a c' + i + '" data-x="' + x[2] + '"><i>' + ic(x[0]) + '</i><span>' + x[1] + '</span></button>'; }).join('') + '</div>' +
         (open.length ? '<div class="day">Open invoices</div><div class="list">' + open.slice(0, 4).map(invRow).join('') + '</div>' : '') +
         '<div class="day">Top customers</div>' + (TC.length ? '<div class="card bz-card">' + TC.map(function (x) { return '<div class="cat"><div class="row"><span>' + esc(K.isG(x[0]) ? K.short(x[0]) : who(x[0])) + '</span><b class="num bz-amt">' + fpi(x[1]) + ' π</b></div><div class="bar"><i style="width:' + Math.max(4, x[1] / topv * 100) + '%"></i></div></div>'; }).join('') + '</div>' : '<div class="list"><div class="empty">No payments received in this period.</div></div>') +
         '<div class="day">Top items</div>' + (TI.length ? '<div class="card bz-card">' + TI.map(function (x) { return '<div class="cat"><div class="row"><span>' + esc(x[0]) + ' <small class="muted">× ' + fpi(x[2]) + '</small></span><b class="num bz-amt">' + fpi(x[1]) + ' π</b></div><div class="bar"><i style="width:' + Math.max(4, x[1] / topi * 100) + '%"></i></div></div>'; }).join('') + '</div>' : '<div class="list"><div class="empty">Items from paid invoices appear here.</div></div>'));
       $$('[data-bp]', w).forEach(function (q) { q.onclick = function () { bizSheet(q.dataset.bp); }; });
       $$('[data-x="prof"]', w).forEach(function (q) { q.onclick = profSheet; });
-      var go = { 'b-exp': function () { expSheet(p === '7d' || p === '30d' || p === 'today' ? p : 'month'); }, 'b-pro': function () { expSheet(p); }, 'b-day': function () { daySheet(); }, 'b-sale': function () { saleSheet(); }, 'b-prod': function () { prodSheet(); }, 'b-new': function () { invEdit(''); }, 'b-inv': function () { invList(); }, 'b-cus': function () { custSheet(); }, 'b-rec': recSheet, 'b-qr': qrSheet, 'b-rep': repSheet };
+      var go = { 'b-exp': function () { expSheet(p === '7d' || p === '30d' || p === 'today' ? p : 'month'); }, 'b-pro': function () { expSheet(p); }, 'b-day': function () { daySheet(); }, 'b-staff': function () { staffSheet(); }, 'b-tax': function () { taxSheet(); }, 'b-sale': function () { saleSheet(); }, 'b-prod': function () { prodSheet(); }, 'b-new': function () { invEdit(''); }, 'b-inv': function () { invList(); }, 'b-cus': function () { custSheet(); }, 'b-rec': recSheet, 'b-qr': qrSheet, 'b-rep': repSheet };
       Object.keys(go).forEach(function (k) { $$('[data-x="' + k + '"]', w).forEach(function (q) { q.onclick = go[k]; }); });
       bindInvRows(w);
     }
@@ -862,8 +1046,8 @@
       var B = [], L = [];
       if (per === 'all') { var d0 = new Date(day0()); d0.setDate(1); d0.setMonth(d0.getMonth() - 11); for (var m = 0; m < 12; m++) { var a = new Date(d0); a.setMonth(a.getMonth() + m); var e = new Date(a); e.setMonth(e.getMonth() + 1); B.push(sum(S.filter(function (x) { return x.ts >= a.getTime() && x.ts < e.getTime(); }))); L.push(a.toLocaleDateString('en-GB', { month: 'short' })); } }
       else { var end = Math.min(r[1], Date.now()), n = Math.max(1, Math.round((day0(end) - r[0]) / 864e5) + 1); for (var i = 0; i < n; i++) { var t = r[0] + i * 864e5; B.push(sum(S.filter(function (x) { return day0(x.ts) === day0(t + 3600e3); }))); L.push(String(new Date(t + 3600e3).getDate())); } }
-      var E = expIn(r[0], r[1]), et = esum(E);
-      return { S: S, tot: tot, E: E, et: et, pr: r7(tot - et), V: V, paid: paid, open: open, od: od, TI: TI, TC: TC, B: B, L: L, out: r7(open.reduce(function (a, v) { return a + balance(v); }, 0)) };
+      var E = expIn(r[0], r[1]), et = esum(E), rt = retIn(r[0], r[1]);
+      return { S: S, tot: tot, E: E, et: et, rt: rt, pr: r7(tot - rt - et), V: V, paid: paid, open: open, od: od, TI: TI, TC: TC, B: B, L: L, out: r7(open.reduce(function (a, v) { return a + balance(v); }, 0)) };
     }
     function docIdOf(str) {
       try { return crypto.subtle.digest('SHA-256', new TextEncoder().encode(str)).then(function (b) { var u = new Uint8Array(b), A = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789', c = ''; for (var k = 0; k < 10; k++) c += A[u[k] % 32]; return 'FPR-' + c.slice(0, 5) + '-' + c.slice(5); }).catch(function () { return ''; }); } catch (e) { return Promise.resolve(''); }
@@ -885,7 +1069,7 @@
         T(x, 'Generated ' + dstr(Date.now()) + ' · ' + K.NETN, W - X, 186, '500 20px ' + FONT, 'rgba(255,255,255,.8)', 'right');
         // KPI cards
         var avg = D.S.length ? Math.round(D.tot / D.S.length * 100) / 100 : 0, cw = (W - 2 * X - 3 * 20) / 4, y = 330;
-        [['SALES', fpi(D.tot) + ' π', D.S.length + ' payment' + (D.S.length === 1 ? '' : 's') + (D.S.length ? ' · avg ' + fpi(avg) + ' π' : ''), '#0B2A6F'], ['EXPENSES', fpi(D.et) + ' π', D.E.length + ' entr' + (D.E.length === 1 ? 'y' : 'ies'), '#0B1B33'], ['PROFIT', (D.pr < 0 ? '−' : '') + fpi(Math.abs(D.pr)) + ' π', conv(Math.abs(D.pr)), D.pr < 0 ? '#B42318' : '#047857'], ['OUTSTANDING', fpi(D.out) + ' π', D.open.length + ' open' + (D.od.length ? ' · ' + D.od.length + ' overdue' : ''), D.od.length ? '#B42318' : '#0B1B33']].forEach(function (k, i) {
+        [['SALES', fpi(D.tot) + ' π', D.S.length + ' payment' + (D.S.length === 1 ? '' : 's') + (D.S.length ? ' · avg ' + fpi(avg) + ' π' : ''), '#0B2A6F'], ['EXPENSES', fpi(D.et) + ' π', D.E.length + ' entr' + (D.E.length === 1 ? 'y' : 'ies') + (D.rt ? ' · returns ' + fpi(D.rt) + ' π' : ''), '#0B1B33'], ['PROFIT', (D.pr < 0 ? '−' : '') + fpi(Math.abs(D.pr)) + ' π', conv(Math.abs(D.pr)), D.pr < 0 ? '#B42318' : '#047857'], ['OUTSTANDING', fpi(D.out) + ' π', D.open.length + ' open' + (D.od.length ? ' · ' + D.od.length + ' overdue' : ''), D.od.length ? '#B42318' : '#0B1B33']].forEach(function (k, i) {
           var cx = X + i * (cw + 20); x.fillStyle = i === 0 ? '#EEF3FF' : '#F5F7FB'; rr(x, cx, y, cw, 150, 20); x.fill(); x.strokeStyle = i === 0 ? 'rgba(21,67,224,.3)' : '#E2E8F0'; x.lineWidth = 2; x.stroke();
           T(x, k[0], cx + 22, y + 40, '700 17px ' + FONT, '#64748B'); x.font = '800 32px ' + MONO; T(x, fit(x, k[1], cw - 40), cx + 22, y + 88, '800 32px ' + MONO, k[3]);
           if (k[2]) { x.font = '500 16px ' + FONT; T(x, fit(x, k[2], cw - 40), cx + 22, y + 124, '500 16px ' + FONT, '#64748B'); }
@@ -935,9 +1119,9 @@
       var per = 'month';
       var w = sheet('Business reports', '<label class="l">Period</label><div class="chips" id="rp-p">' + [['month', 'This month'], ['last', 'Last month'], ['30d', 'Last 30 days'], ['all', 'All time']].map(function (x) { return '<button type="button" class="chip' + (x[0] === per ? ' on' : '') + '" data-rp="' + x[0] + '">' + x[1] + '</button>'; }).join('') + '</div>' +
         '<div class="card" id="rp-s"></div>' +
-        '<div class="list" style="margin-top:12px">' + row('bars', 'Business report (PDF)', 'Sales, invoices, products and customers on one page', 'x', ' data-xr="pdf"') + row('down', 'Sales report (CSV)', 'Every payment received, with values', 'x', ' data-xr="sales"') + row('inv', 'Invoices report (CSV)', 'Numbers, customers, status and balances', 'x', ' data-xr="inv"') + row('exp', 'Expenses report (CSV)', 'Every expense with its category', 'x', ' data-xr="exp"') + row('sun', 'Day summary', 'Sales, expenses and profit for any day', 'x', ' data-xr="day"') + row('rcpt', 'Monthly statement (PDF)', 'All payments for a month', 'x', ' data-xr="st"') + '</div>');
+        '<div class="list" style="margin-top:12px">' + row('bars', 'Business report (PDF)', 'Sales, invoices, products and customers on one page', 'x', ' data-xr="pdf"') + row('down', 'Sales report (CSV)', 'Every payment received, with values', 'x', ' data-xr="sales"') + row('inv', 'Invoices report (CSV)', 'Numbers, customers, status and balances', 'x', ' data-xr="inv"') + row('exp', 'Expenses report (CSV)', 'Every expense with its category', 'x', ' data-xr="exp"') + row('pct', 'Tax summary', 'Tax collected, by rate', 'x', ' data-xr="tax"') + row('sun', 'Day summary', 'Sales, expenses and profit for any day', 'x', ' data-xr="day"') + row('rcpt', 'Monthly statement (PDF)', 'All payments for a month', 'x', ' data-xr="st"') + '</div>');
       function rg() { var n = Date.now(); if (per === 'all') return [0, n + 1, 'all']; if (per === '30d') return [day0() - 29 * 864e5, n + 1, 'last-30-days']; var d = new Date(day0()); d.setDate(1); if (per === 'last') { var e = d.getTime(); d.setMonth(d.getMonth() - 1); return [d.getTime(), e, d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0')]; } return [d.getTime(), n + 1, d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0')]; }
-      function info() { var r = rg(), S = sales().filter(function (x) { return x.ts >= r[0] && x.ts < r[1]; }), V = invs().filter(function (v) { return v.ts >= r[0] && v.ts < r[1]; }); var et = esum(expIn(r[0], r[1])), pr = r7(sum(S) - et); $('#rp-s', w).innerHTML = '<div class="stats" style="margin-top:0"><div><small>Sales</small><b class="bz-amt">' + fpi(sum(S)) + ' π</b></div><div><small>Expenses</small><b class="bz-amt">' + fpi(et) + ' π</b></div><div><small>Profit</small><b class="bz-amt' + (pr < 0 ? ' neg' : '') + '">' + (pr < 0 ? '−' : '') + fpi(Math.abs(pr)) + ' π</b></div></div><div class="small muted" style="margin-top:8px">' + S.length + ' payment' + (S.length === 1 ? '' : 's') + ' · ' + V.length + ' invoice' + (V.length === 1 ? '' : 's') + '</div>'; }
+      function info() { var r = rg(), S = sales().filter(function (x) { return x.ts >= r[0] && x.ts < r[1]; }), V = invs().filter(function (v) { return v.ts >= r[0] && v.ts < r[1]; }); var et = esum(expIn(r[0], r[1])), pr = r7(sum(S) - retIn(r[0], r[1]) - et); $('#rp-s', w).innerHTML = '<div class="stats" style="margin-top:0"><div><small>Sales</small><b class="bz-amt">' + fpi(sum(S)) + ' π</b></div><div><small>Expenses</small><b class="bz-amt">' + fpi(et) + ' π</b></div><div><small>Profit</small><b class="bz-amt' + (pr < 0 ? ' neg' : '') + '">' + (pr < 0 ? '−' : '') + fpi(Math.abs(pr)) + ' π</b></div></div><div class="small muted" style="margin-top:8px">' + S.length + ' payment' + (S.length === 1 ? '' : 's') + ' · ' + V.length + ' invoice' + (V.length === 1 ? '' : 's') + '</div>'; }
       $$('[data-rp]', w).forEach(function (b) { b.onclick = function () { per = b.dataset.rp; $$('[data-rp]', w).forEach(function (x) { x.classList.toggle('on', x === b); }); info(); }; });
       info();
       $$('[data-xr]', w).forEach(function (b) {
@@ -947,6 +1131,7 @@
           if (k === 'st') return K.A.statement();
           if (k === 'pdf') return reportSheet(per);
           if (k === 'day') return daySheet();
+          if (k === 'tax') return taxSheet(per);
           if (k === 'exp') {
             var X = expIn(r[0], r[1]).sort(function (a, c) { return a.ts - c.ts; }); if (!X.length) return toast('No expenses in this period');
             return csvOut([['date', 'category', 'note', 'amount_pi', 'amount_local', 'currency']].concat(X.map(function (e) { return [iso(e.ts), e.cat, e.note || '', e.a, e.lv || '', e.lc || '']; })), 'FinPi-expenses-' + r[2] + '.csv', 'FinPi expenses report');
@@ -980,11 +1165,11 @@
       var b = biz(), open = invs().filter(function (v) { return /Unpaid|Part paid|Overdue/.test(status(v)); }).length;
       return '<div class="sec"><h2>Business</h2></div><div class="list">' + row('store', 'FinPi Business', 'Sales, invoices and reports', 'biz') + row('edit', 'Business profile', b.name || 'Name, address and tax ID', 'bizprof') +
         row('inv', 'Invoices', open ? open + ' open' : 'Create and track invoices', 'invs') + row('users', 'Customers', custs().length ? custs().length + ' saved' : 'People and businesses who pay you', 'cust') +
-        row('exp', 'Expenses', 'What the business spends, and its profit', 'expenses') + row('sun', 'Day summary', 'Today’s sales, expenses and profit', 'daysum') + row('repeat', 'Recurring requests', recs().length ? recs().length + ' active' : 'Weekly or monthly invoices', 'recur') + row('qr', 'My Pi QR', 'Poster to print or share', 'myqr') + '</div>';
+        row('exp', 'Expenses', 'What the business spends, and its profit', 'expenses') + row('sun', 'Day summary', 'Today’s sales, expenses and profit', 'daysum') + row('user', 'Staff mode', get('staffC', {}).code ? 'Active · ' + (get('staffC', {}).staff || 'Staff') : 'Let staff take sales on their phone', 'staff') + row('repeat', 'Recurring requests', recs().length ? recs().length + ' active' : 'Weekly or monthly invoices', 'recur') + row('qr', 'My Pi QR', 'Poster to print or share', 'myqr') + '</div>';
     };
     K.HK.html.settings = function () { return row('store', 'Business profile', biz().name ? K.NTYPE[K.nType() === 'name' ? 'business' : K.nType()].l + ' · ' + biz().name : 'Name, logo, address, tax ID', 'bizprof') + row('sound', 'Payment sounds', get('sound', true) ? 'On · sound and vibration' : 'Off', 'sound') + row(get('hide', false) ? 'eyeoff' : 'eye', 'Hide amounts', get('hide', false) ? 'On' : 'Off', 'hide'); };
     Object.assign(K.A, {
-      biz: function () { bizSheet(); }, bizreport: function () { reportSheet(); }, expenses: function () { expSheet(); }, daysum: function () { daySheet(); }, sale: function () { saleSheet(); }, prods: function () { prodSheet(); }, 'inv-new': function () { invEdit(''); }, invs: function () { invList(); }, cust: function () { custSheet(); }, recur: recSheet, myqr: qrSheet, bizprof: profSheet, reports: repSheet,
+      biz: function () { bizSheet(); }, bizreport: function () { reportSheet(); }, expenses: function () { expSheet(); }, daysum: function () { daySheet(); }, staff: function () { staffSheet(); }, taxsum: function () { taxSheet(); }, sale: function () { saleSheet(); }, prods: function () { prodSheet(); }, 'inv-new': function () { invEdit(''); }, invs: function () { invList(); }, cust: function () { custSheet(); }, recur: recSheet, myqr: qrSheet, bizprof: profSheet, reports: repSheet,
       hide: toggleHide,
       sound: function () { put('sound', !get('sound', true)); if (get('sound', true)) { ac(); fx('in'); } toast(get('sound', true) ? 'Payment sounds on' : 'Payment sounds off'); K.rerender(); }
     });
@@ -995,10 +1180,12 @@
       function upd(fn, msg) { saveInvs(invs().map(function (x) { if (x.id === id) fn(x); return x; })); if (msg) toast(msg); K.rerender(); invView(id); }
       var acts = { 'x-paid': function () { upd(function (x) { x.mpaid = true; x.pts = Date.now(); }, v.no + ' marked as paid'); stockOut(id); fx('paid'); }, 'x-unpaid': function () { upd(function (x) { x.mpaid = false; if ((x.paid || 0) < x.total) x.pts = 0; }, v.no + ' marked as unpaid'); },
         'x-edit': function () { invEdit(id); }, 'x-dup': function () { invEdit('', { tpl: { cid: v.cid, cname: v.cname, cto: v.cto, cphone: v.cphone, cemail: v.cemail, items: v.items, disc: v.disc, tax: v.tax, notes: v.notes, term: v.due ? Math.max(0, Math.round((v.due - day0(v.ts)) / 864e5)) : 0 } }); },
-        'x-void': function () { upd(function (x) { x.void = true; }, v.no + ' cancelled'); }, 'x-del': function () { saveInvs(invs().filter(function (x) { return x.id !== id; })); toast(v.no + ' deleted'); K.rerender(); invList(); } };
+        'x-ret': function () { retSheet(id); }, 'x-void': function () { upd(function (x) { x.void = true; }, v.no + ' cancelled'); }, 'x-del': function () { saveInvs(invs().filter(function (x) { return x.id !== id; })); toast(v.no + ' deleted'); K.rerender(); invList(); } };
       $$('[data-xa]', w).forEach(function (b) { if (acts[b.dataset.xa]) b.onclick = acts[b.dataset.xa]; });
     }
 
+    try { var sq = /[?&]staff=([A-Za-z2-9]{20})\b/.exec(location.search); if (sq) { put('staffK', sq[1].toUpperCase()); history.replaceState(null, '', location.pathname); } } catch (e) {}
+    if (staffMode()) return;
     matchAll(); checkRec();
     setInterval(function () { if (!document.hidden) checkRec(); }, 60000);
     document.addEventListener('visibilitychange', function () { if (!document.hidden) checkRec(); });

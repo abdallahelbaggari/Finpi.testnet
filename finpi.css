@@ -749,3 +749,17 @@ body{background:#EAF1FF!important}
 .pd-hero{display:flex;flex-direction:column;align-items:center;text-align:center;gap:6px;padding:20px 16px;border-radius:20px;background:radial-gradient(90% 120% at 100% 0%,rgba(0,214,201,.35),transparent 60%),linear-gradient(135deg,#0A2A8C,#1D5BFF);color:#fff}
 .pd-hero svg{width:34px;height:34px}.pd-hero b{font-size:17px}.pd-hero span{font-size:13.5px;opacity:.88}.pd-hero .sv-soon{position:static;font-size:12px;padding:4px 12px;margin-top:4px;background:rgba(255,255,255,.2)}
 .pd-in{display:flex;align-items:center;gap:8px}.pd-in .in{flex:1}.pd-in span{font-weight:800;color:var(--mute)}
+
+/* returns, staff mode */
+.rt-n{position:static;display:flex;align-items:center;gap:6px;background:none;border:0;padding:0}
+.rt-n button{width:34px;height:34px;border-radius:10px;border:1px solid var(--line);background:#F1F5FD;display:flex;align-items:center;justify-content:center}
+.rt-n b{min-width:26px;text-align:center}
+.rt-tg{display:flex;align-items:center;gap:10px;margin:14px 2px;font-weight:600;font-size:14px}.rt-tg input{width:20px;height:20px;accent-color:#1543E0}
+html.fp-staff body>:not(#staffv):not(#toast):not(.sh-wrap):not(script):not(#netbar){display:none!important}
+#staffv{max-width:560px;margin:0 auto;padding:calc(env(safe-area-inset-top) + 16px) 16px 40px;min-height:100vh}
+.stf-h{display:flex;align-items:center;gap:12px;margin-bottom:16px}.stf-h .grow{min-width:0}.stf-h b{display:block;font-size:18px;color:var(--ink);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.stf-h small{color:var(--mute);font-weight:600}
+.stf-lg{width:46px;height:46px;border-radius:14px;display:flex;align-items:center;justify-content:center;color:#fff;background:linear-gradient(135deg,#1543E0,#14C2AE);flex:none}
+.stf-b{font-size:11px;font-weight:800;padding:4px 10px;border-radius:999px;background:#FEF3C7;color:#92400E}
+.stf-go{margin-top:14px;font-size:17px;padding:18px}
+.stf-err{display:flex;gap:10px;align-items:center;padding:12px 14px;border-radius:14px;background:#FDECEC;color:var(--bad);font-weight:600;font-size:13.5px;margin-bottom:12px}
+.bz-ok{color:#047857;font-weight:700}

@@ -80,6 +80,7 @@
 
   /* ── icons (Feather, MIT) ── */
   var P = {
+    pct: '<line x1="19" y1="5" x2="5" y2="19"/><circle cx="6.5" cy="6.5" r="2.5"/><circle cx="17.5" cy="17.5" r="2.5"/>',
     exp: '<circle cx="12" cy="12" r="10"/><polyline points="8 12 12 16 16 12"/><line x1="12" y1="8" x2="12" y2="16"/>',
     sun: '<circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/>',
     home: '<path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/>',
@@ -1298,6 +1299,8 @@
     { id: 'recur', n: 'Recurring', s: 'Weekly or monthly invoices', i: 'repeat', c: 'a', g: 'biz', a: 'recur' },
     { id: 'expenses', n: 'Expenses', s: 'Spending and profit', i: 'exp', c: 'a', g: 'biz', a: 'expenses' },
     { id: 'daysum', n: 'Day summary', s: 'Sales, expenses and profit', i: 'sun', c: 'g', g: 'biz', a: 'daysum' },
+    { id: 'staff', n: 'Staff mode', s: 'Staff take sales on their phone', i: 'user', c: 'n', g: 'biz', a: 'staff' },
+    { id: 'taxsum', n: 'Tax summary', s: 'Tax collected, by rate', i: 'pct', c: 'b', g: 'biz', a: 'taxsum' },
     { id: 'bizreport', n: 'Business report', s: 'One-page PDF for any period', i: 'bars', c: 'n', g: 'biz', a: 'bizreport' },
     { id: 'reports', n: 'Reports', s: 'Sales and invoices CSV', i: 'down', c: 'b', g: 'biz', a: 'reports' },
     { id: 'bizprof', n: 'Business profile', s: 'Name, logo, tax ID, store, shop', i: 'store', c: 'n', g: 'biz', a: 'bizprof' },
@@ -1791,6 +1794,7 @@
   }
   function onboarding(force) {
     // shown every time FinPi is opened (once per visit); Skip closes it
+    try { if (localStorage.getItem('fp_v1_staffK') || /[?&]staff=/.test(location.search)) return; } catch (e) {}
     if (!force && window.__fpOnbShown) return; window.__fpOnbShown = true;
     var rt = null, at = null;
     var i = 0, o = document.createElement('div'); o.id = 'onb'; o.setAttribute('role', 'dialog'); o.setAttribute('aria-modal', 'true'); o.setAttribute('aria-label', 'Welcome to FinPi');
