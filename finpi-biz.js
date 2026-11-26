@@ -54,7 +54,8 @@
     var STC = { Paid: 'ok', Overdue: 'bad', Unpaid: 'wait', 'Part paid': 'wait', Cancelled: 'off' };
     function badge(v) { var s = status(v); return '<span class="bz-st ' + STC[s] + '">' + s + '</span>'; }
     function balance(v) { return status(v) === 'Paid' || v.void ? 0 : r7(Math.max(0, v.total - (v.paid || 0))); }
-    function sales() { return K.rcpts().filter(function (r) { return r.dir === 'in' && r.kind !== 'refund'; }); }
+    function incoming() { return K.rcpts().filter(function (r) { return r.dir === 'in' && r.kind !== 'refund'; }); }
+    function sales() { return incoming().filter(function (r) { return !/\bCOL-[A-Z2-9]{6}\b/i.test(String(r.narr || '')); }); }
     function payer(r) { return r.kind === 'wallet' ? (r.from || r.addr || '') : String(r.other || '').replace(/^@/, ''); }
     var CI = { raw: null, map: {} };
     function custFor(to) { to = String(to || '').toLowerCase(); if (!to) return null; var raw = localStorage.getItem('fp_v1_cust') || ''; if (CI.raw !== raw) { var m = {}; custs().forEach(function (c) { if (c.to) m[String(c.to).toLowerCase()] = c; }); CI = { raw: raw, map: m }; } return CI.map[to] || null; }
@@ -62,10 +63,10 @@
     function invLink(v) { return K.payLink({ u: v.to, a: balance(v) || v.total, x: (v.no + ' · ' + (v.title || (v.items[0] && v.items[0].d) || 'Invoice')).slice(0, 80) }); }
 
     /* ── backup of business records to the Pi account (restored on any phone after sign-in) ── */
-    var BK = ['biz', 'inv', 'invSeq', 'cust', 'recur', 'qrO', 'prod', 'name', 'nameType', 'exp'], bT = null, put0 = K.put;
+    var BK = ['biz', 'inv', 'invSeq', 'cust', 'recur', 'qrO', 'prod', 'name', 'nameType', 'exp', 'goals', 'cols'], bT = null, put0 = K.put;
     put = function (k, v) { var r = put0(k, v); if (BK.indexOf(k) >= 0) bDirty(); if (k === 'prod' || k === 'biz' || k === 'name') { try { staffPushSoon(); } catch (e) {} } return r; };
     function bSnap() { var d = {}; BK.forEach(function (k) { var v = get(k, null); if (v !== null) d[k] = v; }); return d; }
-    function bHas(d) { return !!(d && ((d.inv || []).length || (d.cust || []).length || (d.recur || []).length || (d.prod || []).length || (d.exp || []).length || (d.biz && d.biz.name))); }
+    function bHas(d) { return !!(d && ((d.inv || []).length || (d.cust || []).length || (d.recur || []).length || (d.prod || []).length || (d.exp || []).length || (d.goals || []).length || (d.cols || []).length || (d.biz && d.biz.name))); }
     function bDirty() { put0('bizTs', Date.now()); clearTimeout(bT); bT = setTimeout(bPush, 2500); }
     function bPush() {
       if (!K.signedIn() || !K.token()) return Promise.resolve(); var ts = get('bizTs', 0);
@@ -977,6 +978,133 @@
       return true;
     }
 
+    /* ── savings goals: progress toward a goal; the Pi stays in the user's own wallet ── */
+    function goals() { return get('goals', []); }
+    function gSaved(g) { return r7((g.ent || []).reduce(function (s0, e) { return s0 + Number(e.a || 0); }, 0)); }
+    function goalSheet() {
+      var G = goals();
+      var w = sheet('Savings goals', '<div class="list">' + (G.length ? G.map(function (g) { var sv = gSaved(g), pc = g.t ? Math.min(100, Math.round(sv / g.t * 100)) : 0; return '<button type="button" class="li gl-li" data-gv="' + g.id + '"><span class="ico in">' + ic('star') + '</span><span class="grow"><b>' + esc(g.n) + '</b><small>' + fpi(sv) + ' of ' + fpi(g.t) + ' π' + (g.d ? ' · by ' + dstr(g.d) : '') + '</small><span class="bar gl-bar"><i style="width:' + Math.max(2, pc) + '%"></i></span></span><span class="amt-r"><b class="num">' + pc + '%</b>' + (pc >= 100 ? '<small class="bz-ok">Reached</small>' : '') + '</span></button>'; }).join('')
+        : '<div class="empty">' + ic('star') + '<div>No goals yet. Set a goal and track every step toward it.</div></div>') + '</div>' +
+        '<p class="small muted gl-note">' + ic('lock') + 'Your Pi stays in your own wallet. FinPi keeps the record.</p>' +
+        '<button type="button" class="btn" data-x="new">' + ic('plus') + 'New goal</button>');
+      $$('[data-gv]', w).forEach(function (b) { b.onclick = function () { goalView(b.dataset.gv); }; });
+      $('[data-x="new"]', w).onclick = function () { goalEdit(''); };
+    }
+    function goalEdit(id) {
+      var g = goals().filter(function (x) { return x.id === id; })[0] || {};
+      var w = sheet(id ? 'Edit goal' : 'New goal', '<label class="l" for="gl-n">Goal</label><input class="in" id="gl-n" maxlength="40" value="' + esc(g.n || '') + '" placeholder="e.g. New phone, school fees, travel">' +
+        '<label class="l" for="gl-t">Target</label><div class="amt sm"><input id="gl-t" type="number" inputmode="decimal" placeholder="0.00" value="' + (g.t || '') + '"><span>π</span></div><div class="hint num" id="gl-c"></div>' +
+        '<label class="l" for="gl-d">Target date (optional)</label><input class="in" id="gl-d" type="date" min="' + iso(Date.now() + 864e5) + '" value="' + (g.d ? iso(g.d) : '') + '">' +
+        '<button type="button" class="btn" id="gl-go">' + ic('check') + 'Save goal</button>' + (id ? '<button type="button" class="btn danger" id="gl-rm">' + ic('trash') + 'Delete goal</button>' : ''), { stack: true });
+      var ti = $('#gl-t', w); ti.oninput = function () { $('#gl-c', w).textContent = conv(r7(ti.value)); }; ti.oninput();
+      $('#gl-go', w).onclick = function () {
+        var n = $('#gl-n', w).value.trim(), t = r7(ti.value), dv = $('#gl-d', w).value, d = dv ? new Date(dv + 'T12:00:00').getTime() : 0;
+        if (!n) return toast('Name your goal'); if (!(t >= 0.01)) return toast('Enter a target of at least 0.01 π'); if (t > 1e9) return toast('Check the target');
+        if (d && day0(d) <= day0()) return toast('Choose a date after today');
+        var x = { id: id || uid(), n: n, t: t, d: d, ent: g.ent || [], ts: g.ts || Date.now() };
+        put('goals', [x].concat(goals().filter(function (y) { return y.id !== x.id; })).slice(0, 50)); toast('Goal saved'); goalView(x.id);
+      };
+      var rm = $('#gl-rm', w); if (rm) rm.onclick = function () { put('goals', goals().filter(function (y) { return y.id !== id; })); toast('Goal deleted'); goalSheet(); };
+    }
+    function goalView(id) {
+      var g = goals().filter(function (x) { return x.id === id; })[0]; if (!g) return goalSheet();
+      var sv = gSaved(g), left = r7(Math.max(0, g.t - sv)), pc = Math.min(100, Math.round(sv / g.t * 100)), wk = g.d && left > 0 ? Math.max(1, Math.ceil((g.d - Date.now()) / (7 * 864e5))) : 0;
+      var C = 2 * Math.PI * 52, E = (g.ent || []).slice().sort(function (a, b) { return b.ts - a.ts; });
+      var w = sheet(g.n, '<div class="gl-hero"><svg viewBox="0 0 120 120" class="gl-ring" aria-hidden="true"><circle cx="60" cy="60" r="52" fill="none" stroke="#E2E8F0" stroke-width="12"/><circle cx="60" cy="60" r="52" fill="none" stroke="url(#glg)" stroke-width="12" stroke-linecap="round" stroke-dasharray="' + C.toFixed(1) + '" stroke-dashoffset="' + (C * (1 - pc / 100)).toFixed(1) + '" transform="rotate(-90 60 60)"/><defs><linearGradient id="glg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#1543E0"/><stop offset="1" stop-color="#14C2AE"/></linearGradient></defs></svg><div class="gl-pc"><b>' + pc + '%</b><small>' + (pc >= 100 ? 'Reached' : 'saved') + '</small></div></div>' +
+        '<div class="stats"><div><small>Saved</small><b class="bz-amt">' + fpi(sv) + ' π</b></div><div><small>Target</small><b class="bz-amt">' + fpi(g.t) + ' π</b></div><div><small>Left</small><b class="bz-amt">' + fpi(left) + ' π</b></div></div>' +
+        (wk ? '<div class="note gl-plan">' + ic('cal') + '<span>Save ' + fpi(r7(Math.ceil(left / wk * 100) / 100)) + ' π a week to reach it by ' + dstr(g.d) + '.</span></div>' : '') +
+        '<div class="two"><button type="button" class="btn" data-x="add">' + ic('plus') + 'Add savings</button><button type="button" class="btn ghost" data-x="out">' + ic('minus') + 'Take out</button></div>' +
+        '<div class="day">History</div><div class="list">' + (E.length ? E.slice(0, 60).map(function (e) { return '<div class="li"><span class="ico ' + (e.a < 0 ? 'rf' : 'in') + '">' + ic(e.a < 0 ? 'minus' : 'plus') + '</span><span class="grow"><b>' + esc(e.note || (e.a < 0 ? 'Taken out' : 'Saved')) + '</b><small>' + dstr(e.ts) + '</small></span><span class="amt-r"><b class="num bz-amt">' + (e.a < 0 ? '−' : '+') + fpi(Math.abs(e.a)) + ' π</b></span></div>'; }).join('') : '<div class="empty">' + ic('star') + '<div>Add what you set aside to see your progress.</div></div>') + '</div>' +
+        '<button type="button" class="btn soft" data-x="ed">' + ic('edit') + 'Edit goal</button>');
+      function entry(sign) {
+        var w2 = sheet(sign > 0 ? 'Add savings' : 'Take out', '<label class="l" for="ge-a">Amount</label><div class="amt sm"><input id="ge-a" type="number" inputmode="decimal" placeholder="0.00"><span>π</span></div><div class="hint num" id="ge-c"></div><label class="l" for="ge-n">Note (optional)</label><input class="in" id="ge-n" maxlength="40" placeholder="' + (sign > 0 ? 'e.g. This week' : 'e.g. Used for fees') + '"><button type="button" class="btn" id="ge-go">' + ic('check') + 'Save</button>', { stack: true });
+        var ai = $('#ge-a', w2); ai.oninput = function () { $('#ge-c', w2).textContent = conv(r7(ai.value)); }; setTimeout(function () { try { ai.focus(); } catch (e) {} }, 200);
+        $('#ge-go', w2).onclick = function () {
+          var a = r7(ai.value); if (!(a >= 0.01)) return toast('Enter at least 0.01 π'); if (sign < 0 && a > gSaved(g) + 1e-7) return toast('You have ' + fpi(gSaved(g)) + ' π in this goal');
+          var before = gSaved(g);
+          put('goals', goals().map(function (y) { if (y.id === id) y.ent = (y.ent || []).concat([{ ts: Date.now(), a: sign * a, note: $('#ge-n', w2).value.trim() }]).slice(-500); return y; }));
+          var now = goals().filter(function (y) { return y.id === id; })[0];
+          if (sign > 0 && before < g.t && gSaved(now) >= g.t) { fx('paid'); K.addNote('star', 'Goal reached', g.n + ' · ' + fpi(g.t) + ' π', 'goal-' + id); } else toast('Saved');
+          goalView(id);
+        };
+      }
+      $('[data-x="add"]', w).onclick = function () { entry(1); };
+      $('[data-x="out"]', w).onclick = function () { entry(-1); };
+      $('[data-x="ed"]', w).onclick = function () { goalEdit(id); };
+    }
+
+    /* ── group collections: one link for a family, community or event fund, with live progress ── */
+    function cols() { return get('cols', []); }
+    function colCode() { var A = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789', c = ''; for (var i = 0; i < 6; i++) c += A[Math.floor(Math.random() * 32)]; return 'COL-' + c; }
+    function colPays(c) { var re = new RegExp('\\b' + c.code + '\\b', 'i'); return incoming().filter(function (r) { return r.ts >= c.ts - 60e3 && re.test(String(r.narr || '')); }).sort(function (a, b) { return b.ts - a.ts; }); }
+    function colLink(c) { return K.payLink({ u: c.to, a: c.each || '', x: (c.code + ' · ' + c.n).slice(0, 80) }); }
+    function colSheet() {
+      var C = cols();
+      var w = sheet('Group collections', '<div class="list">' + (C.length ? C.map(function (c) { var P = colPays(c), got = sum(P), pc = c.t ? Math.min(100, Math.round(got / c.t * 100)) : 0; return '<button type="button" class="li gl-li" data-cv="' + c.id + '"><span class="ico">' + ic('users') + '</span><span class="grow"><b>' + esc(c.n) + '</b><small>' + fpi(got) + (c.t ? ' of ' + fpi(c.t) : '') + ' π · ' + P.length + ' contribution' + (P.length === 1 ? '' : 's') + (c.off ? ' · closed' : '') + '</small>' + (c.t ? '<span class="bar gl-bar"><i style="width:' + Math.max(2, pc) + '%"></i></span>' : '') + '</span><span class="go">' + ic('chev') + '</span></button>'; }).join('')
+        : '<div class="empty">' + ic('users') + '<div>Collect for a family need, a community project or an event. Everyone pays with one link.</div></div>') + '</div>' +
+        '<button type="button" class="btn" data-x="new">' + ic('plus') + 'New collection</button>');
+      $$('[data-cv]', w).forEach(function (b) { b.onclick = function () { colView(b.dataset.cv); }; });
+      $('[data-x="new"]', w).onclick = function () { colEdit(''); };
+    }
+    function colEdit(id) {
+      if (K.needTarget('Group collection')) return;
+      var c = cols().filter(function (x) { return x.id === id; })[0] || {};
+      var w = sheet(id ? 'Edit collection' : 'New collection', '<label class="l" for="cl-n">Collection for</label><input class="in" id="cl-n" maxlength="40" value="' + esc(c.n || '') + '" placeholder="e.g. Wedding gift, mosque repair, team trip">' +
+        '<div class="two bz-two"><div><label class="l" for="cl-t">Target (optional)</label><div class="amt sm"><input id="cl-t" type="number" inputmode="decimal" placeholder="0.00" value="' + (c.t || '') + '"><span>π</span></div></div><div><label class="l" for="cl-e">Each person (optional)</label><div class="amt sm"><input id="cl-e" type="number" inputmode="decimal" placeholder="Any" value="' + (c.each || '') + '"><span>π</span></div></div></div>' +
+        '<label class="l" for="cl-d">End date (optional)</label><input class="in" id="cl-d" type="date" min="' + iso(Date.now()) + '" value="' + (c.d ? iso(c.d) : '') + '">' +
+        '<button type="button" class="btn" id="cl-go">' + ic('check') + (id ? 'Save' : 'Create collection') + '</button>', { stack: true });
+      $('#cl-go', w).onclick = function () {
+        var n = $('#cl-n', w).value.trim(), t = r7($('#cl-t', w).value), e = r7($('#cl-e', w).value), dv = $('#cl-d', w).value;
+        if (!n) return toast('Name the collection'); if ($('#cl-t', w).value && !(t >= 0.01)) return toast('The target must be at least 0.01 π'); if ($('#cl-e', w).value && !(e >= 0.01)) return toast('Each person’s amount must be at least 0.01 π');
+        if (t && e && e > t) return toast('Each person’s amount is more than the target');
+        var x = { id: id || uid(), code: c.code || colCode(), n: n, t: t || 0, each: e || 0, d: dv ? new Date(dv + 'T23:59:00').getTime() : 0, to: c.to || K.myTarget(), ts: c.ts || Date.now(), off: !!c.off };
+        put('cols', [x].concat(cols().filter(function (y) { return y.id !== x.id; })).slice(0, 50)); toast(id ? 'Saved' : 'Collection ready'); colView(x.id);
+      };
+    }
+    function colCanvas(c) {
+      var P = colPays(c), got = sum(P), pc = c.t ? Math.min(1, got / c.t) : 0, W = 1080, H = 1350, X = 80, cv = document.createElement('canvas'); cv.width = W; cv.height = H; var x = cv.getContext('2d'), FR = window.FPReceipt || {};
+      var g = x.createLinearGradient(0, 0, W, H); g.addColorStop(0, '#061A4F'); g.addColorStop(.55, '#1543E0'); g.addColorStop(1, '#0A9488'); x.fillStyle = g; x.fillRect(0, 0, W, H); if (FR.guilloche) FR.guilloche(x, 0, 0, W, H, '#FFFFFF', .07);
+      T(x, 'GROUP COLLECTION', X, 130, '700 26px ' + FONT, '#99F6E4'); x.font = '800 60px ' + FONT; wrap(x, c.n, W - 2 * X).slice(0, 2).forEach(function (l, i) { T(x, l, X, 210 + i * 72, '800 60px ' + FONT, '#fff'); });
+      T(x, fpi(got) + ' π', X, 420, '800 84px ' + MONO, '#fff'); T(x, (c.t ? 'raised of ' + fpi(c.t) + ' π' : 'raised') + ' · ' + P.length + ' contribution' + (P.length === 1 ? '' : 's'), X, 472, '600 28px ' + FONT, 'rgba(255,255,255,.85)');
+      if (c.t) { x.fillStyle = 'rgba(255,255,255,.22)'; rr(x, X, 510, W - 2 * X, 26, 13); x.fill(); x.fillStyle = '#5EEAD4'; rr(x, X, 510, Math.max(26, (W - 2 * X) * pc), 26, 13); x.fill(); }
+      x.fillStyle = '#fff'; rr(x, W / 2 - 250, 610, 500, 500, 36); x.fill();
+      if (window.FPQR) { var q = FPQR.canvas(colLink(c), 900, '#0A1F55', '#FFFFFF'); x.drawImage(q, W / 2 - 220, 640, 440, 440); }
+      T(x, 'Scan with FinPi to contribute' + (c.each ? ' · ' + fpi(c.each) + ' π each' : ''), W / 2, 1170, '700 30px ' + FONT, '#fff', 'center');
+      T(x, bizName() + (c.d ? ' · until ' + dstr(c.d) : ''), W / 2, 1218, '500 26px ' + FONT, 'rgba(255,255,255,.85)', 'center');
+      T(x, 'FinPi · ' + K.NETN + ' · ' + c.code, W / 2, H - 50, '600 22px ' + MONO, 'rgba(255,255,255,.7)', 'center');
+      return Promise.resolve(cv);
+    }
+    function colView(id) {
+      var c = cols().filter(function (x) { return x.id === id; })[0]; if (!c) return colSheet();
+      var P = colPays(c), got = sum(P), pc = c.t ? Math.min(100, Math.round(got / c.t * 100)) : 0, link = colLink(c);
+      var txt = function () { return c.n + ' · group collection' + (c.t ? ' · target ' + fpi(c.t) + ' π' : '') + (c.each ? ' · ' + fpi(c.each) + ' π each' : '') + '\nContribute with FinPi:\n' + link; };
+      var w = sheet(c.n, '<div class="big bz-big"><div class="bz-row"><span class="bz-st ' + (c.off ? 'off' : 'ok') + '">' + (c.off ? 'Closed' : 'Open') + '</span><span class="small">' + esc(c.code) + '</span></div><div class="v bz-amt">' + fpi(got) + ' π</div><div class="c">' + (c.t ? pc + '% of ' + fpi(c.t) + ' π' : 'Raised so far') + ' · ' + P.length + ' contribution' + (P.length === 1 ? '' : 's') + '</div>' + (c.t ? '<div class="bar gl-bar on-dark"><i style="width:' + Math.max(2, pc) + '%"></i></div>' : '') + (c.d ? '<div class="w">Until ' + dstr(c.d) + '</div>' : '') + '</div>' +
+        (c.off ? '' : '<div class="two"><button type="button" class="btn" data-x="lk">' + ic('share') + 'Share link</button><button type="button" class="btn ghost" data-x="cp">' + ic('copy') + 'Copy link</button></div>') +
+        '<div class="day">Contributions</div><div class="list">' + (P.length ? P.slice(0, 100).map(function (r) { var p = payer(r); return '<div class="li"><span class="ico in">' + ic('heart') + '</span><span class="grow"><b>' + esc(K.isG(p) ? K.short(p) : who(p)) + '</b><small>' + new Date(r.ts).toLocaleString('en-GB', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }) + '</small></span><span class="amt-r"><b class="num bz-amt">+' + fpi(r.amount) + ' π</b></span></div>'; }).join('') : '<div class="empty">' + ic('heart') + '<div>Contributions appear here as they arrive.</div></div>') + '</div>' +
+        '<div class="day">Progress card</div><div class="bz-prev">Preparing…</div>' + fileBtns('') +
+        '<div class="day">Manage</div><div class="list">' + (c.off ? '' : row('edit', 'Edit', 'Name, target and amount', 'x', ' data-cx="ed"')) + row(c.off ? 'repeat' : 'x', c.off ? 'Reopen' : 'Close collection', c.off ? 'Accept contributions again' : 'The link stays valid; mark it as finished', 'x', ' data-cx="tog"') + row('down', 'Contributions (CSV)', 'Who gave and when', 'x', ' data-cx="csv"') + row('trash', 'Delete', 'Remove it from this phone', 'x', ' data-cx="del"') + '</div>');
+      fileActions(w, function () { return colCanvas(c); }, 'FinPi-collection-' + c.code, 'collection card', 'FinPi collection ' + c.n, txt);
+      var lk = $('[data-x="lk"]', w); if (lk) lk.onclick = function () { K.shareText(c.n, txt()); };
+      var cp = $('[data-x="cp"]', w); if (cp) cp.onclick = function () { K.copy(link); };
+      $$('[data-cx]', w).forEach(function (b) {
+        b.removeAttribute('data-act');
+        b.onclick = function () {
+          var k = b.dataset.cx;
+          if (k === 'ed') return colEdit(id);
+          if (k === 'tog') { put('cols', cols().map(function (y) { if (y.id === id) y.off = !y.off; return y; })); toast(c.off ? 'Collection reopened' : 'Collection closed'); return colView(id); }
+          if (k === 'csv') { if (!P.length) return toast('No contributions yet'); return csvOut([['date', 'time', 'from', 'amount_pi', 'transaction_id']].concat(P.slice().reverse().map(function (r) { return [iso(r.ts), new Date(r.ts).toTimeString().slice(0, 5), payer(r), r.amount, r.txid || '']; })), 'FinPi-' + c.code + '.csv', 'FinPi collection'); }
+          if (k === 'del') { put('cols', cols().filter(function (y) { return y.id !== id; })); toast('Collection deleted'); colSheet(); }
+        };
+      });
+    }
+    // a contribution arriving: one notification each
+    K.HK.rcpt.push(function (r) {
+      if (!r || r.dir !== 'in' || !/COL-[A-Z2-9]{6}/i.test(String(r.narr || ''))) return;
+      var c = cols().filter(function (x) { return new RegExp('\\b' + x.code + '\\b', 'i').test(String(r.narr || '')); })[0]; if (!c) return;
+      var got = sum(colPays(c)); K.addNote('heart', 'Contribution received', c.n + ' · ' + fpi(r.amount) + ' π from ' + who(payer(r)) + ' · ' + fpi(got) + (c.t ? ' of ' + fpi(c.t) : '') + ' π', 'col-' + rkey(r));
+      if (c.t && got >= c.t && got - Number(r.amount) < c.t) K.addNote('star', 'Collection target reached', c.n + ' · ' + fpi(got) + ' π', 'colt-' + c.id);
+    });
+
     /* ── recurring requests ── */
     function recSheet() {
       var R = recs();
@@ -1169,7 +1297,7 @@
     };
     K.HK.html.settings = function () { return row('store', 'Business profile', biz().name ? K.NTYPE[K.nType() === 'name' ? 'business' : K.nType()].l + ' · ' + biz().name : 'Name, logo, address, tax ID', 'bizprof') + row('sound', 'Payment sounds', get('sound', true) ? 'On · sound and vibration' : 'Off', 'sound') + row(get('hide', false) ? 'eyeoff' : 'eye', 'Hide amounts', get('hide', false) ? 'On' : 'Off', 'hide'); };
     Object.assign(K.A, {
-      biz: function () { bizSheet(); }, bizreport: function () { reportSheet(); }, expenses: function () { expSheet(); }, daysum: function () { daySheet(); }, staff: function () { staffSheet(); }, taxsum: function () { taxSheet(); }, sale: function () { saleSheet(); }, prods: function () { prodSheet(); }, 'inv-new': function () { invEdit(''); }, invs: function () { invList(); }, cust: function () { custSheet(); }, recur: recSheet, myqr: qrSheet, bizprof: profSheet, reports: repSheet,
+      biz: function () { bizSheet(); }, bizreport: function () { reportSheet(); }, expenses: function () { expSheet(); }, daysum: function () { daySheet(); }, staff: function () { staffSheet(); }, taxsum: function () { taxSheet(); }, goals: function () { goalSheet(); }, collect: function () { colSheet(); }, sale: function () { saleSheet(); }, prods: function () { prodSheet(); }, 'inv-new': function () { invEdit(''); }, invs: function () { invList(); }, cust: function () { custSheet(); }, recur: recSheet, myqr: qrSheet, bizprof: profSheet, reports: repSheet,
       hide: toggleHide,
       sound: function () { put('sound', !get('sound', true)); if (get('sound', true)) { ac(); fx('in'); } toast(get('sound', true) ? 'Payment sounds on' : 'Payment sounds off'); K.rerender(); }
     });

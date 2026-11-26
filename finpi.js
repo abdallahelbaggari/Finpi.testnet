@@ -1127,12 +1127,36 @@
 
   /* ── month maths ── */
   function monthRange(off) { var d = new Date(); d.setDate(1); d.setHours(0, 0, 0, 0); d.setMonth(d.getMonth() + (off || 0)); var e = new Date(d); e.setMonth(e.getMonth() + 1); return [d.getTime(), e.getTime(), d]; }
+  function catKey(r) { return String(r.other || r.addr || '').replace(/^@/, '').toLowerCase(); }
+  function catOf(r) { return r.cat || (get('catMap', {}) || {})[catKey(r)] || ''; }
+  function rkeyOf(r) { return String(r.txid || r.pid || r.ts); }
+  function catSort(off) {
+    var m = monthRange(off || 0), L = rcpts().filter(function (r) { return r.dir === 'out' && r.kind !== 'refund' && r.kind !== 'supporter' && r.ts >= m[0] && r.ts < m[1] && !catOf(r); }).sort(function (a, b) { return b.ts - a.ts; });
+    if (!L.length) { toast('All payments are sorted'); return render(S.tab); }
+    var w = sheet('Sort payments', '<p class="small muted" style="margin:0 2px 10px">Choose a category. FinPi remembers it for the same recipient.</p><div class="list">' + L.slice(0, 40).map(function (r) { return '<div class="li cs-li" data-ck="' + esc(rkeyOf(r)) + '"><span class="grow"><b>' + esc(r.other || short(r.addr)) + '</b><small>' + new Date(r.ts).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }) + (r.narr ? ' · ' + esc(r.narr) : '') + '</small></span><b class="num">−' + fpi(r.amount) + ' π</b><div class="chips cs-ch">' + CATS.map(function (c) { return '<button type="button" class="chip" data-cc="' + c + '">' + c + '</button>'; }).join('') + '</div></div>'; }).join('') + '</div>');
+    $$('[data-cc]', w).forEach(function (b) {
+      b.onclick = function () {
+        var li = b.closest('[data-ck]'), k = li.dataset.ck, c = b.dataset.cc, R = rcpts(), hit = null;
+        R.forEach(function (r) { if (rkeyOf(r) === k) { r.cat = c; hit = r; } });
+        if (!hit) return; put('rcpts', R); var mp = get('catMap', {}) || {}; mp[catKey(hit)] = c; put('catMap', mp);
+        var gone = $$('[data-ck]', w).filter(function (x) { var r = R.filter(function (y) { return rkeyOf(y) === x.dataset.ck; })[0]; return r && catOf(r); });
+        gone.forEach(function (x) { x.classList.add('done'); setTimeout(function () { x.remove(); if (!$('[data-ck]', w)) { w.remove(); render(S.tab); toast('All payments are sorted'); } }, 260); });
+      };
+    });
+  }
+  function trendSvg() {
+    var B = [], L = [];
+    for (var i = -5; i <= 0; i++) { var s0 = monthStats(i); B.push(Math.max(0, s0.out)); L.push(monthRange(i)[2].toLocaleDateString('en-GB', { month: 'short' })); }
+    var mx = Math.max.apply(null, B.concat([0])), W = 300, H = 90, bw = W / 6;
+    return '<svg class="tr-ch" viewBox="0 0 ' + W + ' ' + (H + 18) + '" role="img" aria-label="Spending in the last 6 months">' + B.map(function (v, i) { var h = mx ? Math.max(v ? 4 : 2, v / mx * (H - 16)) : 2; return '<rect x="' + (i * bw + bw * .22).toFixed(1) + '" y="' + (H - h).toFixed(1) + '" width="' + (bw * .56).toFixed(1) + '" height="' + h.toFixed(1) + '" rx="5" fill="' + (i === 5 ? '#1543E0' : '#BFD0FF') + '"><title>' + fpi(r7(v)) + ' π</title></rect>' + (v ? '<text x="' + (i * bw + bw / 2).toFixed(1) + '" y="' + (H - h - 4).toFixed(1) + '" text-anchor="middle" font-size="8.5" fill="#475569">' + fpi(Math.round(v)) + '</text>' : ''); }).join('') +
+      L.map(function (l, i) { return '<text x="' + (i * bw + bw / 2).toFixed(1) + '" y="' + (H + 14) + '" text-anchor="middle" font-size="9.5" fill="#64748B"' + (i === 5 ? ' font-weight="700"' : '') + '>' + l + '</text>'; }).join('') + '</svg>';
+  }
   function monthStats(off) {
     var m = monthRange(off), o = { out: 0, inn: 0, n: 0, cats: {} };
     rcpts().forEach(function (r) {
       if (r.ts < m[0] || r.ts >= m[1]) return; o.n++;
       if (r.kind === 'refund') { o.out -= Number(r.amount); return; }
-      if (r.dir === 'in') o.inn += Number(r.amount); else { o.out += Number(r.amount); var c = r.kind === 'supporter' ? 'Other' : (r.cat || 'Other'); o.cats[c] = (o.cats[c] || 0) + Number(r.amount); }
+      if (r.dir === 'in') o.inn += Number(r.amount); else { o.out += Number(r.amount); var c = r.kind === 'supporter' ? 'Other' : (catOf(r) || 'Not sorted'); o.cats[c] = (o.cats[c] || 0) + Number(r.amount); }
     });
     o.out = r7(Math.max(0, o.out)); o.inn = r7(o.inn); return o;
   }
@@ -1291,6 +1315,7 @@
     { id: 'myqr', n: 'My Pi QR', s: 'Poster to print or share', i: 'qr', c: 't', g: 'get', a: 'myqr' },
     { id: 'invoice', n: 'Invoices', s: 'Paid automatically on arrival', i: 'inv', c: 'n', g: 'get', a: 'invs' },
     { id: 'split', n: 'Split a bill', s: 'Request each share', i: 'users', c: 'a', g: 'get', a: 'split' },
+    { id: 'collect', n: 'Group collection', s: 'One link for a family or event fund', i: 'heart', c: 't', g: 'get', a: 'collect' },
     { id: 'sale', n: 'Quick sale', s: 'Charge a customer by QR', i: 'card', c: 'g', g: 'biz', a: 'sale' },
     { id: 'prod', n: 'Products', s: 'Catalog, prices and stock', i: 'tag', c: 'a', g: 'biz', a: 'prods' },
     { id: 'biz', n: 'Dashboard', s: 'Sales and outstanding', i: 'bars', c: 'b', g: 'biz', a: 'biz' },
@@ -1312,7 +1337,8 @@
     { id: 'csv', n: 'Export CSV', s: 'Your payments as a file', i: 'down', c: 'a', g: 'rec', a: 'csv' },
     { id: 'rems', n: 'Reminders', s: 'Rent, fees, regular payments', i: 'bell', c: 'a', g: 'plan', a: 'rems' },
     { id: 'budget', n: 'Budget', s: 'Monthly spending limit', i: 'pie', c: 't', g: 'plan', a: 'budget' },
-    { id: 'insights', n: 'Insights', s: 'Where your Pi goes', i: 'bars', c: 'b', g: 'plan', a: 'insights' },
+    { id: 'goals', n: 'Savings goals', s: 'Track progress to a goal', i: 'star', c: 'g', g: 'plan', a: 'goals' },
+    { id: 'insights', n: 'Spending', s: 'Categories and monthly trend', i: 'pie', c: 'b', g: 'plan', a: 'insights' },
     { id: 'alerts', n: 'Price alerts', s: 'When Pi reaches your price', i: 'act', c: 'n', g: 'plan', a: 'alerts' },
     { id: 'wallet', n: 'Pi rate', s: 'Live rate and converter', i: 'conv', c: 'b', g: 'wal', tab: 'wallet' },
     { id: 'checkaddr', n: 'Check address', s: 'Any Pi wallet address', i: 'search', c: 't', g: 'wal', a: 'check-addr' },
@@ -1411,8 +1437,9 @@
       '<div class="stats"><div><small>Spent</small><b>' + fpi(s.out) + ' π</b></div><div><small>Received</small><b class="pos">' + fpi(s.inn) + ' π</b></div><div><small>Net</small><b>' + (s.inn - s.out >= 0 ? '+' : '−') + fpi(Math.abs(r7(s.inn - s.out))) + ' π</b></div></div>' +
       (u ? '<p class="small muted" style="margin-top:8px">Spent ≈ ' + money(s.out * u, 'USD') + (r && c !== 'USD' ? ' · ' + money(s.out * r, c) : '') + ' at today’s rate</p>' : '') +
       (b && S.month === 0 ? '<div class="row small" style="margin-top:12px"><span class="grow muted">Monthly budget ' + fpi(b) + ' π</span><b class="num">' + Math.round(s.out / b * 100) + '%</b></div><div class="bar"><i class="' + (s.out > b ? 'over' : '') + '" style="width:' + Math.min(100, s.out / b * 100) + '%"></i></div>' + (s.out > b ? '<div class="note warn" style="margin-top:10px">' + ic('warn') + '<span>You are ' + fpi(r7(s.out - b)) + ' π over your budget this month.</span></div>' : '') : '') + '</div>' +
+      '<div class="card tr-card"><div class="row small"><b class="grow">Spending · last 6 months</b><span class="muted">π</span></div>' + trendSvg() + '</div>' +
       '<div class="sec"><h2>Where your Pi went</h2><button type="button" data-act="budget">' + (b ? 'Edit budget' : 'Set budget') + '</button></div>' +
-      (cats.length ? '<div class="card">' + cats.map(function (x) { return '<div class="cat"><div class="row"><span>' + esc(x[0]) + '</span><b>' + fpi(x[1]) + ' π</b></div><div class="bar"><i style="width:' + Math.max(4, x[1] / top * 100) + '%"></i></div><small>' + Math.round(x[1] / (s.out || 1) * 100) + '% of spending</small></div>'; }).join('') + '</div>'
+      (cats.length ? '<div class="card">' + cats.map(function (x) { return '<div class="cat' + (x[0] === 'Not sorted' ? ' ns' : '') + '"><div class="row"><span>' + esc(x[0]) + '</span><b>' + fpi(x[1]) + ' π</b></div><div class="bar"><i style="width:' + Math.max(4, x[1] / top * 100) + '%"></i></div><small>' + Math.round(x[1] / (s.out || 1) * 100) + '% of spending' + (x[0] === 'Not sorted' ? ' · <button type="button" class="lnk" data-act="catsort">Sort these payments</button>' : '') + '</small></div>'; }).join('') + '</div>'
         : '<div class="list"><div class="empty">' + ic('pie') + '<div>No spending this month. Choose a category when you send Pi to see it here.</div></div></div>');
   }
 
@@ -1866,7 +1893,7 @@
       };
       var t = $('#ps-t', w); if (t) t.onclick = function () { addNote('bell', 'FinPi notifications', 'Alerts are working.', 'test-' + Date.now()); toast('Test sent'); };
     },
-    resolvepend: function () { window.fpResolvePending(); }, backup: function () { backupSheet(); }, travel: function () { curSheet(true); }, insights: function () { S.seg = 'ins'; go('activity'); }, repair: function () { repairSheet(); },
+    resolvepend: function () { window.fpResolvePending(); }, backup: function () { backupSheet(); }, travel: function () { curSheet(true); }, insights: function () { S.seg = 'ins'; go('activity'); }, catsort: function () { catSort(S.month); }, repair: function () { repairSheet(); },
     security: function () {
       sheet('Trust center', '<div class="trust big-t">' + trustChips() + '</div>' +
         '<div class="card" style="margin-top:12px"><h3>Payments</h3><p>Every transfer is processed through Pi Network’s official payments and delivered within seconds. If delivery is not possible, the Pi is refunded automatically. Each payment is checked on the Pi blockchain, so nothing is paid twice.</p></div>' +
