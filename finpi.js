@@ -285,7 +285,13 @@
   function saveRcpt(r) {
     var R = rcpts(); if (r.txid && R.some(function (x) { return x.txid === r.txid; })) return false;
     var c = curr(); r.usd = r.usd || rateIn('USD'); r.lc = c; r.lr = rateIn(c); r.net = r.net || NETN; r.ts = r.ts || Date.now(); r.saved = Date.now();
-    R.unshift(r); R.sort(function (a, b) { return (b.ts || 0) - (a.ts || 0); }); put('rcpts', R.slice(0, LCAP)); try { remMatch(r); } catch (e) {} HK.rcpt.forEach(function (f) { try { f(r); } catch (e) {} }); hSoon(); return true;
+    R.unshift(r); R.sort(function (a, b) { return (b.ts || 0) - (a.ts || 0); }); put('rcpts', R.slice(0, LCAP)); try { remMatch(r); } catch (e) {} HK.rcpt.forEach(function (f) { try { f(r); } catch (e) {} }); if (r.dir === 'out' && Date.now() - r.ts < 864e5) { try { budgetCheck(); } catch (e) {} } hSoon(); return true;
+  }
+  // monthly budget: one notice at 80% and one when it is passed
+  function budgetCheck() {
+    var b = get('budget', 0); if (!(b > 0)) return; var s0 = monthStats(0), m = new Date(), key = m.getFullYear() + '-' + (m.getMonth() + 1), st = get('budN', {}) || {};
+    var lvl = s0.out >= b ? 2 : s0.out >= b * 0.8 ? 1 : 0; if (!lvl || (st.k === key && st.l >= lvl)) return;
+    put('budN', { k: key, l: lvl }); addNote('warn', lvl === 2 ? 'Monthly budget passed' : 'Monthly budget 80% used', fpi(r7(s0.out)) + ' of ' + fpi(b) + ' π spent this month', 'bud-' + key + '-' + lvl);
   }
   /* ── full history, backed up on the server for this Pi account (never lost, no size limit) ── */
   function hKey(r) { var t = String(r.txid || '').toLowerCase(); if (/^[a-f0-9]{64}$/.test(t)) return 'tx:' + t + (r.kind === 'refund' ? ':r' : '') + (r.dir ? ':' + r.dir : ''); var f = String(r.ref || r.pid || ''); return f ? 'ref:' + f : ''; }
@@ -1987,7 +1993,7 @@
     kit: { HK: HK, P: P, A: A, T: T, get: get, put: put, esc: esc, ic: ic, toast: toast, sheet: sheet, closeSheets: closeSheets, copy: copy, fpi: fpi, conv: conv, money: money, rateIn: rateIn, curr: curr, short: short, r7: r7,
       rcpts: rcpts, me: me, signedIn: signedIn, myTarget: myTarget, needTarget: needTarget, payLink: payLink, isG: isG, validG: validG, cName: cName, contacts: contacts, toLabel: toLabel,
       shareText: shareText, shareImage: shareImage, shareLink: shareLink, shareFile: shareFile, saveFile: saveFile, canShareFile: canShareFile, makePdf: makePdf, fontsReady: fontsReady, addNote: addNote,
-      go: go, rerender: rerender, scanBox: scanBox, scanOk: scanOk, nType: nType, NTYPE: NTYPE, setName: setName, curSheet: curSheet, api: api, token: function () { return S.token; }, NETN: NETN, TEST: TEST, USER_RE: USER_RE, rcptTitle: rcptTitle } };
+      go: go, rerender: rerender, scanBox: scanBox, scanOk: scanOk, budgetCheck: budgetCheck, nType: nType, NTYPE: NTYPE, setName: setName, curSheet: curSheet, api: api, token: function () { return S.token; }, NETN: NETN, TEST: TEST, USER_RE: USER_RE, rcptTitle: rcptTitle } };
   try { document.dispatchEvent(new Event('finpi:ready')); } catch (e) {}
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', start); else start();
 })();

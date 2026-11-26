@@ -48,6 +48,8 @@ export async function onRequestPost({ request, env }) {
         if (!NO_RE.test(no) || !no.startsWith('INV-S' + s.n + '-') || !(ts > Date.now() - 7 * 864e5 && ts < Date.now() + 864e5) || !items.length) return json({ ok: false, error: 'Sale details are not valid' });
         const sale = { no, ts: Math.round(ts), items: items.map((it) => ({ d: String(it.d || '').slice(0, 60), q: num(it.q), p: num(it.p), pid: String(it.pid || '').slice(0, 24), tip: it.tip ? 1 : 0 })).filter((it) => it.d && it.q > 0 && it.p >= 0), disc: Math.max(0, num(x.disc) || 0), total: num(x.total), note: String(x.note || '').slice(0, 40), staff: String(x.staff || '').slice(0, 30) };
         const str = JSON.stringify(sale); if (str.length > MAX_SALE || !(sale.total > 0)) return json({ ok: false, error: 'Sale details are not valid' });
+        const today = await d.prepare('SELECT COUNT(*) AS k FROM staff_sales WHERE code = ? AND ts > ?').bind(code, Date.now() - 864e5).first();
+        if (today && today.k >= 1000) return json({ ok: false, error: 'Daily sale limit reached for this staff link' });
         await d.prepare('INSERT OR IGNORE INTO staff_sales (uid, no, code, ts, data, paid) VALUES (?, ?, ?, ?, ?, 0)').bind(s.uid, no, code, sale.ts, str).run();
         return json({ ok: true });
       }
