@@ -1222,6 +1222,19 @@
       };
     });
   }
+  // forecast from your own history: the daily average of the last 90 days, plus scheduled reminders
+  function forecastHTML(b) {
+    var now = Date.now(), out = rcpts().filter(function (r) { return r.dir === 'out' && r.kind !== 'refund' && r.kind !== 'supporter' && now - r.ts < 90 * 864e5; });
+    var first = out.reduce(function (a, r) { return Math.min(a, r.ts); }, now), days = Math.min(90, (now - first) / 864e5);
+    if (out.length < 3 || days < 14) return '<div class="card fc-card"><div class="row small"><b class="grow">Spending forecast</b></div><p class="small muted" style="margin:6px 0 0">Available after two weeks of payments.</p></div>';
+    var daily = out.reduce(function (a, r) { return a + Number(r.amount); }, 0) / Math.max(days, 1), m = monthRange(0), m1 = monthRange(1), left = Math.max(0, (m[1] - now) / 864e5), nd = (m1[1] - m1[0]) / 864e5;
+    var remIn = function (a, z) { return rems().filter(function (q) { return q.next >= a && q.next < z; }).reduce(function (s0, q) { return s0 + Number(q.amt || 0); }, 0); };
+    var spent = monthStats(0).out, endM = r7(spent + daily * left + remIn(now, m[1])), nextM = r7(daily * nd + remIn(m1[0], m1[1]));
+    var over = b > 0 && endM > b;
+    return '<div class="card fc-card"><div class="row small"><b class="grow">Spending forecast</b><span class="muted">from your last ' + Math.round(days) + ' days</span></div>' +
+      '<div class="stats" style="margin-top:8px"><div><small>By month end</small><b class="' + (over ? 'neg' : '') + '">' + fpi(Math.round(endM * 100) / 100) + ' π</b></div><div><small>Next month</small><b>' + fpi(Math.round(nextM * 100) / 100) + ' π</b></div><div><small>Per day</small><b>' + fpi(Math.round(daily * 100) / 100) + ' π</b></div></div>' +
+      (over ? '<div class="note warn" style="margin-top:10px">' + ic('warn') + '<span>At this pace you will pass your budget of ' + fpi(b) + ' π this month.</span></div>' : '') + '</div>';
+  }
   function trendSvg() {
     var B = [], L = [];
     for (var i = -5; i <= 0; i++) { var s0 = monthStats(i); B.push(Math.max(0, s0.out)); L.push(monthRange(i)[2].toLocaleDateString('en-GB', { month: 'short' })); }
@@ -1415,6 +1428,7 @@
     { id: 'csv', n: 'Export CSV', s: 'Your payments as a file', i: 'down', c: 'a', g: 'rec', a: 'csv' },
     { id: 'rems', n: 'Reminders', s: 'Rent, fees, regular payments', i: 'bell', c: 'a', g: 'plan', a: 'rems' },
     { id: 'budget', n: 'Budget', s: 'Monthly spending limit', i: 'pie', c: 't', g: 'plan', a: 'budget' },
+    { id: 'networth', n: 'Net worth', s: 'What you own and owe', i: 'pie', c: 'n', g: 'plan', a: 'networth' },
     { id: 'goals', n: 'Savings goals', s: 'Track progress to a goal', i: 'star', c: 'g', g: 'plan', a: 'goals' },
     { id: 'insights', n: 'Spending', s: 'Categories and monthly trend', i: 'pie', c: 'b', g: 'plan', a: 'insights' },
     { id: 'alerts', n: 'Price alerts', s: 'When Pi reaches your price', i: 'act', c: 'n', g: 'plan', a: 'alerts' },
@@ -1529,6 +1543,7 @@
       '<div class="stats"><div><small>Spent</small><b>' + fpi(s.out) + ' π</b></div><div><small>Received</small><b class="pos">' + fpi(s.inn) + ' π</b></div><div><small>Net</small><b>' + (s.inn - s.out >= 0 ? '+' : '−') + fpi(Math.abs(r7(s.inn - s.out))) + ' π</b></div></div>' +
       (u ? '<p class="small muted" style="margin-top:8px">Spent ≈ ' + money(s.out * u, 'USD') + (r && c !== 'USD' ? ' · ' + money(s.out * r, c) : '') + ' at today’s rate</p>' : '') +
       (b && S.month === 0 ? '<div class="row small" style="margin-top:12px"><span class="grow muted">Monthly budget ' + fpi(b) + ' π</span><b class="num">' + Math.round(s.out / b * 100) + '%</b></div><div class="bar"><i class="' + (s.out > b ? 'over' : '') + '" style="width:' + Math.min(100, s.out / b * 100) + '%"></i></div>' + (s.out > b ? '<div class="note warn" style="margin-top:10px">' + ic('warn') + '<span>You are ' + fpi(r7(s.out - b)) + ' π over your budget this month.</span></div>' : '') : '') + '</div>' +
+      (S.month === 0 ? forecastHTML(b) : '') +
       '<div class="card tr-card"><div class="row small"><b class="grow">Spending · last 6 months</b><span class="muted">π</span></div>' + trendSvg() + '</div>' +
       '<div class="sec"><h2>Where your Pi went</h2><button type="button" data-act="budget">' + (b ? 'Edit budget' : 'Set budget') + '</button></div>' +
       (cats.length ? '<div class="card">' + cats.map(function (x) { return '<div class="cat' + (x[0] === 'Not sorted' ? ' ns' : '') + '"><div class="row"><span>' + esc(x[0]) + '</span><b>' + fpi(x[1]) + ' π</b></div><div class="bar"><i style="width:' + Math.max(4, x[1] / top * 100) + '%"></i></div><small>' + Math.round(x[1] / (s.out || 1) * 100) + '% of spending' + (x[0] === 'Not sorted' ? ' · <button type="button" class="lnk" data-act="catsort">Sort these payments</button>' : '') + '</small></div>'; }).join('') + '</div>'
@@ -2068,7 +2083,7 @@
     kit: { HK: HK, P: P, A: A, T: T, get: get, put: put, esc: esc, ic: ic, toast: toast, sheet: sheet, closeSheets: closeSheets, copy: copy, fpi: fpi, conv: conv, money: money, rateIn: rateIn, curr: curr, short: short, r7: r7,
       rcpts: rcpts, me: me, signedIn: signedIn, myTarget: myTarget, needTarget: needTarget, payLink: payLink, isG: isG, validG: validG, cName: cName, contacts: contacts, toLabel: toLabel,
       shareText: shareText, shareImage: shareImage, shareLink: shareLink, shareFile: shareFile, saveFile: saveFile, canShareFile: canShareFile, makePdf: makePdf, fontsReady: fontsReady, addNote: addNote,
-      go: go, rerender: rerender, scanBox: scanBox, scanOk: scanOk, budgetCheck: budgetCheck, nType: nType, NTYPE: NTYPE, setName: setName, curSheet: curSheet, api: api, token: function () { return S.token; }, NETN: NETN, TEST: TEST, USER_RE: USER_RE, rcptTitle: rcptTitle } };
+      go: go, rerender: rerender, wal: function () { return S.wal; }, loadWal: function () { var a = get('addr', ''); if (!a) return Promise.resolve(); return lookAddr(a).then(function (W) { S.wal = W; }).catch(function () {}); }, scanBox: scanBox, scanOk: scanOk, budgetCheck: budgetCheck, nType: nType, NTYPE: NTYPE, setName: setName, curSheet: curSheet, api: api, token: function () { return S.token; }, NETN: NETN, TEST: TEST, USER_RE: USER_RE, rcptTitle: rcptTitle } };
   try { document.dispatchEvent(new Event('finpi:ready')); } catch (e) {}
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', start); else start();
 })();

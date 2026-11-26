@@ -63,7 +63,7 @@
     function invLink(v) { return K.payLink({ u: v.to, a: balance(v) || v.total, x: (v.no + ' · ' + (v.title || (v.items[0] && v.items[0].d) || 'Invoice')).slice(0, 80) }); }
 
     /* ── backup of business records to the Pi account (restored on any phone after sign-in) ── */
-    var BK = ['biz', 'inv', 'invSeq', 'cust', 'recur', 'qrO', 'prod', 'name', 'nameType', 'exp', 'goals', 'cols'], bT = null, put0 = K.put;
+    var BK = ['biz', 'inv', 'invSeq', 'cust', 'recur', 'qrO', 'prod', 'name', 'nameType', 'exp', 'goals', 'cols', 'nw'], bT = null, put0 = K.put;
     put = function (k, v) { var r = put0(k, v); if (BK.indexOf(k) >= 0) bDirty(); if (k === 'prod' || k === 'biz' || k === 'name') { try { staffPushSoon(); } catch (e) {} } return r; };
     function bSnap() { var d = {}; BK.forEach(function (k) { var v = get(k, null); if (v !== null) d[k] = v; }); return d; }
     function bHas(d) { return !!(d && ((d.inv || []).length || (d.cust || []).length || (d.recur || []).length || (d.prod || []).length || (d.exp || []).length || (d.goals || []).length || (d.cols || []).length || (d.biz && d.biz.name))); }
@@ -479,11 +479,22 @@
       var w = sheet(c.name, '<div class="big"><div class="v bz-amt">' + fpi(sum(S)) + ' π</div><div class="c">Received from ' + esc(c.name) + ' · ' + S.length + ' payment' + (S.length === 1 ? '' : 's') + '</div>' + (due ? '<div class="w">' + fpi(due) + ' π outstanding</div>' : '') + '</div>' +
         '<div class="list" style="margin-top:12px">' + [c.to ? ['Pi', K.isG(c.to) ? K.short(c.to) : '@' + c.to] : null, c.phone ? ['Phone', c.phone] : null, c.email ? ['Email', c.email] : null, c.note ? ['Note', c.note] : null].filter(Boolean).map(function (x) { return '<div class="txr"><span>' + esc(x[0]) + '</span><b>' + esc(x[1]) + '</b></div>'; }).join('') + '</div>' +
         '<div class="two"><button type="button" class="btn" data-x="inv">' + ic('inv') + 'New invoice</button><button type="button" class="btn ghost" data-x="ed">' + ic('edit') + 'Edit</button></div>' +
-        (c.to ? '<button type="button" class="btn soft" data-x="pay">' + ic('send') + 'Send Pi</button>' : '') +
-        (V.length ? '<div class="day">Invoices</div><div class="list">' + V.slice(0, 20).map(invRow).join('') + '</div>' : '') +
+        (c.to ? '<button type="button" class="btn soft" data-x="pay">' + ic('send') + 'Send Pi</button>' : '') + (V.length || S.length ? '<button type="button" class="btn soft" data-x="csv">' + ic('down') + 'Customer history (CSV)</button>' : '') +
+        (function () {
+          var P = V.filter(function (v) { return status(v) === 'Paid' && !v.void; }), spent = r7(P.reduce(function (a, v) { return a + v.total - retAmt(v); }, 0)), last = P.reduce(function (a, v) { return Math.max(a, v.pts || v.ts); }, 0), first = V.concat(S).reduce(function (a, x) { return Math.min(a, x.ts || a); }, Date.now());
+          var it = {}; P.forEach(function (v) { v.items.forEach(function (x) { if (x.tip) return; var k = x.d.trim(); it[k] = it[k] || [0, 0]; it[k][0] += Number(x.q); it[k][1] = r7(it[k][1] + x.q * x.p); }); });
+          var TI = Object.keys(it).map(function (k) { return [k, it[k][0], it[k][1]]; }).sort(function (a, b) { return b[2] - a[2]; }).slice(0, 5);
+          return '<div class="stats"><div><small>Purchases</small><b>' + P.length + '</b></div><div><small>Spent</small><b class="bz-amt">' + fpi(spent) + ' π</b></div><div><small>Average</small><b class="bz-amt">' + fpi(P.length ? Math.round(spent / P.length * 100) / 100 : 0) + ' π</b></div></div>' +
+            '<p class="small muted" style="margin:8px 2px 0">' + (last ? 'Last purchase ' + dstr(last) + ' · ' : '') + 'Customer since ' + dstr(c.ts || first) + '</p>' +
+            (TI.length ? '<div class="day">Items bought</div><div class="card bz-card">' + TI.map(function (x) { return '<div class="cat"><div class="row"><span>' + esc(x[0]) + ' <small class="muted">× ' + fpi(x[1]) + '</small></span><b class="num bz-amt">' + fpi(x[2]) + ' π</b></div></div>'; }).join('') + '</div>' : '');
+        })() +
+        (V.length ? '<div class="day">Invoices and sales</div><div class="list">' + V.slice(0, 30).map(invRow).join('') + '</div>' : '') +
         (S.length ? '<div class="day">Payments</div><div class="list">' + S.slice(0, 20).map(function (r) { return '<div class="li"><span class="ico in">' + ic('req') + '</span><span class="grow"><b>' + esc(r.narr || 'Payment') + '</b><small>' + dstr(r.ts) + '</small></span><span class="amt-r"><b class="num pos bz-amt">+' + fpi(r.amount) + ' π</b></span></div>'; }).join('') + '</div>' : ''));
       $('[data-x="inv"]', w).onclick = function () { invEdit('', { cid: c.id }); };
       $('[data-x="ed"]', w).onclick = function () { custEdit(c.id); };
+      var cv = $('[data-x="csv"]', w); if (cv) cv.onclick = function () {
+        csvOut([['date', 'type', 'number', 'status', 'items', 'total_pi', 'paid_pi', 'transaction_id']].concat(V.map(function (v) { return [iso(v.ts), v.sale ? 'sale' : 'invoice', v.no, status(v), v.items.map(function (x) { return x.d + ' x' + x.q; }).join('; '), v.total, v.mpaid ? v.total : (v.paid || 0), '']; })).concat(S.map(function (r) { return [iso(r.ts), 'payment', '', 'Received', r.narr || '', r.amount, r.amount, r.txid || '']; })), 'FinPi-customer-' + c.name.replace(/[^A-Za-z0-9]+/g, '-') + '.csv', 'FinPi customer history');
+      };
       var p = $('[data-x="pay"]', w); if (p) p.onclick = function () { K.closeSheets(); F.sendSheet({ u: c.to }); };
       bindInvRows(w);
     }
@@ -626,6 +637,7 @@
       var w = sheet('Quick sale', (P.length ? '<div class="qs-top"><div class="bz-search">' + ic('search') + '<input class="in" id="qs-q" placeholder="Search products"></div><button type="button" class="qs-scan" data-x="scan" aria-label="Scan a barcode">' + ic('bar') + '<span>Scan</span></button></div><div class="qs-grid" id="qs-g"></div>' : SX ? '' : '<button type="button" class="btn soft" data-x="pa">' + ic('plus') + 'Add products</button>') +
         '<label class="l" for="qs-a">' + (P.length ? 'Other amount' : 'Amount') + '</label><div class="amt sm"><input id="qs-a" type="number" inputmode="decimal" placeholder="0.00"><span>π</span></div>' +
         '<label class="l" for="qs-x">Note (optional)</label><input class="in" id="qs-x" maxlength="40" placeholder="e.g. Table 4, delivery">' +
+        (!SX && custs().length ? '<label class="l" for="qs-cu">Customer (optional)</label><select class="in" id="qs-cu"><option value="">Walk-in customer</option>' + custs().slice().sort(function (a, b) { return a.name.localeCompare(b.name); }).map(function (c) { return '<option value="' + esc(c.id) + '">' + esc(c.name) + '</option>'; }).join('') + '</select>' : '') +
         '<div class="qs-adj"><div><label class="l" for="qs-d">Discount</label><div class="qs-dw"><input class="in num" id="qs-d" type="number" inputmode="decimal" min="0" placeholder="0"><div class="seg qs-du" role="tablist"><button type="button" data-du="pi" class="on">π</button><button type="button" data-du="pc">%</button></div></div></div>' +
         '<div><label class="l">Tip</label><div class="chips qs-tip">' + [[0, 'None'], [5, '5%'], [10, '10%'], [15, '15%']].map(function (x) { return '<button type="button" class="chip' + (x[0] ? '' : ' on') + '" data-tp="' + x[0] + '">' + x[1] + '</button>'; }).join('') + '</div></div></div>' +
         '<div class="sum" id="qs-s"></div><button type="button" class="btn" id="qs-go">' + ic('qr') + 'Charge</button>');
@@ -667,7 +679,8 @@
         if (L.length > 12) return toast('Up to 12 different items per sale');
         var note = $('#qs-x', w).value.trim();
         if (SX) return SX.charge(A, note);
-        var v = issue({ to: K.myTarget(), cname: note ? 'Sale · ' + note : 'Walk-in customer', cto: '', items: L, disc: A.disc, term: 0, title: A.G.length === 1 ? A.G[0].d : 'Sale' }, '');
+        var cu = $('#qs-cu', w) && $('#qs-cu', w).value ? custs().filter(function (c) { return c.id === $('#qs-cu', w).value; })[0] : null;
+        var v = issue({ to: K.myTarget(), cname: cu ? cu.name : note ? 'Sale · ' + note : 'Walk-in customer', cto: cu ? cu.to || '' : '', cid: cu ? cu.id : '', cphone: cu ? cu.phone || '' : '', items: L, disc: A.disc, notes: cu && note ? note : '', term: 0, title: A.G.length === 1 ? A.G[0].d : 'Sale' }, '');
         var all = invs(); all.forEach(function (x) { if (x.id === v.id) x.sale = true; }); saveInvs(all); K.rerender(); saleView(v.id);
       };
     }
@@ -1162,6 +1175,44 @@
       if (c.t && got >= c.t && got - Number(r.amount) < c.t) K.addNote('star', 'Collection target reached', c.n + ' · ' + fpi(got) + ' π', 'colt-' + c.id);
     });
 
+    /* ── net worth: what you own and what you owe, entered by you; your Pi balance is read from the Pi blockchain ── */
+    function nwItems() { return get('nw', []); }
+    function nwPi(it) { if (it.cur === 'PI') return Number(it.a) || 0; var r = K.rateIn(it.cur); return r ? Math.round((Number(it.a) || 0) / r * 100) / 100 : 0; }
+    function nwSheet() {
+      var L = nwItems(), A = L.filter(function (x) { return x.k === 'a'; }), D = L.filter(function (x) { return x.k === 'l'; });
+      var bal = (K.wal && K.wal()) || null, pb = bal && typeof bal.bal === 'number' ? bal.bal : null;
+      var ta = r7(A.reduce(function (s0, x) { return s0 + nwPi(x); }, 0) + (pb || 0)), tl = r7(D.reduce(function (s0, x) { return s0 + nwPi(x); }, 0)), nw = r7(ta - tl);
+      function li(x) { return '<button type="button" class="li" data-nv="' + x.id + '"><span class="ico ' + (x.k === 'a' ? 'in' : 'rf') + '">' + ic(x.k === 'a' ? 'plus' : 'minus') + '</span><span class="grow"><b>' + esc(x.n) + '</b><small>' + (x.cur === 'PI' ? fpi(x.a) + ' π' : esc(K.money(x.a, x.cur, 2)) + ' · ≈ ' + fpi(r7(nwPi(x))) + ' π') + '</small></span><span class="amt-r"><b class="num bz-amt">' + fpi(r7(nwPi(x))) + ' π</b></span></button>'; }
+      var w = sheet('Net worth', '<div class="bz-kpi"><div class="bz-k1"><small>Net worth</small><b class="num bz-amt">' + (nw < 0 ? '−' : '') + fpi(Math.abs(nw)) + ' π</b><span class="bz-amt">' + esc(conv(Math.abs(nw)) || ' ') + '</span></div>' +
+        '<div><small>Own</small><b class="num bz-amt">' + fpi(ta) + ' π</b></div><div class="' + (tl > ta ? 'bad' : '') + '"><small>Owe</small><b class="num bz-amt">' + fpi(tl) + ' π</b></div><div><small>Items</small><b class="num">' + L.length + '</b></div></div>' +
+        '<div class="day">Pi wallet</div><div class="list">' + (get('addr', '') ? '<div class="li"><span class="ico in">' + ic('card') + '</span><span class="grow"><b>Pi balance</b><small>' + esc(K.short(get('addr', ''))) + ' · from the Pi blockchain</small></span><span class="amt-r"><b class="num bz-amt">' + (pb === null ? '…' : fpi(r7(pb)) + ' π') + '</b></span></div>' : '<button type="button" class="li" data-act="addr-set"><span class="ico">' + ic('card') + '</span><span class="grow"><b>Add your Pi wallet address</b><small>Your Pi balance is included automatically</small></span><span class="go">' + ic('chev') + '</span></button>') + '</div>' +
+        '<div class="day">What you own</div><div class="list">' + (A.length ? A.map(li).join('') : '<div class="empty">' + ic('plus') + '<div>Savings, stock, equipment, land or other Pi.</div></div>') + '</div>' +
+        '<div class="day">What you owe</div><div class="list">' + (D.length ? D.map(li).join('') : '<div class="empty">' + ic('minus') + '<div>Bills or amounts you still have to pay.</div></div>') + '</div>' +
+        '<div class="two"><button type="button" class="btn" data-x="a">' + ic('plus') + 'Add what you own</button><button type="button" class="btn ghost" data-x="l">' + ic('minus') + 'Add what you owe</button></div>' +
+        '<p class="small muted gl-note">' + ic('lock') + 'Saved on this phone and in your backup. Values in other currencies use today’s rate.</p>');
+      $$('[data-nv]', w).forEach(function (b) { b.onclick = function () { nwEdit(b.dataset.nv); }; });
+      $('[data-x="a"]', w).onclick = function () { nwEdit('', 'a'); }; $('[data-x="l"]', w).onclick = function () { nwEdit('', 'l'); };
+      if (get('addr', '') && pb === null && K.loadWal) K.loadWal().then(function () { if (document.body.contains(w)) nwSheet(); });
+    }
+    function nwEdit(id, k) {
+      var x = nwItems().filter(function (y) { return y.id === id; })[0] || { k: k, cur: 'PI' }, c = K.curr(), cur = x.cur;
+      var w = sheet(id ? 'Edit' : x.k === 'a' ? 'Add what you own' : 'Add what you owe', '<label class="l" for="nw-n">Name</label><input class="in" id="nw-n" maxlength="40" value="' + esc(x.n || '') + '" placeholder="' + (x.k === 'a' ? 'e.g. Shop stock, savings, motorbike' : 'e.g. Supplier balance, school fees') + '">' +
+        '<label class="l" for="nw-a">Value</label><div class="qs-top"><div class="amt sm" style="flex:1"><input id="nw-a" type="number" inputmode="decimal" placeholder="0.00" value="' + (x.a || '') + '"><span id="nw-u">' + (cur === 'PI' ? 'π' : esc(cur)) + '</span></div>' +
+        (c !== 'PI' ? '<div class="seg qs-du" role="tablist"><button type="button" data-nc="PI" class="' + (cur === 'PI' ? 'on' : '') + '">π</button><button type="button" data-nc="' + esc(c) + '" class="' + (cur !== 'PI' ? 'on' : '') + '">' + esc(c) + '</button></div>' : '') + '</div><div class="hint num" id="nw-c"></div>' +
+        '<button type="button" class="btn" id="nw-go">' + ic('check') + 'Save</button>' + (id ? '<button type="button" class="btn danger" id="nw-rm">' + ic('trash') + 'Delete</button>' : ''), { stack: true });
+      var ai = $('#nw-a', w);
+      function hint() { var v = Number(ai.value) || 0; $('#nw-c', w).textContent = cur === 'PI' ? conv(v) : (v > 0 && K.rateIn(cur) ? '≈ ' + fpi(Math.round(v / K.rateIn(cur) * 100) / 100) + ' π at today’s rate' : ''); }
+      ai.oninput = hint; hint();
+      $$('[data-nc]', w).forEach(function (b) { b.onclick = function () { cur = b.dataset.nc; $$('[data-nc]', w).forEach(function (q) { q.classList.toggle('on', q === b); }); $('#nw-u', w).textContent = cur === 'PI' ? 'π' : cur; hint(); }; });
+      $('#nw-go', w).onclick = function () {
+        var n = $('#nw-n', w).value.trim(), a = Number(ai.value);
+        if (!n) return toast('Enter a name'); if (!(a > 0) || a > 1e12) return toast('Enter a value');
+        var d = { id: id || uid(), k: x.k, n: n, a: Math.round(a * 1e7) / 1e7, cur: cur, ts: Date.now() };
+        put('nw', [d].concat(nwItems().filter(function (y) { return y.id !== d.id; })).slice(0, 200)); toast('Saved'); nwSheet();
+      };
+      var rm = $('#nw-rm', w); if (rm) rm.onclick = function () { put('nw', nwItems().filter(function (y) { return y.id !== id; })); toast('Deleted'); nwSheet(); };
+    }
+
     /* ── recurring requests ── */
     function recSheet() {
       var R = recs();
@@ -1354,7 +1405,7 @@
     };
     K.HK.html.settings = function () { return row('sound', 'Voice announcements', get('voice', true) ? 'On · “FinPi! You have received … Pi.”' : 'Off', 'voice') + row('store', 'Business profile', biz().name ? K.NTYPE[K.nType() === 'name' ? 'business' : K.nType()].l + ' · ' + biz().name : 'Name, logo, address, tax ID', 'bizprof') + row('sound', 'Payment sounds', get('sound', true) ? 'On · sound and vibration' : 'Off', 'sound') + row(get('hide', false) ? 'eyeoff' : 'eye', 'Hide amounts', get('hide', false) ? 'On' : 'Off', 'hide'); };
     Object.assign(K.A, {
-      biz: function () { bizSheet(); }, bizreport: function () { reportSheet(); }, expenses: function () { expSheet(); }, daysum: function () { daySheet(); }, staff: function () { staffSheet(); }, voice: function () { voiceSheet(); }, taxsum: function () { taxSheet(); }, goals: function () { goalSheet(); }, collect: function () { colSheet(); }, sale: function () { saleSheet(); }, prods: function () { prodSheet(); }, 'inv-new': function () { invEdit(''); }, invs: function () { invList(); }, cust: function () { custSheet(); }, recur: recSheet, myqr: qrSheet, bizprof: profSheet, reports: repSheet,
+      biz: function () { bizSheet(); }, bizreport: function () { reportSheet(); }, expenses: function () { expSheet(); }, daysum: function () { daySheet(); }, staff: function () { staffSheet(); }, voice: function () { voiceSheet(); }, taxsum: function () { taxSheet(); }, goals: function () { goalSheet(); }, collect: function () { colSheet(); }, networth: function () { nwSheet(); }, sale: function () { saleSheet(); }, prods: function () { prodSheet(); }, 'inv-new': function () { invEdit(''); }, invs: function () { invList(); }, cust: function () { custSheet(); }, recur: recSheet, myqr: qrSheet, bizprof: profSheet, reports: repSheet,
       hide: toggleHide,
       sound: function () { put('sound', !get('sound', true)); if (get('sound', true)) { ac(); fx('in'); } toast(get('sound', true) ? 'Payment sounds on' : 'Payment sounds off'); K.rerender(); }
     });

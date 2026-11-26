@@ -796,3 +796,4 @@ html.fp-staff body>:not(#staffv):not(#toast):not(.sh-wrap):not(script):not(#netb
 .risk-r.r0 svg{color:#059669}.risk-r.r1 svg{color:#D97706}.risk-r.r2{color:#B42318;font-weight:700}.risk-r.r2 svg{color:#DC2626}
 .risk-rep{margin-top:6px;font-size:12.5px;color:#B42318}
 .tr-b{display:inline-flex;align-items:center;gap:3px;font-size:10.5px;font-weight:800;color:#047857;background:#D1FAE5;border-radius:999px;padding:2px 7px;vertical-align:2px}.tr-b svg{width:11px;height:11px}
+.fc-card{margin-top:12px}
