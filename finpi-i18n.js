@@ -16,7 +16,7 @@
   };
   document.documentElement.lang = lang;
   if (lang === 'ar') document.documentElement.dir = 'rtl';
-  if (lang !== 'en') document.write('<script src="i18n/' + lang + '.js?v=7"><\/script>');
+  if (lang !== 'en') document.write('<script src="i18n/' + lang + '.js?v=8"><\/script>');
 
   // the greeting carries the user's name, so it is matched by its start
   var PRE = ['Good morning', 'Good afternoon', 'Good evening'];
@@ -33,6 +33,10 @@
     for (var i = 0; i < PRE.length; i++) if (k.indexOf(PRE[i] + ',') === 0 && D[PRE[i]]) return s.replace(PRE[i], D[PRE[i]]);
     // labels joined with " · " are translated part by part
     if (k.indexOf(' · ') > 0) { var parts = k.split(' · '), hit = false; parts = parts.map(function (x) { var t = one(x); if (t) { hit = true; return t; } return x; }); if (hit) return s.replace(k, parts.join(' · ')); }
+    // "Name (@user)": the label is translated, the part in brackets stays
+    var br = /^(.*\S) \(([^)]*)\)$/.exec(k); if (br && one(br[1])) return s.replace(k, one(br[1]) + ' (' + br[2] + ')');
+    // month and day names in dates, for languages the browser cannot format
+    var M = D['@mon']; if (M && /\d/.test(k)) { var r = k.replace(/\b(January|February|March|April|May|June|July|August|September|October|November|December|Jan|Feb|Mar|Apr|Jun|Jul|Aug|Sep|Sept|Oct|Nov|Dec|Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday|Mon|Tue|Wed|Thu|Fri|Sat|Sun)\b/g, function (x) { return M[x] || x; }); if (r !== k) return s.replace(k, r); }
     return null;
   }
   function node(n) {
