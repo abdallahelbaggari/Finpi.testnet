@@ -818,3 +818,13 @@ html.fp-staff body>:not(#staffv):not(#toast):not(.sh-wrap):not(script):not(#netb
 .txd-st{display:flex;flex-direction:column;align-items:center;gap:4px;margin-bottom:4px}.txd-st b{font-size:18px;color:#0B1B33}.txd-st .sa{width:68px;height:68px}
 @keyframes saDraw{to{stroke-dashoffset:0}}@keyframes saSpin{to{transform:rotate(360deg)}}@keyframes pstIn{from{opacity:0;transform:scale(.96)}to{opacity:1;transform:none}}
 @media (prefers-reduced-motion:reduce){.sa .sa-c,.sa .sa-d{animation:none;stroke-dashoffset:0}.sa.pend .sa-c{animation:none}}
+
+/* sign-in on the overview, offline pill, readable activity totals */
+.hello-si{display:inline-flex;align-items:center;gap:8px;margin-top:12px;padding:10px 18px;border-radius:999px;border:0;background:#fff;color:var(--navy);font:700 14px/1 var(--f);box-shadow:0 6px 18px rgba(0,0,0,.22);animation:hsiIn .35s ease-out both}
+.hello-si:active{transform:scale(.96)}
+.hello-si .pi-dot{display:inline-grid;place-items:center;width:22px;height:22px;border-radius:50%;background:var(--gold);color:#fff;font-size:13px}
+@keyframes hsiIn{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+#netbar{top:auto;left:50%;right:auto;bottom:calc(96px + env(safe-area-inset-bottom));transform:translateX(-50%);padding:8px 16px;border-radius:999px;font-size:13px;box-shadow:0 8px 22px rgba(0,0,0,.22);animation:hsiIn .3s ease-out both}
+.act-row div{background:rgba(0,0,0,.22);border-color:rgba(255,255,255,.18)}
+.act-row small{color:rgba(255,255,255,.88)}
+.act-row b,.act-row div:first-child b{color:#fff}
