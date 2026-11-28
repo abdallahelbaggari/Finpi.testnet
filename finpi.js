@@ -1390,7 +1390,7 @@
         row('mail', 'Help & contact', 'Contact the FinPi team', 'help') + '</div>' +
         '<div class="sec"><h2>Legal</h2></div><div class="list">' + lrow('Terms of Service', 'terms-of-service.html') + lrow('Privacy Policy', 'privacy-policy.html') + lrow('Risk Disclosure', 'risk-disclosure.html') + '</div>' +
         (signedIn() ? '<button type="button" class="btn danger" data-act="signout" style="margin-top:18px">' + ic('out') + 'Sign out</button>' : '') +
-        '<p class="small muted corp" style="text-align:center;margin-top:16px">FinPi 1.3.0 · ' + NETN + ' · finpi.pi<br><span class="notr">© 2026 ELBAGGARI INVESTMENT LIMITED</span></p>';
+        '<p class="small muted corp" style="text-align:center;margin-top:16px">FinPi 1.3.0 · ' + NETN + ' · finpi.pi<br><span class="notr">© 2026 FinPi</span></p>';
       function row(i, t, s, a) { return '<button type="button" class="li" data-act="' + a + '"><span class="ico">' + ic(i) + '</span><span class="grow"><b>' + esc(t) + '</b><small>' + esc(s) + '</small></span><span class="go">' + ic('chev') + '</span></button>'; }
       function lrow(t, h) { return '<a class="li" href="' + h + '"><span class="ico">' + ic('rcpt') + '</span><span class="grow"><b>' + t + '</b></span><span class="go">' + ic('chev') + '</span></a>'; }
     }

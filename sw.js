@@ -3,7 +3,7 @@
    and used from the next opening (first visit and offline work the same way).
    Versioned files (?v=), icons, logo and onboarding photos: cache first.
    Server functions (payments, prices, live location, AI…) are never cached. */
-var CACHE = 'finpi-v46';
+var CACHE = 'finpi-v47';
 var SHELL = ['/', '/index.html', '/manifest.webmanifest', '/icons/icon-192.png', '/icons/icon-512.png', '/icons/logo-256.png'];
 var LIVE = /^\/(approve|complete|recover|transfer|users|pi-price|fx|verify|file|f|r|history|staff|report|directory|validation-key\.txt)(\/|$|\?)/;
 
